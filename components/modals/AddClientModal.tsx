@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import ModalBase from './ModalBase';
 import type { Client } from '../../types';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../contexts/AuthContext';
+import { createClient } from '../../services/firestore/clients';
 
 interface AddClientModalProps {
     onClose: () => void;
-    onAddClient: (client: Omit<Client, 'id' | 'status'>) => void;
+    onAddClient?: (client: Omit<Client, 'id' | 'status'>) => void;
 }
 
 const InputField: React.FC<{label: string, id: string, name: string, type?: string, placeholder: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void}> = ({ label, id, name, type = 'text', placeholder, value, onChange }) => (
@@ -17,6 +19,7 @@ const InputField: React.FC<{label: string, id: string, name: string, type?: stri
 
 const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient }) => {
     const { t } = useTranslation();
+    const { currentUser, organizationId } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
         contactPerson: '',
@@ -26,20 +29,75 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient })
         tin: '',
         cacNumber: ''
     });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({...prev, [name]: value}));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onAddClient(formData);
+
+        if (!organizationId || !currentUser) {
+            setError('You must be logged in to add a client');
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            if (!formData.name) {
+                setError('Company name is required');
+                setLoading(false);
+                return;
+            }
+
+            // Create client in Firestore
+            await createClient(
+                organizationId,
+                {
+                    name: formData.name,
+                    email: formData.email,
+                    phone: formData.phone,
+                    company: formData.name,
+                    address: formData.address,
+                    status: 'Active',
+                    notes: '',
+                    contactPerson: formData.contactPerson,
+                    taxId: formData.tin,
+                    paymentTerms: 'Net 30',
+                    creditLimit: 0,
+                    outstandingBalance: 0,
+                    totalRevenue: 0,
+                    totalRoutes: 0,
+                },
+                currentUser.uid
+            );
+
+            // Call legacy callback if provided (for demo mode)
+            if (onAddClient) {
+                onAddClient(formData);
+            }
+
+            onClose();
+        } catch (err: any) {
+            console.error('Error creating client:', err);
+            setError(err.message || 'Failed to create client');
+            setLoading(false);
+        }
     };
 
     return (
         <ModalBase title={t('modals.addClient.title')} onClose={onClose}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
                 <InputField label={t('modals.addClient.companyName')} id="name" name="name" placeholder="e.g., GlobalTech Inc." value={formData.name} onChange={handleChange} />
                 <InputField label={t('modals.addClient.contactPerson')} id="contactPerson" name="contactPerson" placeholder="e.g., Jane Smith" value={formData.contactPerson} onChange={handleChange} />
                 <InputField label={t('modals.addClient.email')} id="email" name="email" type="email" placeholder="e.g., contact@globaltech.com" value={formData.email} onChange={handleChange} />
@@ -51,8 +109,10 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient })
                 </div>
                 
                 <div className="flex justify-end gap-3 pt-4 border-t mt-6 dark:border-slate-700">
-                    <button type="button" onClick={onClose} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-gray-300">{t('common.cancel')}</button>
-                    <button type="submit" className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg dark:bg-indigo-600 dark:hover:bg-indigo-700">{t('modals.addClient.saveButton')}</button>
+                    <button type="button" onClick={onClose} disabled={loading} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-gray-300 disabled:opacity-50">{t('common.cancel')}</button>
+                    <button type="submit" disabled={loading} className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg dark:bg-indigo-600 dark:hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {loading ? 'Saving...' : t('modals.addClient.saveButton')}
+                    </button>
                 </div>
             </form>
         </ModalBase>

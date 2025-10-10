@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import type { Organization } from '../../types';
+import { generateOrganizationId } from './utils';
 
 // Collection reference
 const ORGANIZATIONS_COLLECTION = 'organizations';
@@ -51,8 +52,8 @@ export const createOrganization = async (
     }
 ): Promise<string> => {
     try {
-        // Generate a new organization ID
-        const orgRef = doc(collection(db, ORGANIZATIONS_COLLECTION));
+        const organizationId = generateOrganizationId();
+        const orgRef = doc(db, ORGANIZATIONS_COLLECTION, organizationId);
 
         const newOrg: Omit<Organization, 'id'> = {
             name: orgData.name,
@@ -87,7 +88,7 @@ export const createOrganization = async (
         };
 
         await setDoc(orgRef, newOrg);
-        return orgRef.id;
+        return organizationId;
     } catch (error) {
         console.error('Error creating organization:', error);
         throw new Error('Failed to create organization');

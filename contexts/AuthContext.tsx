@@ -1,5 +1,25 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User as AppUser, Organization } from '../types';
+import {
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged,
+    updateProfile,
+    updatePassword as firebaseUpdatePassword,
+    User as FirebaseUser,
+} from 'firebase/auth';
+import { auth } from '../firebase/firebaseConfig';
+import {
+    getUserProfile,
+    createOrUpdateUserProfile,
+    updateUserRoleAndOrganization,
+    updateLastLogin,
+} from '../services/firestore/users';
+import {
+    createOrganization,
+    getOrganizationById,
+} from '../services/firestore/organizations';
 
 interface AuthContextType {
     currentUser: AppUser | null;
@@ -28,18 +48,16 @@ export const useAuth = () => {
     return context;
 };
 
-// Helper to get session from localStorage
-const getSession = (): { user: AppUser; role: string | null; organizationId?: string; organization?: Organization } | null => {
-    try {
-        const sessionStr = localStorage.getItem('userSession');
-        if (sessionStr) {
-            return JSON.parse(sessionStr);
-        }
-        return null;
-    } catch (error) {
-        console.error("Could not parse user session from localStorage", error);
-        return null;
-    }
+// Helper to convert Firebase User to AppUser
+const firebaseUserToAppUser = (firebaseUser: FirebaseUser): AppUser => {
+    return {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        displayName: firebaseUser.displayName || 'User',
+        photoURL: firebaseUser.photoURL || undefined,
+        phone: '',
+        whatsappOptIn: false,
+    };
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -51,81 +69,119 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     useEffect(() => {
         setLoading(true);
-        const session = getSession();
-        if (session) {
-            setCurrentUser(session.user);
-            setUserRole(session.role);
-            setOrganizationId(session.organizationId || null);
-            setOrganizationState(session.organization || null);
-        }
-        setLoading(false);
+
+        // Listen to Firebase Auth state changes
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                // User is signed in
+                const appUser = firebaseUserToAppUser(firebaseUser);
+                setCurrentUser(appUser);
+
+                // Load user profile from Firestore
+                try {
+                    const userProfile = await getUserProfile(firebaseUser.uid);
+
+                    if (userProfile) {
+                        // Update last login
+                        await updateLastLogin(firebaseUser.uid);
+
+                        // Set role and organization
+                        setUserRole(userProfile.role);
+                        // Use email as organizationId for better traceability
+                        const orgId = firebaseUser.email || userProfile.organizationId;
+                        setOrganizationId(orgId);
+
+                        // Load organization if exists
+                        if (orgId) {
+                            const org = await getOrganizationById(orgId);
+                            setOrganizationState(org);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading user profile:', error);
+                }
+            } else {
+                // User is signed out
+                setCurrentUser(null);
+                setUserRole(null);
+                setOrganizationId(null);
+                setOrganizationState(null);
+            }
+
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
 
     const signUp = async (email: string, password: string, fullName: string, phone: string) => {
-        const newUser: AppUser = {
-            uid: `mock-${Date.now()}`,
-            email,
-            displayName: fullName,
-            phone,
-            photoURL: 'https://picsum.photos/seed/newuser/40/40',
-            whatsappOptIn: false,
-        };
-        const session = { user: newUser, role: null };
-        localStorage.setItem('userSession', JSON.stringify(session));
-        setCurrentUser(newUser);
-        setUserRole(null);
+        try {
+            // Create Firebase Auth user
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const firebaseUser = userCredential.user;
+
+            // Update display name in Firebase Auth
+            await updateProfile(firebaseUser, {
+                displayName: fullName,
+            });
+
+            // Create user profile in Firestore
+            await createOrUpdateUserProfile(
+                firebaseUser.uid,
+                email,
+                fullName
+            );
+
+            // The onAuthStateChanged listener will handle setting the current user
+        } catch (error: any) {
+            console.error('Error signing up:', error);
+            throw new Error(error.message || 'Failed to create account');
+        }
     };
 
     const logIn = async (email: string, password: string) => {
-        if (password !== 'password123') {
-            throw new Error('Invalid credentials. Please use password "password123".');
-        }
-        // If a user session already exists for this email, load it. Otherwise, create a new mock user.
-        const existingSession = getSession();
-        if (existingSession && existingSession.user.email === email) {
-            setCurrentUser(existingSession.user);
-            setUserRole(existingSession.role);
-            return;
-        }
+        try {
+            // Sign in with Firebase Auth
+            await signInWithEmailAndPassword(auth, email, password);
 
-        const mockUser: AppUser = {
-            uid: `mock-${Date.now()}`,
-            email,
-            displayName: 'John Doe',
-            photoURL: 'https://picsum.photos/seed/placeholder/40/40',
-            phone: '(123) 456-7890',
-            whatsappOptIn: false,
-        };
-        const session = { user: mockUser, role: null };
-        localStorage.setItem('userSession', JSON.stringify(session));
-        setCurrentUser(mockUser);
-        setUserRole(null);
+            // The onAuthStateChanged listener will handle setting the current user
+        } catch (error: any) {
+            console.error('Error logging in:', error);
+
+            // Provide user-friendly error messages
+            if (error.code === 'auth/user-not-found') {
+                throw new Error('No account found with this email');
+            } else if (error.code === 'auth/wrong-password') {
+                throw new Error('Incorrect password');
+            } else if (error.code === 'auth/invalid-email') {
+                throw new Error('Invalid email address');
+            } else {
+                throw new Error(error.message || 'Failed to log in');
+            }
+        }
     };
 
     const logOut = async () => {
-        localStorage.removeItem('userSession');
-        setCurrentUser(null);
-        setUserRole(null);
+        try {
+            await signOut(auth);
+            // The onAuthStateChanged listener will handle clearing the state
+        } catch (error: any) {
+            console.error('Error logging out:', error);
+            throw new Error(error.message || 'Failed to log out');
+        }
     };
 
     const updateUserRole = async (role: string) => {
-        const session = getSession();
-        if (session) {
-            // Create a mock organization when role is selected
-            const mockOrgId = `org-${Date.now()}`;
-            const mockOrganization: Organization = {
-                id: mockOrgId,
-                name: `${session.user.displayName}'s ${role} Organization`,
+        if (!currentUser) {
+            throw new Error("No user is currently signed in.");
+        }
+
+        try {
+            // Create organization in Firestore
+            const organizationData = {
+                name: `${currentUser.displayName}'s ${role} Organization`,
                 type: role as Organization['type'],
-                ownerId: session.user.uid,
-                members: [
-                    {
-                        userId: session.user.uid,
-                        role: 'owner',
-                        permissions: ['*'],
-                        addedAt: new Date().toISOString(),
-                    }
-                ],
+                ownerId: currentUser.uid,
                 settings: {
                     currency: 'NGN',
                     timezone: 'Africa/Lagos',
@@ -138,85 +194,116 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 },
                 companyDetails: {
                     address: '',
-                    email: session.user.email,
-                    phone: session.user.phone || '',
+                    email: currentUser.email,
+                    phone: currentUser.phone || '',
                 },
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                createdBy: session.user.uid,
             };
 
-            const updatedSession = {
-                ...session,
-                role,
-                organizationId: mockOrgId,
-                organization: mockOrganization,
-            };
-            localStorage.setItem('userSession', JSON.stringify(updatedSession));
+            const orgId = await createOrganization(currentUser.uid, organizationData);
+
+            // Update user role and organization in Firestore
+            await updateUserRoleAndOrganization(
+                currentUser.uid,
+                role as 'individual' | 'business' | 'partner',
+                orgId
+            );
+
+            // Load the created organization
+            const org = await getOrganizationById(orgId);
+
+            // Update local state
             setUserRole(role);
-            setOrganizationId(mockOrgId);
-            setOrganizationState(mockOrganization);
-        } else {
-            throw new Error("No user is currently signed in.");
+            setOrganizationId(orgId);
+            setOrganizationState(org);
+        } catch (error: any) {
+            console.error('Error updating user role:', error);
+            throw new Error(error.message || 'Failed to update role');
         }
     };
     
     const updateDisplayName = async (newName: string) => {
-        const session = getSession();
-        if (session && session.user) {
-            const updatedUser = { ...session.user, displayName: newName };
-            const updatedSession = { ...session, user: updatedUser };
-            localStorage.setItem('userSession', JSON.stringify(updatedSession));
-            setCurrentUser(updatedUser);
-        } else {
-             throw new Error("No user is currently signed in.");
+        if (!currentUser || !auth.currentUser) {
+            throw new Error("No user is currently signed in.");
+        }
+
+        try {
+            // Update display name in Firebase Auth
+            await updateProfile(auth.currentUser, {
+                displayName: newName,
+            });
+
+            // Update in Firestore
+            await createOrUpdateUserProfile(
+                currentUser.uid,
+                currentUser.email,
+                newName,
+                currentUser.photoURL
+            );
+
+            // Update local state
+            setCurrentUser({ ...currentUser, displayName: newName });
+        } catch (error: any) {
+            console.error('Error updating display name:', error);
+            throw new Error(error.message || 'Failed to update display name');
         }
     };
 
     const updatePassword = async (newPassword: string) => {
-        console.log("Mock password update successful.");
-        // In a real app, this would involve more complex logic. For mock, we do nothing.
+        if (!auth.currentUser) {
+            throw new Error("No user is currently signed in.");
+        }
+
+        try {
+            await firebaseUpdatePassword(auth.currentUser, newPassword);
+        } catch (error: any) {
+            console.error('Error updating password:', error);
+            throw new Error(error.message || 'Failed to update password');
+        }
     };
 
     const updateProfilePicture = async (file: File) => {
-        const session = getSession();
-         if (session && session.user) {
-            // Simulate upload and get a URL
-            const photoURL = URL.createObjectURL(file);
-            const updatedUser = { ...session.user, photoURL };
-            const updatedSession = { ...session, user: updatedUser };
-            localStorage.setItem('userSession', JSON.stringify(updatedSession));
-            setCurrentUser(updatedUser);
-        } else {
+        if (!currentUser || !auth.currentUser) {
             throw new Error("No user is currently signed in.");
+        }
+
+        try {
+            // In production, upload to Firebase Storage
+            // For now, create a local URL
+            const photoURL = URL.createObjectURL(file);
+
+            // Update in Firebase Auth
+            await updateProfile(auth.currentUser, { photoURL });
+
+            // Update in Firestore
+            await createOrUpdateUserProfile(
+                currentUser.uid,
+                currentUser.email,
+                currentUser.displayName,
+                photoURL
+            );
+
+            // Update local state
+            setCurrentUser({ ...currentUser, photoURL });
+        } catch (error: any) {
+            console.error('Error updating profile picture:', error);
+            throw new Error(error.message || 'Failed to update profile picture');
         }
     };
 
     const updateNotificationPreferences = async (prefs: { phone: string; whatsappOptIn: boolean }) => {
-        const session = getSession();
-        if (session && session.user) {
-            const updatedUser = { ...session.user, ...prefs };
-            const updatedSession = { ...session, user: updatedUser };
-            localStorage.setItem('userSession', JSON.stringify(updatedSession));
-            setCurrentUser(updatedUser);
-        } else {
-             throw new Error("No user is currently signed in.");
+        if (!currentUser) {
+            throw new Error("No user is currently signed in.");
         }
+
+        // Update local state
+        setCurrentUser({ ...currentUser, ...prefs });
+
+        // Note: In production, you might want to store these preferences in Firestore
     };
 
     const setOrganization = (org: Organization) => {
         setOrganizationState(org);
         setOrganizationId(org.id);
-
-        const session = getSession();
-        if (session) {
-            const updatedSession = {
-                ...session,
-                organizationId: org.id,
-                organization: org,
-            };
-            localStorage.setItem('userSession', JSON.stringify(updatedSession));
-        }
     };
 
     const value = {

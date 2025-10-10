@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import ModalBase from './ModalBase';
+import { useAuth } from '../../contexts/AuthContext';
+import { createDriver } from '../../services/firestore/drivers';
 
 interface AddDriverModalProps {
     onClose: () => void;
@@ -15,9 +17,12 @@ const InputField: React.FC<{label: string, id: string, type?: string, placeholde
 
 const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose }) => {
     const { t } = useTranslation();
+    const { currentUser, organizationId } = useAuth();
     const [driverPhoto, setDriverPhoto] = useState<File | null>(null);
     const [licensePhoto, setLicensePhoto] = useState<File | null>(null);
-    
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
     const driverPhotoInputRef = useRef<HTMLInputElement>(null);
     const licensePhotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -26,23 +31,84 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose }) => {
             setter(e.target.files[0]);
         }
     };
-    
+
     const driverPhotoPreview = driverPhoto ? URL.createObjectURL(driverPhoto) : null;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        // Handle form submission logic
-        console.log("Driver form submitted");
-        onClose();
+
+        if (!organizationId || !currentUser) {
+            setError('You must be logged in to add a driver');
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const formData = new FormData(e.currentTarget);
+            const fullName = formData.get('fullName') as string;
+            const phone = formData.get('phone') as string;
+            const license = formData.get('license') as string;
+            const nin = formData.get('nin') as string;
+            const baseSalary = formData.get('baseSalary') as string;
+
+            if (!fullName || !phone) {
+                setError('Name and phone are required');
+                setLoading(false);
+                return;
+            }
+
+            // Create driver in Firestore
+            await createDriver(
+                organizationId,
+                {
+                    name: fullName,
+                    phone: phone,
+                    licenseNumber: license || '',
+                    nin: nin || '',
+                    status: 'Available',
+                    email: '',
+                    address: '',
+                    dateOfBirth: '',
+                    hireDate: new Date().toISOString(),
+                    vehicleId: null,
+                    currentRouteId: null,
+                    totalRoutes: 0,
+                    completedRoutes: 0,
+                    rating: 5.0,
+                    photoURL: driverPhoto ? URL.createObjectURL(driverPhoto) : undefined,
+                    payrollInfo: {
+                        baseSalary: baseSalary ? Number(baseSalary) : 150000,
+                        pensionContributionRate: 0.08,
+                        nhfContributionRate: 0.025,
+                    },
+                    locationData: undefined,
+                },
+                currentUser.uid
+            );
+
+            onClose();
+        } catch (err: any) {
+            console.error('Error creating driver:', err);
+            setError(err.message || 'Failed to create driver');
+            setLoading(false);
+        }
     };
 
     return (
         <ModalBase title={t('modals.addDriver.title')} onClose={onClose}>
             <form onSubmit={handleSubmit} className="space-y-6">
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
                 <InputField label={t('modals.addDriver.fullName')} id="fullName" placeholder="e.g., John Doe" />
                 <InputField label={t('modals.addDriver.phone')} id="phone" type="tel" placeholder="e.g., (555) 123-4567" />
                 <InputField label={t('modals.addDriver.license')} id="license" placeholder="Enter license number" />
                 <InputField label={`${t('modals.addDriver.nin')} (${t('common.optional')})`} id="nin" placeholder="Enter National Identification Number" />
+                <InputField label="Base Salary (₦)" id="baseSalary" type="number" placeholder="e.g., 150000" />
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('modals.addDriver.photo')}</label>
@@ -102,8 +168,10 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose }) => {
                 </div>
                 
                 <div className="flex justify-end gap-3 pt-4 border-t mt-6 dark:border-slate-700">
-                    <button type="button" onClick={onClose} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-gray-300">{t('common.cancel')}</button>
-                    <button type="submit" className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg dark:bg-indigo-600 dark:hover:bg-indigo-700">{t('modals.addDriver.saveButton')}</button>
+                    <button type="button" onClick={onClose} disabled={loading} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-gray-300 disabled:opacity-50">{t('common.cancel')}</button>
+                    <button type="submit" disabled={loading} className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg dark:bg-indigo-600 dark:hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {loading ? 'Saving...' : t('modals.addDriver.saveButton')}
+                    </button>
                 </div>
             </form>
         </ModalBase>

@@ -11,9 +11,10 @@ interface VehiclesScreenProps {
     onVehicleUpdate: (updatedVehicle: Vehicle) => void;
     setActiveModal: (modal: 'addVehicle' | 'updateVehicleStatus' | 'addMaintenanceLog' | 'uploadDocument', vehicle?: Vehicle) => void;
     dateRange: { start: Date; end: Date };
+    onRemove?: (vehicle: Vehicle) => void;
 }
 
-const VehiclesScreen: React.FC<VehiclesScreenProps> = ({ vehicles, onVehicleUpdate, setActiveModal, dateRange }) => {
+const VehiclesScreen: React.FC<VehiclesScreenProps> = ({ vehicles, onVehicleUpdate, setActiveModal, dateRange, onRemove }) => {
     const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'analytics' | 'track'>('all');
 
@@ -91,11 +92,12 @@ const VehiclesScreen: React.FC<VehiclesScreenProps> = ({ vehicles, onVehicleUpda
             {/* Tab Content */}
             <div>
                 {activeTab === 'all' && (
-                    <VehiclesTable 
+                    <VehiclesTable
                         vehicles={vehicles}
-                        showViewAllButton={false} 
+                        showViewAllButton={false}
                         onViewDetails={handleViewDetails}
                         onUpdateStatus={handleUpdateStatus}
+                        onRemove={onRemove}
                     />
                 )}
                 {activeTab === 'analytics' && (

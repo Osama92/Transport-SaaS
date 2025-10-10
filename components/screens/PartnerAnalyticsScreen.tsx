@@ -71,8 +71,9 @@ const PartnerAnalyticsScreen: React.FC<PartnerAnalyticsScreenProps> = ({ drivers
         // Financial Summary Calculations
         const totalRevenue = filteredRoutes.reduce((sum, r) => sum + r.rate, 0);
         const totalRouteExpenses = filteredRoutes.reduce((sum, r) => sum + (r.expenses?.reduce((expSum, exp) => expSum + exp.amount, 0) || 0), 0);
-        const totalMaintenanceCosts = vehicles.flatMap(v => v.maintenanceLogs)
+        const totalMaintenanceCosts = vehicles.flatMap(v => v.maintenanceLogs || [])
             .filter(log => {
+                if (!log || !log.date) return false;
                 const logDate = new Date(log.date);
                 return logDate >= dateRange.start && logDate <= dateRange.end;
             })

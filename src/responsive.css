@@ -1,0 +1,331 @@
+/* Responsive typography and spacing adjustments */
+
+/* Base font size adjustments for better mobile readability */
+@layer base {
+  /* Smaller base text on mobile */
+  html {
+    @apply text-sm sm:text-base;
+  }
+
+  /* Responsive headings */
+  h1 {
+    @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl;
+  }
+
+  h2 {
+    @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl;
+  }
+
+  h3 {
+    @apply text-lg sm:text-xl md:text-2xl lg:text-3xl;
+  }
+
+  h4 {
+    @apply text-base sm:text-lg md:text-xl lg:text-2xl;
+  }
+
+  h5 {
+    @apply text-sm sm:text-base md:text-lg lg:text-xl;
+  }
+
+  h6 {
+    @apply text-xs sm:text-sm md:text-base lg:text-lg;
+  }
+
+  p {
+    @apply text-xs sm:text-sm md:text-base;
+  }
+
+  /* Responsive spacing */
+  .container {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+}
+
+/* Responsive card layouts */
+@layer components {
+  /* Dashboard cards responsive grid */
+  .dashboard-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6;
+  }
+
+  /* Stat cards */
+  .stat-card {
+    @apply p-3 sm:p-4 md:p-5 lg:p-6;
+  }
+
+  .stat-card-title {
+    @apply text-xs sm:text-sm md:text-base font-medium;
+  }
+
+  .stat-card-value {
+    @apply text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold;
+  }
+
+  .stat-card-description {
+    @apply text-xs sm:text-sm text-gray-500;
+  }
+
+  /* Tables */
+  .table-responsive {
+    @apply overflow-x-auto -mx-4 sm:-mx-6 md:mx-0;
+  }
+
+  .table-responsive table {
+    @apply min-w-full;
+  }
+
+  .table-header {
+    @apply text-xs sm:text-sm font-medium;
+  }
+
+  .table-cell {
+    @apply text-xs sm:text-sm px-2 sm:px-3 md:px-4 py-2 sm:py-3;
+  }
+
+  /* Buttons */
+  .btn-responsive {
+    @apply text-xs sm:text-sm md:text-base px-3 sm:px-4 py-1.5 sm:py-2;
+  }
+
+  .btn-icon-responsive {
+    @apply w-4 h-4 sm:w-5 sm:h-5;
+  }
+
+  /* Forms */
+  .form-label {
+    @apply text-xs sm:text-sm font-medium;
+  }
+
+  .form-input {
+    @apply text-xs sm:text-sm md:text-base px-2 sm:px-3 py-1.5 sm:py-2;
+  }
+
+  /* Modals */
+  .modal-responsive {
+    @apply w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl mx-4 sm:mx-auto;
+  }
+
+  .modal-title {
+    @apply text-base sm:text-lg md:text-xl lg:text-2xl font-bold;
+  }
+
+  /* Navigation */
+  .nav-item {
+    @apply text-xs sm:text-sm md:text-base px-2 sm:px-3 py-1.5 sm:py-2;
+  }
+
+  .nav-icon {
+    @apply w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6;
+  }
+
+  /* Sidebar */
+  .sidebar-width {
+    @apply w-16 sm:w-20 md:w-64;
+  }
+
+  .sidebar-item {
+    @apply px-2 sm:px-3 md:px-4 py-2 sm:py-2.5 md:py-3;
+  }
+
+  .sidebar-text {
+    @apply hidden md:inline text-sm lg:text-base;
+  }
+
+  /* Cards spacing */
+  .card-padding {
+    @apply p-3 sm:p-4 md:p-5 lg:p-6;
+  }
+
+  /* Section spacing */
+  .section-spacing {
+    @apply space-y-4 sm:space-y-6 md:space-y-8;
+  }
+
+  /* Grid gaps */
+  .grid-gap {
+    @apply gap-3 sm:gap-4 md:gap-6;
+  }
+
+  /* Text sizes for different components */
+  .text-display {
+    @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl;
+  }
+
+  .text-heading {
+    @apply text-xl sm:text-2xl md:text-3xl;
+  }
+
+  .text-subheading {
+    @apply text-base sm:text-lg md:text-xl;
+  }
+
+  .text-body {
+    @apply text-xs sm:text-sm md:text-base;
+  }
+
+  .text-caption {
+    @apply text-xs sm:text-sm;
+  }
+
+  .text-overline {
+    @apply text-xs uppercase tracking-wider;
+  }
+
+  /* Responsive padding utilities */
+  .px-responsive {
+    @apply px-3 sm:px-4 md:px-6 lg:px-8;
+  }
+
+  .py-responsive {
+    @apply py-2 sm:py-3 md:py-4 lg:py-6;
+  }
+
+  .p-responsive {
+    @apply p-3 sm:p-4 md:p-6 lg:p-8;
+  }
+
+  /* Hide on mobile */
+  .hide-mobile {
+    @apply hidden sm:block;
+  }
+
+  .hide-tablet {
+    @apply hidden md:block;
+  }
+
+  .hide-desktop {
+    @apply block lg:hidden;
+  }
+
+  /* Stack on mobile */
+  .stack-mobile {
+    @apply flex-col sm:flex-row;
+  }
+
+  /* Full width on mobile */
+  .full-mobile {
+    @apply w-full sm:w-auto;
+  }
+}
+
+/* Media query helpers */
+@media (max-width: 640px) {
+  /* Reduce all font sizes by 1 step on mobile */
+  .text-xs { font-size: 0.625rem; /* 10px */ }
+  .text-sm { font-size: 0.75rem; /* 12px */ }
+  .text-base { font-size: 0.875rem; /* 14px */ }
+  .text-lg { font-size: 1rem; /* 16px */ }
+  .text-xl { font-size: 1.125rem; /* 18px */ }
+  .text-2xl { font-size: 1.25rem; /* 20px */ }
+  .text-3xl { font-size: 1.5rem; /* 24px */ }
+  .text-4xl { font-size: 1.875rem; /* 30px */ }
+  .text-5xl { font-size: 2.25rem; /* 36px */ }
+
+  /* Reduce padding and margins */
+  .space-y-1 > * + * { margin-top: 0.125rem; }
+  .space-y-2 > * + * { margin-top: 0.25rem; }
+  .space-y-3 > * + * { margin-top: 0.5rem; }
+  .space-y-4 > * + * { margin-top: 0.75rem; }
+  .space-y-5 > * + * { margin-top: 1rem; }
+  .space-y-6 > * + * { margin-top: 1.25rem; }
+  .space-y-8 > * + * { margin-top: 1.5rem; }
+
+  /* Compact buttons on mobile */
+  button, .btn {
+    @apply text-xs px-2 py-1;
+  }
+
+  /* Smaller icons on mobile */
+  svg {
+    @apply w-4 h-4;
+  }
+
+  /* Reduce modal padding */
+  .modal-content {
+    @apply p-4;
+  }
+
+  /* Stack tables on mobile */
+  table {
+    display: block;
+  }
+
+  tbody {
+    display: block;
+  }
+
+  tr {
+    display: block;
+    margin-bottom: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+  }
+
+  td {
+    display: block;
+    text-align: right;
+    padding: 0.5rem;
+    position: relative;
+    padding-left: 50%;
+  }
+
+  td:before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0.5rem;
+    width: 45%;
+    text-align: left;
+    font-weight: 500;
+  }
+
+  thead {
+    display: none;
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 640px) and (max-width: 1024px) {
+  /* Adjust spacing for tablets */
+  .container {
+    @apply px-6;
+  }
+
+  /* Two column layout for cards */
+  .dashboard-grid {
+    @apply grid-cols-2 gap-4;
+  }
+}
+
+/* Large screen optimizations */
+@media (min-width: 1280px) {
+  /* Maximum content width */
+  .container {
+    @apply max-w-7xl mx-auto;
+  }
+
+  /* Larger text for better readability */
+  body {
+    @apply text-base;
+  }
+}
+
+/* Print styles */
+@media print {
+  /* Hide navigation and controls */
+  nav, .sidebar, .no-print {
+    display: none !important;
+  }
+
+  /* Optimize for printing */
+  body {
+    font-size: 10pt;
+    line-height: 1.3;
+  }
+
+  /* Ensure content fits on page */
+  .container {
+    width: 100%;
+    max-width: none;
+  }
+}

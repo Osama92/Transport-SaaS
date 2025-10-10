@@ -22,7 +22,7 @@ interface AssignDriverModalProps {
     route: Route | null;
     drivers: Driver[];
     vehicles: Vehicle[];
-    onAssign: (routeId: string, driverId: number, vehicleId: string) => void;
+    onAssign: (routeId: string, driverId: string | number, vehicleId: string) => void;
 }
 
 const AssignDriverModal: React.FC<AssignDriverModalProps> = ({ onClose, route, drivers, vehicles, onAssign }) => {
@@ -34,7 +34,8 @@ const AssignDriverModal: React.FC<AssignDriverModalProps> = ({ onClose, route, d
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (selectedDriver && selectedVehicle) {
-            onAssign(route.id, parseInt(selectedDriver), selectedVehicle);
+            // Pass the driver ID as-is (could be string like "DRV-xxx" or number for demo)
+            onAssign(route.id, selectedDriver, selectedVehicle);
         } else {
             // Handle validation error
             alert("Please select a driver and a vehicle.");

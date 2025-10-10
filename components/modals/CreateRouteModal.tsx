@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ModalBase from './ModalBase';
+import { useAuth } from '../../contexts/AuthContext';
+import { createRoute } from '../../services/firestore/routes';
 
 interface CreateRouteModalProps {
     onClose: () => void;
-    onAddRoute: (routeData: { distanceKm: number, rate: number, stops: number }) => void;
+    onAddRoute?: (routeData: { distanceKm: number, rate: number, stops: number }) => void;
 }
 
 const InputField: React.FC<{label: string, id: string, placeholder: string, type?: string, required?: boolean, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void}> = ({ label, id, placeholder, type = 'text', required = false, value, onChange }) => (
@@ -16,53 +18,117 @@ const InputField: React.FC<{label: string, id: string, placeholder: string, type
 
 const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute }) => {
     const { t } = useTranslation();
+    const { currentUser, organizationId } = useAuth();
+    const [origin, setOrigin] = useState('');
+    const [destination, setDestination] = useState('');
     const [distance, setDistance] = useState('');
-    const [rate, setRate] = useState('');
-    const [stops, setStops] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onAddRoute({
-            distanceKm: Number(distance),
-            rate: Number(rate),
-            stops: Number(stops),
-        });
+
+        if (!organizationId || !currentUser) {
+            setError('You must be logged in to create a route');
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            if (!origin || !destination) {
+                setError('Origin and destination are required');
+                setLoading(false);
+                return;
+            }
+
+            // Create route in Firestore
+            await createRoute(
+                organizationId,
+                {
+                    origin: origin,
+                    destination: destination,
+                    distance: distance ? Number(distance) : 0,
+                    status: 'Pending',
+                    progress: 0,
+                    assignedDriverId: null,
+                    assignedDriverName: '',
+                    assignedVehicleId: null,
+                    assignedVehiclePlate: '',
+                    clientId: null,
+                    clientName: '',
+                    cargo: {
+                        type: '',
+                        weight: 0,
+                        description: '',
+                    },
+                    estimatedDepartureTime: null,
+                    estimatedArrivalTime: null,
+                    actualDepartureTime: null,
+                    actualArrivalTime: null,
+                    podUrl: null,
+                    notes: '',
+                },
+                currentUser.uid
+            );
+
+            // Call legacy callback if provided (for demo mode)
+            if (onAddRoute) {
+                onAddRoute({
+                    distanceKm: Number(distance),
+                    rate: 0,
+                    stops: 0,
+                });
+            }
+
+            onClose();
+        } catch (err: any) {
+            console.error('Error creating route:', err);
+            setError(err.message || 'Failed to create route');
+            setLoading(false);
+        }
     };
 
     return (
         <ModalBase title={t('modals.createRoute.title')} onClose={onClose}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                <InputField 
-                    label={t('modals.createRoute.distance')}
-                    id="distance" 
-                    type="number" 
-                    placeholder="e.g., 150" 
-                    value={distance} 
-                    onChange={(e) => setDistance(e.target.value)} 
-                    required 
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
+                <InputField
+                    label="Origin"
+                    id="origin"
+                    placeholder="e.g., Lagos"
+                    value={origin}
+                    onChange={(e) => setOrigin(e.target.value)}
+                    required
                 />
-                <InputField 
-                    label={t('modals.createRoute.stops')}
-                    id="stops" 
-                    type="number" 
-                    placeholder="e.g., 12" 
-                    value={stops} 
-                    onChange={(e) => setStops(e.target.value)} 
-                    required 
+                <InputField
+                    label="Destination"
+                    id="destination"
+                    placeholder="e.g., Abuja"
+                    value={destination}
+                    onChange={(e) => setDestination(e.target.value)}
+                    required
                 />
-                <InputField 
-                    label={t('modals.createRoute.rate')}
-                    id="rate" 
-                    type="number" 
-                    placeholder="e.g., 250.00" 
-                    value={rate} 
-                    onChange={(e) => setRate(e.target.value)} 
-                    required 
+                <InputField
+                    label="Distance (km)"
+                    id="distance"
+                    type="number"
+                    placeholder="e.g., 750"
+                    value={distance}
+                    onChange={(e) => setDistance(e.target.value)}
+                    required
                 />
-                
+
                 <div className="flex justify-end gap-3 pt-4 border-t mt-6 dark:border-slate-700">
-                    <button type="button" onClick={onClose} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-gray-300">{t('common.cancel')}</button>
-                    <button type="submit" className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg dark:bg-indigo-600 dark:hover:bg-indigo-700">{t('modals.createRoute.saveButton')}</button>
+                    <button type="button" onClick={onClose} disabled={loading} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-gray-300 disabled:opacity-50">{t('common.cancel')}</button>
+                    <button type="submit" disabled={loading} className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg dark:bg-indigo-600 dark:hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {loading ? 'Creating...' : t('modals.createRoute.saveButton')}
+                    </button>
                 </div>
             </form>
         </ModalBase>

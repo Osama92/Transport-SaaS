@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
+import {
     Squares2X2Icon, MapPinIcon, ChartBarIcon, DocumentTextIcon, BellIcon, Cog8ToothIcon, SunIcon, MoonIcon, ArrowRightOnRectangleIcon,
     UserGroupIcon, TruckIcon, MapIcon, BuildingOffice2Icon, ArchiveBoxIcon, WalletIcon
 } from './Icons';
+import { HomeIcon, DriversIcon, VehiclesIcon, RoutesIcon, ClientsIcon, InvoicesIcon, AnalyticsIcon, PayrollIcon, SettingsIcon } from './NavIcons';
 
 interface SidebarProps {
     onLogout: () => void;
@@ -24,15 +25,15 @@ const baseNavItems = [
 ];
 
 const partnerNavItems = [
-    { icon: <Squares2X2Icon className="w-6 h-6" />, name: 'Dashboard' },
-    { icon: <UserGroupIcon className="w-6 h-6" />, name: 'Drivers' },
-    { icon: <TruckIcon className="w-6 h-6" />, name: 'Vehicles' },
-    { icon: <MapIcon className="w-6 h-6" />, name: 'Routes' },
-    { icon: <BuildingOffice2Icon className="w-6 h-6" />, name: 'Clients' },
-    { icon: <DocumentTextIcon className="w-6 h-6" />, name: 'Invoices' },
-    { icon: <ChartBarIcon className="w-6 h-6" />, name: 'Analytics' },
-    { icon: <WalletIcon className="w-6 h-6" />, name: 'Payroll' },
-    { icon: <Cog8ToothIcon className="w-6 h-6" />, name: 'Settings' },
+    { icon: <HomeIcon className="w-6 h-6" />, name: 'Dashboard' },
+    { icon: <DriversIcon className="w-6 h-6" />, name: 'Drivers' },
+    { icon: <VehiclesIcon className="w-6 h-6" />, name: 'Vehicles' },
+    { icon: <RoutesIcon className="w-6 h-6" />, name: 'Routes' },
+    { icon: <ClientsIcon className="w-6 h-6" />, name: 'Clients' },
+    { icon: <InvoicesIcon className="w-6 h-6" />, name: 'Invoices' },
+    { icon: <AnalyticsIcon className="w-6 h-6" />, name: 'Analytics' },
+    { icon: <PayrollIcon className="w-6 h-6" />, name: 'Payroll' },
+    { icon: <SettingsIcon className="w-6 h-6" />, name: 'Settings' },
 ];
 
 
@@ -58,50 +59,60 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, role, activeNav, onNavChang
     const navItems = role === 'partner' ? getTranslatedNavItems(partnerNavItems) : getTranslatedNavItems(baseNavItems);
 
     return (
-        <aside className="w-20 bg-white dark:bg-slate-800 p-4 flex flex-col items-center justify-between shadow-lg">
-            <div className="flex flex-col items-center gap-8">
-                {/* Logo */}
-                <img src="https://i.postimg.cc/nXNBx2N8/Glyde-I.png" alt="Glyde-I" className="w-12 h-12" />
-
-                {/* Navigation */}
-                <nav className="flex flex-col gap-4">
-                    {navItems.map(item => (
-                        <div key={item.name} className="group relative">
-                            <button
-                                onClick={() => onNavChange(item.name)}
-                                className={`p-3 rounded-lg transition-colors duration-200 ${
-                                    activeNav === item.name
-                                        ? 'bg-indigo-500 text-white'
-                                        : 'text-gray-400 hover:bg-gray-100 hover:text-indigo-500 dark:hover:bg-slate-700'
-                                }`}
-                                aria-label={item.translatedName}
-                            >
-                                {item.icon}
-                            </button>
-                            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 px-2 py-1 bg-gray-700 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                {item.translatedName}
-                            </div>
-                        </div>
-                    ))}
-                </nav>
+        <aside className="w-64 h-screen bg-white dark:bg-slate-800 flex flex-col shadow-lg border-r border-gray-200 dark:border-slate-700 sticky top-0 overflow-hidden">
+            {/* Logo */}
+            <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+                <div className="flex items-center gap-3">
+                    <img src="https://i.postimg.cc/nXNBx2N8/Glyde-I.png" alt="Glyde-I" className="w-10 h-10 object-contain" />
+                    <h1 className="text-xl font-bold text-gray-800 dark:text-white">Glyde Systems</h1>
+                </div>
             </div>
 
-            {/* Bottom Actions */}
-            <div className="flex flex-col items-center gap-4">
-                <div 
-                    onClick={() => setIsDarkMode(!isDarkMode)}
-                    className="w-14 h-8 bg-gray-200 dark:bg-slate-700 rounded-full flex items-center p-1 cursor-pointer transition-all duration-300"
-                >
-                    <div className={`w-6 h-6 bg-white dark:bg-slate-900 rounded-full shadow-md transform transition-transform duration-300 ${isDarkMode ? 'translate-x-6' : ''}`}>
-                         {isDarkMode ? <MoonIcon className="w-4 h-4 text-indigo-400 m-1" /> : <SunIcon className="w-4 h-4 text-yellow-500 m-1"/>}
-                    </div>
+            {/* Navigation */}
+            <nav className="flex-1 overflow-y-auto scrollbar-hide py-4 px-3">
+                <div className="space-y-1">
+                    {navItems.map(item => (
+                        <button
+                            key={item.name}
+                            onClick={() => onNavChange(item.name)}
+                            className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all duration-200 text-left ${
+                                activeNav === item.name
+                                    ? 'bg-indigo-500 text-white shadow-md'
+                                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
+                            }`}
+                        >
+                            <span className={activeNav === item.name ? 'text-white' : 'text-gray-500 dark:text-gray-400'}>
+                                {item.icon}
+                            </span>
+                            <span className="text-sm font-medium">{item.translatedName}</span>
+                        </button>
+                    ))}
                 </div>
-                <button 
-                    onClick={onLogout}
-                    className="p-3 text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200"
-                    aria-label={t('sidebar.logout')}
+            </nav>
+
+            {/* Theme Toggle and Logout */}
+            <div className="p-4 border-t border-gray-200 dark:border-slate-700 space-y-2">
+                <button
+                    onClick={() => setIsDarkMode(!isDarkMode)}
+                    className="w-full flex items-center gap-4 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700 transition-all duration-200 text-left"
                 >
-                    <ArrowRightOnRectangleIcon className="w-6 h-6" />
+                    <span className="text-gray-500 dark:text-gray-400">
+                        {isDarkMode ? (
+                            <MoonIcon className="w-6 h-6" />
+                        ) : (
+                            <SunIcon className="w-6 h-6" />
+                        )}
+                    </span>
+                    <span className="text-sm font-medium">{isDarkMode ? 'Dark Mode' : 'Light Mode'}</span>
+                </button>
+                <button
+                    onClick={onLogout}
+                    className="w-full flex items-center gap-4 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-all duration-200 text-left"
+                >
+                    <span>
+                        <ArrowRightOnRectangleIcon className="w-6 h-6" />
+                    </span>
+                    <span className="text-sm font-medium">{t('sidebar.logout')}</span>
                 </button>
             </div>
         </aside>

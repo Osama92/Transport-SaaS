@@ -97,13 +97,25 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                         </tr>
                     </thead>
                     <tbody>
-                        {routes.map((route) => {
+                        {routes.length === 0 ? (
+                            <tr>
+                                <td colSpan={8} className="py-12 px-4 text-center">
+                                    <div className="flex flex-col items-center justify-center text-gray-400">
+                                        <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                        </svg>
+                                        <p className="text-lg font-medium mb-1">No routes yet</p>
+                                        <p className="text-sm">Create your first route to get started</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        ) : routes.map((route) => {
                             const isInvoiced = invoicedRouteIds.has(route.id);
                             return (
                                 <tr key={route.id} className={`border-b hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-700/50 transition-colors ${selectedRoutes.includes(route.id) ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''} ${isInvoiced ? 'opacity-60' : ''}`}>
                                     <td className="py-4 px-2">
                                         <div className="relative group flex items-center">
-                                            <input 
+                                            <input
                                                 type="checkbox"
                                                 className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 disabled={route.status !== 'Completed' || isInvoiced}
@@ -139,7 +151,7 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                                     <td className="py-4 px-4">
                                         <div className="flex items-center gap-2">
                                             {route.status === 'Pending' && (
-                                                <button 
+                                                <button
                                                     onClick={() => onAssign(route)}
                                                     className="flex items-center gap-1.5 text-sm bg-orange-100 text-orange-700 font-semibold px-3 py-1.5 rounded-lg hover:bg-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:hover:bg-orange-900"
                                                 >

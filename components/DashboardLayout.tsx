@@ -38,7 +38,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     onOpenProfileSettings={onOpenProfileSettings}
                     notifications={notifications}
                 />
-                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-slate-900 p-8">
+                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-slate-900 px-4 sm:px-6 pb-8 scrollbar-hide">
                     {children}
                 </main>
             </div>

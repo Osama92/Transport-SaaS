@@ -3,7 +3,7 @@ import {
     doc,
     getDocs,
     getDoc,
-    addDoc,
+    setDoc,
     updateDoc,
     deleteDoc,
     query,
@@ -13,6 +13,7 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
+import { generateDriverId } from './utils';
 import type { Driver } from '../../types';
 
 // Collection reference
@@ -97,7 +98,9 @@ export const createDriver = async (
     userId: string
 ): Promise<string> => {
     try {
-        const driversRef = collection(db, DRIVERS_COLLECTION);
+        // Generate a readable ID
+        const driverId = generateDriverId();
+        const driverRef = doc(db, DRIVERS_COLLECTION, driverId);
 
         // Structure the data for Firestore
         const newDriver = {
@@ -127,8 +130,9 @@ export const createDriver = async (
             createdBy: userId,
         };
 
-        const docRef = await addDoc(driversRef, newDriver);
-        return docRef.id;
+        // Use setDoc with the readable ID
+        await setDoc(driverRef, newDriver);
+        return driverId;
     } catch (error) {
         console.error('Error creating driver:', error);
         throw new Error('Failed to create driver');

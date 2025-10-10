@@ -104,12 +104,12 @@ const Header: React.FC<HeaderProps> = ({ role, dateRange, onDateRangeChange, onN
 
 
     return (
-        <header className="bg-white dark:bg-slate-800 p-4 flex items-center justify-between shadow-sm dark:shadow-none dark:border-b dark:border-slate-700">
+        <header className="sticky top-0 z-10 bg-gray-100 dark:bg-slate-900 px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-between">
             {/* Left Side */}
             <div className="flex items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 truncate max-w-xs">{getGreeting()}, {userName}! 👋</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{t('header.summary')}</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 truncate max-w-xs">{getGreeting()}, {userName}! 👋</h1>
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('header.summary')}</p>
                 </div>
             </div>
            

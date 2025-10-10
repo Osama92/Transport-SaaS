@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ModalBase from './ModalBase';
+import { useAuth } from '../../contexts/AuthContext';
+import { createVehicle } from '../../services/firestore/vehicles';
 
 interface AddVehicleModalProps {
     onClose: () => void;
@@ -13,16 +15,84 @@ const InputField: React.FC<{label: string, id: string, type?: string, placeholde
 );
 
 const AddVehicleModal: React.FC<AddVehicleModalProps> = ({ onClose }) => {
-    const handleSubmit = (e: React.FormEvent) => {
+    const { currentUser, organizationId } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        // Handle form submission logic
-        console.log("Vehicle form submitted");
-        onClose();
+
+        if (!organizationId || !currentUser) {
+            setError('You must be logged in to add a vehicle');
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const formData = new FormData(e.currentTarget);
+            const make = formData.get('make') as string;
+            const model = formData.get('model') as string;
+            const year = formData.get('year') as string;
+            const plate = formData.get('plate') as string;
+            const vin = formData.get('vin') as string;
+            const odometer = formData.get('odometer') as string;
+
+            if (!make || !model || !year || !plate) {
+                setError('Make, model, year, and plate number are required');
+                setLoading(false);
+                return;
+            }
+
+            // Create vehicle in Firestore
+            await createVehicle(
+                organizationId,
+                {
+                    make: make,
+                    model: model,
+                    year: Number(year),
+                    plateNumber: plate,
+                    vin: vin || '',
+                    status: 'Parked',
+                    assignedDriverId: null,
+                    assignedDriverName: '',
+                    currentRouteId: null,
+                    fuelType: 'Diesel',
+                    color: '',
+                    capacity: 0,
+                    telematics: {
+                        odometer: odometer ? Number(odometer) : 0,
+                        currentSpeed: 0,
+                        batteryLevel: 100,
+                        engineHours: 0,
+                    },
+                    locationData: undefined,
+                    maintenance: {
+                        lastServiceDate: new Date().toISOString(),
+                        nextServiceDate: '',
+                        nextServiceOdometer: 0,
+                    },
+                },
+                currentUser.uid
+            );
+
+            onClose();
+        } catch (err: any) {
+            console.error('Error creating vehicle:', err);
+            setError(err.message || 'Failed to create vehicle');
+            setLoading(false);
+        }
     };
 
     return (
         <ModalBase title="Add New Vehicle" onClose={onClose}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <InputField label="Make" id="make" placeholder="e.g., Ford" required />
                     <InputField label="Model" id="model" placeholder="e.g., Transit" required />
@@ -37,8 +107,10 @@ const AddVehicleModal: React.FC<AddVehicleModalProps> = ({ onClose }) => {
                     <input type="file" id="documents" name="documents" multiple className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/50 dark:file:text-indigo-300 dark:hover:file:bg-indigo-900"/>
                 </div>
                 <div className="flex justify-end gap-3 pt-4 border-t mt-6 dark:border-slate-700">
-                    <button type="button" onClick={onClose} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-gray-300">Cancel</button>
-                    <button type="submit" className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg dark:bg-indigo-600 dark:hover:bg-indigo-700">Save Vehicle</button>
+                    <button type="button" onClick={onClose} disabled={loading} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-gray-300 disabled:opacity-50">Cancel</button>
+                    <button type="submit" disabled={loading} className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg dark:bg-indigo-600 dark:hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {loading ? 'Saving...' : 'Save Vehicle'}
+                    </button>
                 </div>
             </form>
         </ModalBase>

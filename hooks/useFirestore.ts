@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     collection,
     query,
@@ -25,6 +25,12 @@ export function useFirestoreCollection<T>(
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
+
+    // Memoize constraints to prevent infinite re-renders
+    const constraintsKey = useMemo(
+        () => JSON.stringify(constraints.map(c => c.type)),
+        [constraints]
+    );
 
     useEffect(() => {
         let unsubscribe: Unsubscribe;
@@ -71,7 +77,7 @@ export function useFirestoreCollection<T>(
                 unsubscribe();
             }
         };
-    }, [collectionName, ...constraints]);
+    }, [collectionName, constraintsKey]);
 
     return { data, loading, error };
 }
@@ -80,9 +86,12 @@ export function useFirestoreCollection<T>(
  * Hook for fetching drivers with real-time updates
  */
 export function useDrivers(organizationId: string | null) {
-    const constraints = organizationId
-        ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
-        : [];
+    const constraints = useMemo(
+        () => organizationId
+            ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
+            : [],
+        [organizationId]
+    );
 
     return useFirestoreCollection('drivers', constraints);
 }
@@ -91,9 +100,12 @@ export function useDrivers(organizationId: string | null) {
  * Hook for fetching vehicles with real-time updates
  */
 export function useVehicles(organizationId: string | null) {
-    const constraints = organizationId
-        ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
-        : [];
+    const constraints = useMemo(
+        () => organizationId
+            ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
+            : [],
+        [organizationId]
+    );
 
     return useFirestoreCollection('vehicles', constraints);
 }
@@ -102,9 +114,12 @@ export function useVehicles(organizationId: string | null) {
  * Hook for fetching routes with real-time updates
  */
 export function useRoutes(organizationId: string | null) {
-    const constraints = organizationId
-        ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
-        : [];
+    const constraints = useMemo(
+        () => organizationId
+            ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
+            : [],
+        [organizationId]
+    );
 
     return useFirestoreCollection('routes', constraints);
 }
@@ -113,9 +128,12 @@ export function useRoutes(organizationId: string | null) {
  * Hook for fetching clients with real-time updates
  */
 export function useClients(organizationId: string | null) {
-    const constraints = organizationId
-        ? [where('organizationId', '==', organizationId), orderBy('name', 'asc')]
-        : [];
+    const constraints = useMemo(
+        () => organizationId
+            ? [where('organizationId', '==', organizationId), orderBy('name', 'asc')]
+            : [],
+        [organizationId]
+    );
 
     return useFirestoreCollection('clients', constraints);
 }
@@ -124,9 +142,12 @@ export function useClients(organizationId: string | null) {
  * Hook for fetching invoices with real-time updates
  */
 export function useInvoices(organizationId: string | null) {
-    const constraints = organizationId
-        ? [where('organizationId', '==', organizationId), orderBy('issuedDate', 'desc')]
-        : [];
+    const constraints = useMemo(
+        () => organizationId
+            ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
+            : [],
+        [organizationId]
+    );
 
     return useFirestoreCollection('invoices', constraints);
 }
@@ -135,20 +156,26 @@ export function useInvoices(organizationId: string | null) {
  * Hook for fetching payroll runs with real-time updates
  */
 export function usePayrollRuns(organizationId: string | null) {
-    const constraints = organizationId
-        ? [where('organizationId', '==', organizationId), orderBy('periodStart', 'desc')]
-        : [];
+    const constraints = useMemo(
+        () => organizationId
+            ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
+            : [],
+        [organizationId]
+    );
 
-    return useFirestoreCollection('payrolls', constraints);
+    return useFirestoreCollection('payrollRuns', constraints);
 }
 
 /**
  * Hook for fetching user notifications with real-time updates
  */
 export function useNotifications(userId: string | null) {
-    const constraints = userId
-        ? [where('userId', '==', userId), orderBy('timestamp', 'desc')]
-        : [];
+    const constraints = useMemo(
+        () => userId
+            ? [where('userId', '==', userId), orderBy('timestamp', 'desc')]
+            : [],
+        [userId]
+    );
 
     return useFirestoreCollection('notifications', constraints);
 }

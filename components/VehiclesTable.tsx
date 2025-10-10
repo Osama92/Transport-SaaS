@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Vehicle } from '../types';
-import { EllipsisHorizontalIcon, EyeIcon, PencilIcon } from './Icons';
+import { EllipsisHorizontalIcon, EyeIcon, PencilIcon, TrashIcon } from './Icons';
 
 const StatusBadge: React.FC<{ status: Vehicle['status'] }> = ({ status }) => {
     const { t } = useTranslation();
@@ -21,14 +21,16 @@ interface VehiclesTableProps {
     onViewAll?: () => void;
     onViewDetails: (vehicle: Vehicle) => void;
     onUpdateStatus: (vehicle: Vehicle) => void;
+    onRemove?: (vehicle: Vehicle) => void;
 }
 
-const VehiclesTable: React.FC<VehiclesTableProps> = ({ 
-    vehicles, 
-    showViewAllButton = true, 
+const VehiclesTable: React.FC<VehiclesTableProps> = ({
+    vehicles,
+    showViewAllButton = true,
     onViewAll,
     onViewDetails,
-    onUpdateStatus
+    onUpdateStatus,
+    onRemove
 }) => {
     const { t } = useTranslation();
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -68,14 +70,27 @@ const VehiclesTable: React.FC<VehiclesTableProps> = ({
                         </tr>
                     </thead>
                     <tbody>
-                        {vehicles.map((vehicle) => (
+                        {vehicles.length === 0 ? (
+                            <tr>
+                                <td colSpan={5} className="py-12 px-4 text-center">
+                                    <div className="flex flex-col items-center justify-center text-gray-400">
+                                        <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                                        </svg>
+                                        <p className="text-lg font-medium mb-1">No vehicles yet</p>
+                                        <p className="text-sm">Add your first vehicle to get started</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        ) : vehicles.map((vehicle) => (
                             <tr key={vehicle.id} className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                 <td className="py-3 px-4">
                                     <p className="font-semibold text-gray-800 dark:text-gray-100">{vehicle.make} {vehicle.model}</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">{t('screens.vehicleDetails.vin')}: {vehicle.vin}</p>
                                 </td>
                                 <td className="py-3 px-4 text-gray-600 dark:text-gray-300 font-mono">{vehicle.plateNumber}</td>
-                                <td className="py-3 px-4 text-gray-600 dark:text-gray-300">{vehicle.odometer.toLocaleString()} km</td>
+                                <td className="py-3 px-4 text-gray-600 dark:text-gray-300">{(vehicle.telematics?.odometer || 0).toLocaleString()} km</td>
                                 <td className="py-3 px-4"><StatusBadge status={vehicle.status} /></td>
                                 <td className="py-3 px-4">
                                    <div className="relative">
@@ -90,6 +105,11 @@ const VehiclesTable: React.FC<VehiclesTableProps> = ({
                                                 <button onClick={() => { onUpdateStatus(vehicle); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800">
                                                     <PencilIcon className="w-5 h-5 text-gray-500"/> {t('components.vehiclesTable.updateStatus')}
                                                 </button>
+                                                {onRemove && (
+                                                    <button onClick={() => { onRemove(vehicle); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                                        <TrashIcon className="w-5 h-5"/> Remove Vehicle
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>
