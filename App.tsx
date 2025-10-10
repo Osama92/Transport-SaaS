@@ -11,7 +11,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const AppContent: React.FC = () => {
     const { t } = useTranslation();
-    const { currentUser, userRole, loading, updateUserRole } = useAuth();
+    const { currentUser, userRole, organization, loading, updateUserRole } = useAuth();
     const [authPage, setAuthPage] = useState<'login' | 'signup'>('login');
     const [isOnboarding, setIsOnboarding] = useState(false);
     const [isSubscription, setIsSubscription] = useState(false);
@@ -42,15 +42,20 @@ const AppContent: React.FC = () => {
 
     // User is logged in
     if (currentUser) {
-        // But hasn't selected a role yet
-        if (!userRole || isOnboarding || isSubscription) {
+        // Check if user has completed onboarding and has a subscription
+        const hasCompletedOnboarding = userRole && organization?.subscription?.plan;
+
+        // User hasn't completed onboarding or doesn't have a subscription
+        if (!hasCompletedOnboarding || isOnboarding || isSubscription) {
+            // If in subscription flow
             if (isSubscription) {
                 return <SubscriptionPage roleId={userRole || 'business'} onComplete={handleSubscriptionComplete} onBack={handleBackToOnboarding} />
             }
             // Default to onboarding
             return <OnboardingPage onComplete={handleRoleSelection} />;
         }
-        // User is fully authenticated with a role
+
+        // User is fully authenticated with a role and subscription
         return <Dashboard role={userRole} />;
     }
 

@@ -181,7 +181,7 @@ const Header: React.FC<HeaderProps> = ({ role, dateRange, onDateRangeChange, onN
                     {isProfileMenuOpen && (
                          <div className="absolute top-full right-0 mt-3 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-lg border dark:border-slate-700 z-20">
                             <div className="p-2">
-                                <button onClick={() => { onOpenProfileSettings(); setIsProfileMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700">
+                                <button onClick={() => { onNavChange('Settings'); setIsProfileMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700">
                                     <UserCircleIcon className="w-5 h-5 text-gray-500 dark:text-gray-400"/> {t('header.profileSettings')}
                                 </button>
                                 <button onClick={() => { onNavChange('Manage Subscription'); setIsProfileMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700">

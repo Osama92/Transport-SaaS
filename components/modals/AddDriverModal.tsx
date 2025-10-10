@@ -3,9 +3,12 @@ import { useTranslation } from 'react-i18next';
 import ModalBase from './ModalBase';
 import { useAuth } from '../../contexts/AuthContext';
 import { createDriver } from '../../services/firestore/drivers';
+import { canAddResource, getSubscriptionLimits } from '../../services/firestore/subscriptions';
+import LimitReachedModal from '../LimitReachedModal';
 
 interface AddDriverModalProps {
     onClose: () => void;
+    currentDriverCount?: number;
 }
 
 const InputField: React.FC<{label: string, id: string, type?: string, placeholder: string}> = ({ label, id, type = 'text', placeholder }) => (
@@ -15,13 +18,19 @@ const InputField: React.FC<{label: string, id: string, type?: string, placeholde
     </div>
 );
 
-const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose }) => {
+const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverCount = 0 }) => {
     const { t } = useTranslation();
-    const { currentUser, organizationId } = useAuth();
+    const { currentUser, organizationId, organization, userRole } = useAuth();
     const [driverPhoto, setDriverPhoto] = useState<File | null>(null);
     const [licensePhoto, setLicensePhoto] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showLimitModal, setShowLimitModal] = useState(false);
+
+    // Get subscription limits
+    const subscriptionPlan = organization?.subscription?.plan || 'basic';
+    const limits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
+    const driverLimit = limits?.drivers;
 
     const driverPhotoInputRef = useRef<HTMLInputElement>(null);
     const licensePhotoInputRef = useRef<HTMLInputElement>(null);
@@ -39,6 +48,12 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose }) => {
 
         if (!organizationId || !currentUser) {
             setError('You must be logged in to add a driver');
+            return;
+        }
+
+        // Check subscription limit before creating
+        if (!canAddResource(currentDriverCount, driverLimit)) {
+            setShowLimitModal(true);
             return;
         }
 
@@ -96,9 +111,22 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose }) => {
         }
     };
 
+    const handleUpgrade = () => {
+        setShowLimitModal(false);
+        onClose();
+    };
+
     return (
-        <ModalBase title={t('modals.addDriver.title')} onClose={onClose}>
-            <form onSubmit={handleSubmit} className="space-y-6">
+        <>
+            <LimitReachedModal
+                isOpen={showLimitModal}
+                onClose={() => setShowLimitModal(false)}
+                resourceType="drivers"
+                currentPlan={subscriptionPlan}
+                onUpgrade={handleUpgrade}
+            />
+            <ModalBase title={t('modals.addDriver.title')} onClose={onClose}>
+                <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
                         {error}
@@ -173,8 +201,9 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose }) => {
                         {loading ? 'Saving...' : t('modals.addDriver.saveButton')}
                     </button>
                 </div>
-            </form>
-        </ModalBase>
+                </form>
+            </ModalBase>
+        </>
     );
 };
 

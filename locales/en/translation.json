@@ -102,7 +102,19 @@
     "choosePlanSubtitle": "Select the best plan that fits your needs as a {{roleId}}.",
     "back": "Back",
     "skipForNow": "Skip for now",
-    "choosePlanButton": "Choose Plan"
+    "choosePlanButton": "Choose Plan",
+    "limits": {
+      "vehicles": "Vehicles",
+      "drivers": "Drivers",
+      "routes": "Routes",
+      "clients": "Clients"
+    },
+    "limitReached": {
+      "title": "Subscription Limit Reached",
+      "message": "You've reached the maximum number of {{resource}} allowed on your {{plan}} plan.",
+      "upgradePrompt": "Upgrade your subscription to add more resources and unlock additional features.",
+      "upgradeButton": "Upgrade Plan"
+    }
   },
   "partnerDashboard": {
     "hubTitle": "Partner Operations Hub",
@@ -677,34 +689,40 @@
         }
       },
       "partner": {
-        "driver": {
-          "name": "Driver",
-          "description": "For individual couriers and delivery partners.",
+        "basic": {
+          "name": "Basic",
+          "description": "Perfect for small operations getting started.",
           "features": [
-            "Unlimited deliveries",
-            "Route optimization",
-            "Proof of delivery",
-            "Direct communication tools"
+            "Up to 3 vehicles",
+            "Up to 3 drivers",
+            "10 routes per month",
+            "Up to 5 clients",
+            "Basic tracking & reporting"
           ]
         },
-        "fleet": {
-          "name": "Fleet",
-          "description": "For logistics companies managing a fleet of vehicles.",
+        "pro": {
+          "name": "Pro",
+          "description": "For growing logistics companies managing a small fleet.",
           "features": [
-            "Manage up to 20 drivers",
-            "Fleet-wide analytics",
-            "Centralized dispatch",
-            "API for integration"
+            "Up to 15 vehicles",
+            "Up to 15 drivers",
+            "50 routes per month",
+            "Up to 25 clients",
+            "Advanced analytics",
+            "Priority support"
           ]
         },
-        "logisticsPro": {
-          "name": "Logistics Pro",
-          "description": "Comprehensive solution for large logistics operations.",
+        "max": {
+          "name": "Max",
+          "description": "Unlimited solution for large logistics operations.",
           "features": [
+            "Unlimited vehicles",
             "Unlimited drivers",
+            "Unlimited routes",
+            "Unlimited clients",
             "Advanced reporting",
             "Dedicated support",
-            "Custom branding"
+            "Custom integrations"
           ]
         }
       }

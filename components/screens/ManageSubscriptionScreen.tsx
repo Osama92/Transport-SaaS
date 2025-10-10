@@ -1,24 +1,93 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-// FIX: The subscriptionData is exported from firebase/config, not data/subscriptions.
 import { subscriptionData } from '../../firebase/config';
+import { updateOrganizationSubscription } from '../../services/firestore/organizations';
+import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
 import PricingCard from '../PricingCard';
-import { ArrowLeftIcon } from '../Icons';
-// Fix: Import useTranslation to handle plan names.
+import SubscriptionLimitBadge from '../SubscriptionLimitBadge';
+import { ArrowLeftIcon, CheckCircleIcon } from '../Icons';
 import { useTranslation } from 'react-i18next';
+import { useDrivers, useVehicles, useRoutes, useClients } from '../../hooks/useFirestore';
 
 interface ManageSubscriptionScreenProps {
     onBack: () => void;
 }
 
 const ManageSubscriptionScreen: React.FC<ManageSubscriptionScreenProps> = ({ onBack }) => {
-    // Fix: Add useTranslation hook.
     const { t } = useTranslation();
-    const { userRole } = useAuth();
+    const { userRole, organization, organizationId, setOrganization } = useAuth();
+    const [loading, setLoading] = useState(false);
+
+    // Get current data counts
+    const { data: firestoreVehicles } = useVehicles(organizationId);
+    const { data: firestoreDrivers } = useDrivers(organizationId);
+    const { data: firestoreRoutes } = useRoutes(organizationId);
+    const { data: firestoreClients } = useClients(organizationId);
+
+    const vehicles = firestoreVehicles || [];
+    const drivers = firestoreDrivers || [];
+    const routes = firestoreRoutes || [];
+    const clients = firestoreClients || [];
+
+    // Calculate current month route count
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthRouteCount = routes.filter(route => {
+        const createdAt = new Date(route.createdAt || '');
+        return createdAt >= startOfMonth;
+    }).length;
+
     const plans = subscriptionData[userRole as keyof typeof subscriptionData || 'individual'];
-    // Fix: Correctly identify the current plan and get its translated name.
-    const currentPlan = plans.find(p => p.isPopular) || plans[0]; // Assuming one popular or fallback to first
-    const currentPlanName = t(`subscriptions.plans.${userRole || 'individual'}.${currentPlan.key}.name`);
+    const currentPlanKey = organization?.subscription?.plan || 'basic';
+    const currentPlan = plans.find(p => p.key === currentPlanKey) || plans[0];
+
+    // Get plan name with fallback
+    const translatedName = t(`subscriptions.plans.${userRole || 'individual'}.${currentPlanKey}.name`);
+    const currentPlanName = translatedName.includes('subscriptions.plans')
+        ? (currentPlanKey.charAt(0).toUpperCase() + currentPlanKey.slice(1)) // Fallback to capitalized key
+        : translatedName;
+
+    const currentLimits = getSubscriptionLimits(currentPlanKey, userRole || 'partner');
+
+    const handleChangePlan = async (planKey: string) => {
+        if (!organizationId) {
+            alert('Organization ID not found');
+            return;
+        }
+
+        if (planKey === currentPlanKey) {
+            alert('You are already on this plan');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await updateOrganizationSubscription(organizationId, {
+                plan: planKey,
+                status: 'active',
+                startDate: organization?.subscription?.startDate || new Date().toISOString(),
+            });
+
+            // Update local state
+            if (organization) {
+                setOrganization({
+                    ...organization,
+                    subscription: {
+                        ...organization.subscription,
+                        plan: planKey,
+                        status: 'active',
+                    },
+                });
+            }
+
+            alert(`Successfully switched to ${t(`subscriptions.plans.${userRole || 'individual'}.${planKey}.name`)} plan!`);
+        } catch (error) {
+            console.error('Error updating subscription:', error);
+            alert('Failed to update subscription. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="flex flex-col gap-8">
@@ -31,21 +100,66 @@ const ManageSubscriptionScreen: React.FC<ManageSubscriptionScreenProps> = ({ onB
                     <p className="text-sm text-gray-500 dark:text-gray-400">Your current plan is <span className="font-semibold text-indigo-500">{currentPlanName}</span>. Change or update your plan below.</p>
                 </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {plans.map((plan) => {
-                    // Fix: Get translated name for the alert.
-                    const planName = t(`subscriptions.plans.${userRole || 'individual'}.${plan.key}.name`);
-                    return (
-                        <PricingCard
-                            // Fix: Use unique 'key' property for React keys.
-                            key={plan.key}
-                            plan={plan}
-                            // Fix: Use translated plan name in the onSelect handler.
-                            onSelect={() => alert(`Switching to ${planName} plan!`)}
+
+            {/* Current Usage Section */}
+            {userRole === 'partner' && currentLimits && (
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Current Usage</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <SubscriptionLimitBadge
+                            current={vehicles.length}
+                            limit={currentLimits.vehicles}
+                            resourceType="vehicles"
+                            showProgressBar={true}
                         />
-                    );
-                })}
+                        <SubscriptionLimitBadge
+                            current={drivers.length}
+                            limit={currentLimits.drivers}
+                            resourceType="drivers"
+                            showProgressBar={true}
+                        />
+                        <SubscriptionLimitBadge
+                            current={currentMonthRouteCount}
+                            limit={currentLimits.routes}
+                            resourceType="routes"
+                            showProgressBar={true}
+                        />
+                        <SubscriptionLimitBadge
+                            current={clients.length}
+                            limit={currentLimits.clients}
+                            resourceType="clients"
+                            showProgressBar={true}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Available Plans */}
+            <div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Available Plans</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {plans.map((plan) => {
+                        const isCurrentPlan = plan.key === currentPlanKey;
+                        return (
+                            <div key={plan.key} className="relative">
+                                {isCurrentPlan && (
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                                        <span className="bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1">
+                                            <CheckCircleIcon className="w-4 h-4" />
+                                            Current Plan
+                                        </span>
+                                    </div>
+                                )}
+                                <PricingCard
+                                    plan={plan}
+                                    role={userRole || 'partner'}
+                                    onSelect={() => handleChangePlan(plan.key)}
+                                    disabled={loading || isCurrentPlan}
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );

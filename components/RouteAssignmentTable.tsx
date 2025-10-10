@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Route } from '../types';
-import { EllipsisHorizontalIcon, ArrowDownTrayIcon, UserPlusIcon, ClipboardDocumentCheckIcon, CheckCircleIcon } from './Icons';
+import { EllipsisHorizontalIcon, ArrowDownTrayIcon, UserPlusIcon, ClipboardDocumentCheckIcon, CheckCircleIcon, PencilIcon, TrashIcon } from './Icons';
 
 type RouteStatusFilter = 'All' | 'Pending' | 'In Progress' | 'Completed';
 
@@ -9,7 +9,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     const { t } = useTranslation();
     const statusKey = status.replace(' ', '').toLowerCase();
 
-    const baseClasses = "text-xs font-medium px-2.5 py-1 rounded-full";
+    const baseClasses = "text-[10px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap";
     const statusClasses: { [key: string]: string } = {
         'In Progress': 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
         'Completed': 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300',
@@ -29,6 +29,8 @@ interface RouteAssignmentTableProps {
     onSelectRoute: (routeId: string) => void;
     onSelectAllCompleted: () => void;
     invoicedRouteIds: Set<string>;
+    onEdit?: (route: Route) => void;
+    onDelete?: (route: Route) => void;
 }
 
 const FilterButton: React.FC<{
@@ -54,10 +56,23 @@ const FilterButton: React.FC<{
 };
 
 
-const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onAssign, onViewDetails, onComplete, onFilterChange, activeFilter, selectedRoutes, onSelectRoute, onSelectAllCompleted, invoicedRouteIds }) => {
+const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onAssign, onViewDetails, onComplete, onFilterChange, activeFilter, selectedRoutes, onSelectRoute, onSelectAllCompleted, invoicedRouteIds, onEdit, onDelete }) => {
     const { t } = useTranslation();
     const hasSelectableCompletedRoutes = routes.some(r => r.status === 'Completed' && !invoicedRouteIds.has(r.id));
     const allCompletedSelected = hasSelectableCompletedRoutes && routes.filter(r => r.status === 'Completed' && !invoicedRouteIds.has(r.id)).every(r => selectedRoutes.includes(r.id));
+
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setOpenMenuId(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     return (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm h-full">
@@ -174,7 +189,37 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                                                     {t('components.routeAssignmentTable.viewpod')}
                                                 </button>
                                             )}
-                                            <button className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"><EllipsisHorizontalIcon className="w-5 h-5"/></button>
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setOpenMenuId(openMenuId === route.id ? null : route.id)}
+                                                    className="text-gray-500 hover:text-gray-800 p-1 rounded-full hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-slate-700"
+                                                >
+                                                    <EllipsisHorizontalIcon className="w-5 h-5"/>
+                                                </button>
+                                                {openMenuId === route.id && (
+                                                    <div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl z-10 border dark:border-slate-700">
+                                                        {onEdit && (
+                                                            <button
+                                                                onClick={() => { onEdit(route); setOpenMenuId(null); }}
+                                                                className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
+                                                            >
+                                                                <PencilIcon className="w-4 h-4 text-gray-500"/> {t('common.edit')}
+                                                            </button>
+                                                        )}
+                                                        {onDelete && (
+                                                            <>
+                                                                <div className="border-t my-1 dark:border-slate-700"></div>
+                                                                <button
+                                                                    onClick={() => { onDelete(route); setOpenMenuId(null); }}
+                                                                    className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                                >
+                                                                    <TrashIcon className="w-4 h-4"/> {t('common.delete')}
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>

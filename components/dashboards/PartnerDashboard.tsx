@@ -28,13 +28,14 @@ import RouteAssignmentTable from '../RouteAssignmentTable';
 import StatCard from '../StatCard';
 import type { Route, Driver, Vehicle, Client, DriverPerformanceData, MaintenanceLog, VehicleDocument, Invoice, InvoiceItem, Expense, Notification, PayrollRun, Payslip } from '../../types';
 // Import Firestore hooks
-import { useDrivers, useVehicles, useRoutes } from '../../hooks/useFirestore';
+import { useDrivers, useVehicles, useRoutes, useClients } from '../../hooks/useFirestore';
 import { useAuth } from '../../contexts/AuthContext';
-// Import Firestore delete functions
+import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
+// Import Firestore functions
 import { deleteDriver } from '../../services/firestore/drivers';
 import { deleteVehicle } from '../../services/firestore/vehicles';
-import { deleteRoute } from '../../services/firestore/routes';
-import { deleteClient } from '../../services/firestore/clients';
+import { deleteRoute, assignRouteResources, startRoute, updateRoute, addRouteExpense, completeRoute } from '../../services/firestore/routes';
+import { createClient, updateClient as updateClientFirestore, deleteClient, updateClientStatus } from '../../services/firestore/clients';
 // Keep mock data functions for demo mode
 import {
     generateDriverPerformanceData,
@@ -56,6 +57,7 @@ import ClientsScreen from '../screens/ClientsScreen';
 import InvoiceScreen from '../invoice/InvoiceScreen';
 import AllInvoicesScreen from '../screens/AllInvoicesScreen';
 import ManageSubscriptionScreen from '../screens/ManageSubscriptionScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import AllNotificationsScreen from '../screens/AllNotificationsScreen';
 import MapScreen from '../screens/MapScreen'; // Import MapScreen
 import PayrollScreen from '../screens/PayrollScreen';
@@ -133,10 +135,27 @@ interface DashboardViewProps {
   activeFilter: RouteStatusFilter;
   onViewPendingRoutes: () => void;
   invoicedRouteIds: Set<string>;
+  onEditRoute: (route: Route) => void;
+  onDeleteRoute: (route: Route) => void;
 }
 
-const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveModal, routes, drivers, vehicles, clients, onAssignRoute, onViewDetails, onCompleteRoute, onFilterChange, activeFilter, onViewPendingRoutes, invoicedRouteIds }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveModal, routes, drivers, vehicles, clients, onAssignRoute, onViewDetails, onCompleteRoute, onFilterChange, activeFilter, onViewPendingRoutes, invoicedRouteIds, onEditRoute, onDeleteRoute }) => {
     const { t } = useTranslation();
+    const { organization, userRole } = useAuth();
+
+    // Get subscription limits
+    const subscriptionPlan = organization?.subscription?.plan || 'basic';
+    const subscriptionLimits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
+
+    // Calculate current month route count
+    const currentMonthRouteCount = useMemo(() => {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        return routes.filter(route => {
+            const createdAt = new Date(route.createdAt || '');
+            return createdAt >= startOfMonth;
+        }).length;
+    }, [routes]);
 
     // Calculate real-time stats from routes data
     const totalRoutesAssigned = routes.filter(r => r.status === 'In Progress' || r.status === 'Completed').length;
@@ -181,7 +200,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
 
         {/* Header and Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
+            <div className="flex-1">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{t('partnerDashboard.hubTitle')}</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{t('partnerDashboard.hubSubtitle')}</p>
             </div>
@@ -202,14 +221,14 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
         </div>
 
         {/* Management Tables Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-8">
             <DriversTable drivers={drivers.slice(0, 4)} onViewAll={() => setActiveNav('Drivers')} />
             <VehiclesTable vehicles={vehicles.slice(0,4)} onViewAll={() => setActiveNav('Vehicles')} onViewDetails={() => {}} onUpdateStatus={() => {}} />
         </div>
         <div>
-            <RouteAssignmentTable 
-                routes={routes} 
-                onAssign={onAssignRoute} 
+            <RouteAssignmentTable
+                routes={routes}
+                onAssign={onAssignRoute}
                 onViewDetails={onViewDetails}
                 onComplete={onCompleteRoute}
                 onFilterChange={onFilterChange}
@@ -218,6 +237,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
                 onSelectRoute={() => {}}
                 onSelectAllCompleted={() => {}}
                 invoicedRouteIds={invoicedRouteIds}
+                onEdit={onEditRoute}
+                onDelete={onDeleteRoute}
             />
         </div>
         <div>
@@ -230,7 +251,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
 
 const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) => {
   const { t } = useTranslation();
-  const { currentUser, organizationId } = useAuth();
+  const { currentUser, organizationId, organization, userRole } = useAuth();
 
   // Check if demo mode (demo@example.com)
   const isDemoMode = currentUser?.email === 'demo@example.com';
@@ -239,6 +260,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const { data: firestoreDrivers, loading: driversLoading } = useDrivers(isDemoMode ? null : organizationId);
   const { data: firestoreVehicles, loading: vehiclesLoading } = useVehicles(isDemoMode ? null : organizationId);
   const { data: firestoreRoutes, loading: routesLoading } = useRoutes(isDemoMode ? null : organizationId);
+  const { data: firestoreClients, loading: clientsLoading } = useClients(isDemoMode ? null : organizationId);
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [activeNav, setActiveNav] = useState('Dashboard');
@@ -256,8 +278,22 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const routes = isDemoMode ? mockRoutes : (firestoreRoutes || []);
   const drivers = isDemoMode ? mockDrivers : (firestoreDrivers || []);
   const vehicles = isDemoMode ? mockVehicles : (firestoreVehicles || []);
+  const clients = isDemoMode ? mockClients : (firestoreClients || []);
 
-  const [clients, setClients] = useState<Client[]>([]);
+  // Calculate current month route count for subscription limits
+  const currentMonthRouteCount = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return routes.filter(route => {
+      const createdAt = new Date(route.createdAt || '');
+      return createdAt >= startOfMonth;
+    }).length;
+  }, [routes]);
+
+  // Get subscription limits
+  const subscriptionPlan = organization?.subscription?.plan || 'basic';
+  const subscriptionLimits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
@@ -288,23 +324,20 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     const loadAllData = async () => {
         // Only load mock data if in demo mode
         if (!isDemoMode) {
-            // For production mode, just load clients, invoices, notifications, payroll
+            // For production mode, just load invoices, notifications, payroll (clients handled by hook)
             try {
                 setLoading(true);
                 setError(null);
                 const [
-                    clientsData,
                     invoicesData,
                     notificationsData,
                     payrollData,
                 ] = await Promise.all([
-                    getClients(),
                     getInvoices(),
                     getNotifications(),
                     getPayrollRuns(),
                 ]);
 
-                setClients(clientsData as Client[]);
                 setInvoices(invoicesData as Invoice[]);
                 setNotifications(notificationsData as Notification[]);
                 setPayrollRuns(payrollData as PayrollRun[]);
@@ -345,7 +378,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
             setMockClients(clientsData as Client[]);
             setMockRoutes(routesData as Route[]);
             setMockInvoices(invoicesData as Invoice[]);
-            setClients(clientsData as Client[]);
             setInvoices(invoicesData as Invoice[]);
             setNotifications(notificationsData as Notification[]);
             setPayrollRuns(payrollData as PayrollRun[]);
@@ -368,6 +400,21 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       rawPerformanceData = generateDriverPerformanceData(firestoreDrivers);
     }
   }, [firestoreDrivers, isDemoMode]);
+
+  // Update viewingRoute when routes array changes (for expense updates)
+  useEffect(() => {
+    if (viewingRoute) {
+      const updatedRoute = routes.find(r => r.id === viewingRoute.id);
+      if (updatedRoute) {
+        // Only update if expenses actually changed to avoid infinite loops
+        const currentExpensesStr = JSON.stringify(viewingRoute.expenses || []);
+        const newExpensesStr = JSON.stringify(updatedRoute.expenses || []);
+        if (currentExpensesStr !== newExpensesStr) {
+          setViewingRoute(updatedRoute);
+        }
+      }
+    }
+  }, [routes, viewingRoute]);
   
   const analyticsData = useMemo(() => {
     return rawPerformanceData.filter(d => {
@@ -435,7 +482,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     }
   };
   
-  const handleCompleteRoute = (route: Route) => {
+  const handleCompleteRoute = async (route: Route) => {
     if (isDemoMode) {
       setMockRoutes(prev => prev.map(r => r.id === route.id ? { ...r, status: 'Completed', progress: 100 } : r));
       const vehicle = vehicles.find(v => v.plateNumber === route.vehicle);
@@ -444,11 +491,42 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
             v.id === vehicle.id ? { ...v, odometer: v.odometer + route.distanceKm } : v
         ));
       }
+    } else {
+      // For production mode, complete route in Firestore
+      try {
+        await completeRoute(route.id);
+        console.log('Successfully completed route:', route.id);
+      } catch (error) {
+        console.error('Error completing route:', error);
+        alert('Failed to complete route. Please try again.');
+      }
     }
-    // For production mode, update would happen through Firestore
   };
 
-  const handleAssignDriver = (routeId: string, driverId: string | number, vehicleId: string) => {
+  const handleEditRoute = (route: Route) => {
+    // TODO: Implement edit route modal
+    console.log('Edit route:', route);
+    alert('Edit route feature coming soon!');
+  };
+
+  const handleDeleteRoute = async (route: Route) => {
+    const confirmed = window.confirm(`Are you sure you want to delete route ${route.id}?`);
+    if (!confirmed) return;
+
+    if (isDemoMode) {
+      setMockRoutes(prev => prev.filter(r => r.id !== route.id));
+    } else {
+      try {
+        await deleteRoute(route.id);
+        console.log('Successfully deleted route:', route.id);
+      } catch (error) {
+        console.error('Error deleting route:', error);
+        alert('Failed to delete route. Please try again.');
+      }
+    }
+  };
+
+  const handleAssignDriver = async (routeId: string, driverId: string | number, vehicleId: string) => {
       // Handle both string IDs (production) and number IDs (demo)
       const driver = drivers.find(d => String(d.id) === String(driverId));
       const vehicle = vehicles.find(v => String(v.id) === String(vehicleId));
@@ -468,14 +546,40 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
               }
           } else {
               // For production mode, update Firestore
-              // TODO: Implement Firestore route assignment update
-              console.log('Assign driver to route in Firestore:', { routeId, driverId, vehicleId });
+              try {
+                  // Assign driver and vehicle to route
+                  await assignRouteResources(
+                      routeId,
+                      String(driverId),
+                      driver.name,
+                      String(vehicleId),
+                      vehicle.plateNumber
+                  );
+
+                  // Also update the denormalized fields for display
+                  await updateRoute(routeId, {
+                      driverName: driver.name,
+                      driverAvatar: driver.avatar || 'https://picsum.photos/seed/placeholder/40/40',
+                      vehicle: vehicle.plateNumber,
+                      driverId: String(driverId),
+                      vehicleId: String(vehicleId),
+                  });
+
+                  // Start the route
+                  await startRoute(routeId);
+
+                  console.log('Successfully assigned driver and vehicle to route:', { routeId, driverId, vehicleId });
+              } catch (error) {
+                  console.error('Error assigning route:', error);
+                  alert('Failed to assign driver and vehicle to route. Please try again.');
+                  return; // Don't close modal on error
+              }
           }
       }
       setActiveModal(null);
   };
   
-  const handleAddExpense = (routeId: string, newExpense: Expense) => {
+  const handleAddExpense = async (routeId: string, newExpense: Expense) => {
     if (isDemoMode) {
       const updatedRoutes = routes.map(r => {
           if (r.id === routeId) {
@@ -490,8 +594,23 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       if (updatedViewedRoute) {
           setViewingRoute(updatedViewedRoute);
       }
+    } else {
+      // For production mode, add expense to Firestore
+      try {
+        await addRouteExpense(routeId, {
+          type: newExpense.type,
+          description: newExpense.description,
+          amount: newExpense.amount,
+          date: newExpense.date,
+        });
+        console.log('Successfully added expense to route:', routeId);
+        // The useEffect watching routes will automatically update viewingRoute
+      } catch (error) {
+        console.error('Error adding expense:', error);
+        alert('Failed to add expense. Please try again.');
+        return;
+      }
     }
-    // For production mode, update would happen through Firestore
 
     setActiveModal(null);
   };
@@ -649,30 +768,71 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       setInvoiceForPdf(invoice);
   };
   
-  const handleAddClient = (newClientData: Omit<Client, 'id' | 'status'>) => {
-    const newClient: Client = {
-      id: `C${Date.now()}`,
-      ...newClientData,
-      status: 'Active'
-    };
-    setClients(prev => [newClient, ...prev]);
+  const handleAddClient = async (newClientData: Omit<Client, 'id' | 'status'>) => {
+    if (isDemoMode) {
+      const newClient: Client = {
+        id: `C${Date.now()}`,
+        ...newClientData,
+        status: 'Active'
+      };
+      setMockClients(prev => [newClient, ...prev]);
+    } else {
+      try {
+        await createClient(organizationId!, newClientData, currentUser!.uid);
+      } catch (error) {
+        console.error('Error creating client:', error);
+        alert('Failed to create client. Please try again.');
+        return;
+      }
+    }
     setActiveModal(null);
   };
 
-  const handleUpdateClient = (updatedClient: Client) => {
-    setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
+  const handleUpdateClient = async (updatedClient: Client) => {
+    if (isDemoMode) {
+      setMockClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
+    } else {
+      try {
+        const { id, organizationId, createdAt, createdBy, ...updates } = updatedClient;
+        await updateClientFirestore(id, updates);
+      } catch (error) {
+        console.error('Error updating client:', error);
+        alert('Failed to update client. Please try again.');
+        return;
+      }
+    }
     setActiveModal(null);
   };
 
-  const handleDeleteClient = (clientId: string) => {
-      setClients(prev => prev.filter(c => c.id !== clientId));
-      setActiveModal(null);
+  const handleDeleteClient = async (clientId: string) => {
+    if (isDemoMode) {
+      setMockClients(prev => prev.filter(c => c.id !== clientId));
+    } else {
+      try {
+        await deleteClient(clientId);
+      } catch (error) {
+        console.error('Error deleting client:', error);
+        alert('Failed to delete client. Please try again.');
+        return;
+      }
+    }
+    setActiveModal(null);
   };
 
-  const handleToggleClientStatus = (client: Client) => {
-      const newStatus = client.status === 'Active' ? 'Inactive' : 'Active';
-      setClients(prev => prev.map(c => c.id === client.id ? { ...c, status: newStatus } : c));
-      setActiveModal(null);
+  const handleToggleClientStatus = async (client: Client) => {
+    const newStatus = client.status === 'Active' ? 'Inactive' : 'Active';
+    if (isDemoMode) {
+      setMockClients(prev => prev.map(c => c.id === client.id ? { ...c, status: newStatus } : c));
+    } else {
+      try {
+        await updateClientStatus(client.id, newStatus);
+      } catch (error) {
+        console.error('Error updating client status:', error);
+        alert('Failed to update client status. Please try again.');
+        return;
+      }
+    }
+    setActiveModal(null);
   };
 
   const handleUpdateNotification = (id: number, updates: Partial<Notification>) => {
@@ -726,13 +886,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const renderModal = () => {
     switch (activeModal) {
       case 'addVehicle':
-        return <AddVehicleModal onClose={() => setActiveModal(null)} />;
+        return <AddVehicleModal onClose={() => setActiveModal(null)} currentVehicleCount={vehicles.length} />;
       case 'addDriver':
-        return <AddDriverModal onClose={() => setActiveModal(null)} />;
+        return <AddDriverModal onClose={() => setActiveModal(null)} currentDriverCount={drivers.length} />;
       case 'createRoute':
-        return <CreateRouteModal onClose={() => setActiveModal(null)} onAddRoute={handleCreateRoute} />;
+        return <CreateRouteModal onClose={() => setActiveModal(null)} onAddRoute={handleCreateRoute} currentMonthRouteCount={currentMonthRouteCount} />;
       case 'addClient':
-        return <AddClientModal onClose={() => setActiveModal(null)} onAddClient={handleAddClient} />;
+        return <AddClientModal onClose={() => setActiveModal(null)} onAddClient={handleAddClient} currentClientCount={clients.length} />;
       case 'editClient':
         return <EditClientModal client={selectedItem as Client} onClose={() => setActiveModal(null)} onSave={handleUpdateClient} />;
       case 'confirmDeleteClient':
@@ -830,7 +990,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
                 onAddExpenseClick={() => setActiveModal('addExpense')}
             />
         }
-        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0, 3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} />;
+        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0, 3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} onEditRoute={handleEditRoute} onDeleteRoute={handleDeleteRoute} />;
       case 'Map':
         return <MapScreen items={drivers} />;
       case 'Drivers':
@@ -914,11 +1074,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
           />
         );
       case 'Settings':
-        return <div className="bg-white p-6 rounded-xl shadow-sm"><h2>Settings</h2><p>Settings page placeholder.</p></div>;
+        return <SettingsScreen onBack={() => setActiveNav('Dashboard')} onManageSubscription={() => setActiveNav('Manage Subscription')} />;
       case 'Manage Subscription':
-        return <ManageSubscriptionScreen onBack={() => setActiveNav('Dashboard')} />;
+        return <ManageSubscriptionScreen onBack={() => setActiveNav('Settings')} />;
       default:
-        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0,3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} />;
+        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0,3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} onEditRoute={handleEditRoute} onDeleteRoute={handleDeleteRoute} />;
     }
   };
 
@@ -948,3 +1108,4 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
 };
 
 export default PartnerDashboard;
+

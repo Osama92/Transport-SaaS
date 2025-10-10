@@ -4,10 +4,13 @@ import type { Client } from '../../types';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { createClient } from '../../services/firestore/clients';
+import { canAddResource, getSubscriptionLimits } from '../../services/firestore/subscriptions';
+import LimitReachedModal from '../LimitReachedModal';
 
 interface AddClientModalProps {
     onClose: () => void;
     onAddClient?: (client: Omit<Client, 'id' | 'status'>) => void;
+    currentClientCount?: number;
 }
 
 const InputField: React.FC<{label: string, id: string, name: string, type?: string, placeholder: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void}> = ({ label, id, name, type = 'text', placeholder, value, onChange }) => (
@@ -17,9 +20,9 @@ const InputField: React.FC<{label: string, id: string, name: string, type?: stri
     </div>
 );
 
-const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient }) => {
+const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient, currentClientCount = 0 }) => {
     const { t } = useTranslation();
-    const { currentUser, organizationId } = useAuth();
+    const { currentUser, organizationId, organization, userRole } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
         contactPerson: '',
@@ -31,6 +34,12 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient })
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showLimitModal, setShowLimitModal] = useState(false);
+
+    // Get subscription limits
+    const subscriptionPlan = organization?.subscription?.plan || 'basic';
+    const limits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
+    const clientLimit = limits?.clients;
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -42,6 +51,12 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient })
 
         if (!organizationId || !currentUser) {
             setError('You must be logged in to add a client');
+            return;
+        }
+
+        // Check subscription limit before creating
+        if (!canAddResource(currentClientCount, clientLimit)) {
+            setShowLimitModal(true);
             return;
         }
 
@@ -90,9 +105,22 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient })
         }
     };
 
+    const handleUpgrade = () => {
+        setShowLimitModal(false);
+        onClose();
+    };
+
     return (
-        <ModalBase title={t('modals.addClient.title')} onClose={onClose}>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <>
+            <LimitReachedModal
+                isOpen={showLimitModal}
+                onClose={() => setShowLimitModal(false)}
+                resourceType="clients"
+                currentPlan={subscriptionPlan}
+                onUpgrade={handleUpgrade}
+            />
+            <ModalBase title={t('modals.addClient.title')} onClose={onClose}>
+                <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
                         {error}
@@ -114,8 +142,9 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient })
                         {loading ? 'Saving...' : t('modals.addClient.saveButton')}
                     </button>
                 </div>
-            </form>
-        </ModalBase>
+                </form>
+            </ModalBase>
+        </>
     );
 };
 

@@ -338,6 +338,12 @@ export interface SubscriptionPlan {
     key: string;
     price: number;
     isPopular: boolean;
+    limits?: {
+        vehicles?: number;  // -1 for unlimited
+        drivers?: number;   // -1 for unlimited
+        routes?: number;    // Monthly active routes limit, -1 for unlimited
+        clients?: number;   // -1 for unlimited
+    };
 }
 
 export interface Material {

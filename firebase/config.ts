@@ -309,9 +309,39 @@ export const subscriptionData: Record<string, SubscriptionPlan[]> = {
     { key: 'scale', price: 748500, isPopular: false },
   ],
   partner: [
-    { key: 'driver', price: 28500, isPopular: false },
-    { key: 'fleet', price: 298500, isPopular: true },
-    { key: 'logisticsPro', price: 598500, isPopular: false },
+    {
+      key: 'basic',
+      price: 28500,
+      isPopular: false,
+      limits: {
+        vehicles: 3,
+        drivers: 3,
+        routes: 10,  // per month
+        clients: 5
+      }
+    },
+    {
+      key: 'pro',
+      price: 298500,
+      isPopular: true,
+      limits: {
+        vehicles: 15,
+        drivers: 15,
+        routes: 50,  // per month
+        clients: 25
+      }
+    },
+    {
+      key: 'max',
+      price: 598500,
+      isPopular: false,
+      limits: {
+        vehicles: -1,  // unlimited
+        drivers: -1,   // unlimited
+        routes: -1,    // unlimited
+        clients: -1    // unlimited
+      }
+    },
   ],
 };
 // --- END OF MOCK DATA ---

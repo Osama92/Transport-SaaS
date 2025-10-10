@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import ModalBase from './ModalBase';
 import { useAuth } from '../../contexts/AuthContext';
 import { createVehicle } from '../../services/firestore/vehicles';
+import { canAddResource, getSubscriptionLimits } from '../../services/firestore/subscriptions';
+import LimitReachedModal from '../LimitReachedModal';
 
 interface AddVehicleModalProps {
     onClose: () => void;
+    currentVehicleCount?: number;
 }
 
 const InputField: React.FC<{label: string, id: string, type?: string, placeholder: string, required?: boolean}> = ({ label, id, type = 'text', placeholder, required = false }) => (
@@ -14,16 +17,28 @@ const InputField: React.FC<{label: string, id: string, type?: string, placeholde
     </div>
 );
 
-const AddVehicleModal: React.FC<AddVehicleModalProps> = ({ onClose }) => {
-    const { currentUser, organizationId } = useAuth();
+const AddVehicleModal: React.FC<AddVehicleModalProps> = ({ onClose, currentVehicleCount = 0 }) => {
+    const { currentUser, organizationId, organization, userRole } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showLimitModal, setShowLimitModal] = useState(false);
+
+    // Get subscription limits
+    const subscriptionPlan = organization?.subscription?.plan || 'basic';
+    const limits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
+    const vehicleLimit = limits?.vehicles;
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         if (!organizationId || !currentUser) {
             setError('You must be logged in to add a vehicle');
+            return;
+        }
+
+        // Check subscription limit before creating
+        if (!canAddResource(currentVehicleCount, vehicleLimit)) {
+            setShowLimitModal(true);
             return;
         }
 
@@ -85,9 +100,24 @@ const AddVehicleModal: React.FC<AddVehicleModalProps> = ({ onClose }) => {
         }
     };
 
+    const handleUpgrade = () => {
+        setShowLimitModal(false);
+        onClose();
+        // TODO: Navigate to subscription management screen
+        // This will be handled by the parent component
+    };
+
     return (
-        <ModalBase title="Add New Vehicle" onClose={onClose}>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <>
+            <LimitReachedModal
+                isOpen={showLimitModal}
+                onClose={() => setShowLimitModal(false)}
+                resourceType="vehicles"
+                currentPlan={subscriptionPlan}
+                onUpgrade={handleUpgrade}
+            />
+            <ModalBase title="Add New Vehicle" onClose={onClose}>
+                <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
                         {error}
@@ -112,8 +142,9 @@ const AddVehicleModal: React.FC<AddVehicleModalProps> = ({ onClose }) => {
                         {loading ? 'Saving...' : 'Save Vehicle'}
                     </button>
                 </div>
-            </form>
-        </ModalBase>
+                </form>
+            </ModalBase>
+        </>
     );
 };
 
