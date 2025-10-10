@@ -727,5 +727,97 @@
         }
       }
     }
+  },
+  "settings": {
+    "title": "Settings",
+    "save": "Save",
+    "saving": "Saving...",
+    "tabs": {
+      "general": "General",
+      "password": "Password",
+      "orgGeneral": "General",
+      "billing": "Plan & Billing",
+      "team": "Team"
+    },
+    "myAccount": "My account",
+    "organization": "Organization",
+    "profile": {
+      "title": "Profile Settings",
+      "profilePicture": "Profile Picture",
+      "changePhoto": "Change photo",
+      "photoHelp": "JPG, PNG or GIF. Max size 5MB.",
+      "fullName": "Full Name",
+      "emailAddress": "Email Address",
+      "emailCannotChange": "Email cannot be changed",
+      "phoneNumber": "Phone Number",
+      "whatsappIntegration": "WhatsApp Integration",
+      "whatsappOptIn": "Subscribe to WhatsApp notifications for customer updates, delivery alerts, and support messages",
+      "whatsappNumberPlaceholder": "+234 800 000 0000",
+      "whatsappEnabledHelp": "Enter your WhatsApp number to receive notifications",
+      "whatsappDisabledHelp": "Enable WhatsApp integration to receive real-time updates",
+      "role": "Role",
+      "organization": "Organization"
+    },
+    "password": {
+      "title": "Change Password",
+      "subtitle": "Update your password to keep your account secure.",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "newPasswordHelp": "Must be at least 6 characters",
+      "confirmPassword": "Confirm New Password",
+      "updateButton": "Update Password",
+      "errorMatch": "New passwords do not match",
+      "errorLength": "Password must be at least 6 characters",
+      "errorEmail": "User email not found",
+      "errorWrongPassword": "Current password is incorrect",
+      "errorGeneral": "Failed to update password",
+      "successMessage": "Password updated successfully!"
+    },
+    "billing": {
+      "title": "Plan & Billing",
+      "subtitle": "Manage your plan and payments.",
+      "cancelSubscription": "Cancel subscription",
+      "managePayments": "Manage payments",
+      "currentPlan": "Current plan",
+      "monthlyPlan": "Monthly plan",
+      "active": "Active",
+      "renewAt": "Renew at",
+      "changePlan": "Change plan",
+      "usage": "Usage",
+      "usageSubtitle": "Your usage is renewed every month.",
+      "vehicles": "Vehicles",
+      "drivers": "Drivers",
+      "routes": "Routes",
+      "clients": "Clients"
+    },
+    "underDevelopment": "This section is under development."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "viewAll": "View All Notifications",
+    "allCaughtUp": "You're all caught up!",
+    "noCaughtUpDesc": "No new notifications at the moment."
+  },
+  "calendar": {
+    "months": {
+      "january": "January",
+      "february": "February",
+      "march": "March",
+      "april": "April",
+      "may": "May",
+      "june": "June",
+      "july": "July",
+      "august": "August",
+      "september": "September",
+      "october": "October",
+      "november": "November",
+      "december": "December"
+    },
+    "clear": "Clear",
+    "apply": "Apply"
+  },
+  "theme": {
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode"
   }
 }

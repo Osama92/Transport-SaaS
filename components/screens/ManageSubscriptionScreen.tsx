@@ -101,39 +101,6 @@ const ManageSubscriptionScreen: React.FC<ManageSubscriptionScreenProps> = ({ onB
                 </div>
             </div>
 
-            {/* Current Usage Section */}
-            {userRole === 'partner' && currentLimits && (
-                <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Current Usage</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <SubscriptionLimitBadge
-                            current={vehicles.length}
-                            limit={currentLimits.vehicles}
-                            resourceType="vehicles"
-                            showProgressBar={true}
-                        />
-                        <SubscriptionLimitBadge
-                            current={drivers.length}
-                            limit={currentLimits.drivers}
-                            resourceType="drivers"
-                            showProgressBar={true}
-                        />
-                        <SubscriptionLimitBadge
-                            current={currentMonthRouteCount}
-                            limit={currentLimits.routes}
-                            resourceType="routes"
-                            showProgressBar={true}
-                        />
-                        <SubscriptionLimitBadge
-                            current={clients.length}
-                            limit={currentLimits.clients}
-                            resourceType="clients"
-                            showProgressBar={true}
-                        />
-                    </div>
-                </div>
-            )}
-
             {/* Available Plans */}
             <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Available Plans</h3>

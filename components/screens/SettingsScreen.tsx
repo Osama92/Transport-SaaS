@@ -21,6 +21,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
     const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
     const [phone, setPhone] = useState(currentUser?.phoneNumber || '');
     const [whatsapp, setWhatsapp] = useState('');
+    const [whatsappOptIn, setWhatsappOptIn] = useState(false);
     const [profileImage, setProfileImage] = useState(currentUser?.photoURL || '');
     const [isSaving, setIsSaving] = useState(false);
 
@@ -158,7 +159,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                     <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700">
                         <ArrowLeftIcon className="w-6 h-6 text-gray-700 dark:text-gray-300" />
                     </button>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Settings</h1>
+                    <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{t('settings.title')}</h1>
                 </div>
                 {activeTab === 'general' && (
                     <button
@@ -166,7 +167,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                         disabled={isSaving}
                         className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isSaving ? 'Saving...' : 'Save'}
+                        {isSaving ? t('settings.saving') : t('settings.save')}
                     </button>
                 )}
             </div>
@@ -175,7 +176,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                 {/* Sidebar */}
                 <div className="w-64 border-r border-gray-200 dark:border-slate-700 p-6 space-y-6">
                     <div>
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">My account</h3>
+                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">{t('settings.myAccount')}</h3>
                         <button
                             onClick={() => setActiveTab('general')}
                             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${
@@ -185,7 +186,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                             <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">General</span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings.tabs.general')}</span>
                         </button>
                         <button
                             onClick={() => setActiveTab('password')}
@@ -196,12 +197,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                             <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                             </svg>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Password</span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings.tabs.password')}</span>
                         </button>
                     </div>
 
                     <div>
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Organization</h3>
+                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">{t('settings.organization')}</h3>
                         <button
                             onClick={() => setActiveTab('billing')}
                             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${
@@ -211,7 +212,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                             <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                             </svg>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Plan & Billing</span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings.tabs.billing')}</span>
                         </button>
                         <button
                             onClick={() => setActiveTab('team')}
@@ -222,7 +223,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                             <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Team</span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings.tabs.team')}</span>
                         </button>
                     </div>
                 </div>
@@ -490,16 +491,32 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        WhatsApp Number
+                                        WhatsApp Integration
                                     </label>
-                                    <input
-                                        type="tel"
-                                        value={whatsapp}
-                                        onChange={(e) => setWhatsapp(e.target.value)}
-                                        placeholder="+234 800 000 0000"
-                                        className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">For customer notifications and support</p>
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <input
+                                            type="checkbox"
+                                            id="whatsappOptIn"
+                                            checked={whatsappOptIn}
+                                            onChange={(e) => setWhatsappOptIn(e.target.checked)}
+                                            className="mt-1 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                        />
+                                        <label htmlFor="whatsappOptIn" className="text-sm text-gray-700 dark:text-gray-300">
+                                            Subscribe to WhatsApp notifications for customer updates, delivery alerts, and support messages
+                                        </label>
+                                    </div>
+                                    {whatsappOptIn && (
+                                        <input
+                                            type="tel"
+                                            value={whatsapp}
+                                            onChange={(e) => setWhatsapp(e.target.value)}
+                                            placeholder="+234 800 000 0000"
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    )}
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                        {whatsappOptIn ? 'Enter your WhatsApp number to receive notifications' : 'Enable WhatsApp integration to receive real-time updates'}
+                                    </p>
                                 </div>
 
                                 <div>

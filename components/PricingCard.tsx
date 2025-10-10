@@ -29,32 +29,34 @@ const PricingCard: React.FC<PricingCardProps> = ({ plan, onSelect, role: propRol
     };
 
     return (
-        <div className={`bg-white p-8 rounded-2xl shadow-sm transition-all duration-300 relative hover:shadow-xl hover:scale-105 cursor-pointer ${isPopular ? 'border-2 border-indigo-500' : 'border border-gray-200'}`}>
+        <div className={`bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm transition-all duration-300 relative hover:shadow-xl hover:scale-105 cursor-pointer ${isPopular ? 'border-2 border-indigo-500' : 'border border-gray-200 dark:border-slate-700'}`}>
             {isPopular && (
                 <div className="absolute top-0 -translate-y-1/2 left-1/2 -translate-x-1/2">
                     <span className="bg-indigo-500 text-white text-xs font-semibold px-4 py-1 rounded-full uppercase">Most Popular</span>
                 </div>
             )}
-            <h3 className="text-2xl font-bold text-gray-800 text-center">{name}</h3>
-            <p className="text-center text-gray-500 mt-2 h-12 text-sm">{description}</p>
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 text-center">{name}</h3>
+            <p className="text-center text-gray-500 dark:text-gray-400 mt-2 h-12 text-sm">{description}</p>
             <div className="text-center my-8">
                 <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-4xl font-extrabold text-gray-900">{formatCurrency(price)}</span>
-                    <span className="text-sm text-gray-500">/month</span>
+                    <span className="text-4xl font-extrabold text-gray-900 dark:text-gray-100">{formatCurrency(price)}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">/month</span>
                 </div>
             </div>
             <ul className="space-y-4 mb-8 min-h-[200px]">
-                {features.map((feature, index) => (
+                {features.length > 0 ? features.map((feature, index) => (
                     <li key={index} className="flex items-start">
                         <CheckCircleIcon className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-600 text-sm">{feature}</span>
+                        <span className="text-gray-600 dark:text-gray-300 text-sm">{feature}</span>
                     </li>
-                ))}
+                )) : (
+                    <li className="text-sm text-gray-500 dark:text-gray-400 text-center">No features available</li>
+                )}
             </ul>
             <button
                 onClick={onSelect}
                 disabled={disabled}
-                className={`w-full font-bold py-3 px-6 rounded-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 ${isPopular ? 'bg-indigo-500 text-white hover:bg-indigo-600 focus:ring-indigo-500' : 'bg-gray-100 text-indigo-500 hover:bg-indigo-100 focus:ring-indigo-300'}`}
+                className={`w-full font-bold py-3 px-6 rounded-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 ${isPopular ? 'bg-indigo-500 text-white hover:bg-indigo-600 focus:ring-indigo-500' : 'bg-gray-100 dark:bg-slate-700 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-slate-600 focus:ring-indigo-300'}`}
             >
                 {t('subscription.choosePlanButton')}
             </button>
