@@ -97,7 +97,15 @@ const DriversTable: React.FC<DriversTableProps> = ({
                             <tr key={driver.id} className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                 <td className="py-3 px-4">
                                     <div className="flex items-center gap-3">
-                                        <img src={driver.avatar} alt={driver.name} className="w-9 h-9 rounded-full" />
+                                        {driver.avatar ? (
+                                            <img src={driver.avatar} alt={driver.name} className="w-9 h-9 rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                                                <span className="text-indigo-600 dark:text-indigo-300 font-semibold text-sm">
+                                                    {driver.name.charAt(0).toUpperCase()}
+                                                </span>
+                                            </div>
+                                        )}
                                         <div>
                                             <p className="font-semibold text-gray-800 dark:text-gray-100">{driver.name}</p>
                                             <p className="text-xs text-gray-500 dark:text-gray-400">{t('common.license')}: {driver.licenseNumber}</p>

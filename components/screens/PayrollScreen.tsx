@@ -65,6 +65,7 @@ const PayrollScreen: React.FC<PayrollScreenProps> = ({
     }, []);
 
     const calculateTotal = (payslips: PayrollRun['payslips']) => {
+        if (!payslips || payslips.length === 0) return 0;
         return payslips.reduce((sum, item) => sum + item.netPay, 0);
     };
 
@@ -135,9 +136,9 @@ const PayrollScreen: React.FC<PayrollScreenProps> = ({
                                         {run.periodStart} - {run.periodEnd}
                                     </td>
                                     <td className="py-4 px-4 text-gray-600 dark:text-gray-300">{run.payDate}</td>
-                                    <td className="py-4 px-4 text-gray-600 dark:text-gray-300">{run.payslips.length}</td>
+                                    <td className="py-4 px-4 text-gray-600 dark:text-gray-300">{run.payslips?.length || 0}</td>
                                     <td className="py-4 px-4 font-semibold text-gray-800 dark:text-gray-100">
-                                        {formatCurrency(calculateTotal(run.payslips))}
+                                        {formatCurrency(run.totalNetPay || calculateTotal(run.payslips))}
                                     </td>
                                     <td className="py-4 px-4"><StatusBadge status={run.status} /></td>
                                     <td className="py-4 px-4 text-right">

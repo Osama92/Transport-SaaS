@@ -28,7 +28,7 @@ import RouteAssignmentTable from '../RouteAssignmentTable';
 import StatCard from '../StatCard';
 import type { Route, Driver, Vehicle, Client, DriverPerformanceData, MaintenanceLog, VehicleDocument, Invoice, InvoiceItem, Expense, Notification, PayrollRun, Payslip } from '../../types';
 // Import Firestore hooks
-import { useDrivers, useVehicles, useRoutes, useClients } from '../../hooks/useFirestore';
+import { useDrivers, useVehicles, useRoutes, useClients, usePayrollRuns } from '../../hooks/useFirestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
 // Import Firestore functions
@@ -36,6 +36,7 @@ import { deleteDriver, updateDriver } from '../../services/firestore/drivers';
 import { deleteVehicle } from '../../services/firestore/vehicles';
 import { deleteRoute, assignRouteResources, startRoute, updateRoute, addRouteExpense, completeRoute } from '../../services/firestore/routes';
 import { createClient, updateClient as updateClientFirestore, deleteClient, updateClientStatus } from '../../services/firestore/clients';
+import { createPayrollRun } from '../../services/firestore/payroll';
 // Keep mock data functions for demo mode
 import {
     generateDriverPerformanceData,
@@ -261,6 +262,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const { data: firestoreVehicles, loading: vehiclesLoading } = useVehicles(isDemoMode ? null : organizationId);
   const { data: firestoreRoutes, loading: routesLoading } = useRoutes(isDemoMode ? null : organizationId);
   const { data: firestoreClients, loading: clientsLoading } = useClients(isDemoMode ? null : organizationId);
+  const { data: firestorePayrollRuns, loading: payrollLoading } = usePayrollRuns(isDemoMode ? null : organizationId);
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [activeNav, setActiveNav] = useState('Dashboard');
@@ -279,6 +281,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const drivers = isDemoMode ? mockDrivers : (firestoreDrivers || []);
   const vehicles = isDemoMode ? mockVehicles : (firestoreVehicles || []);
   const clients = isDemoMode ? mockClients : (firestoreClients || []);
+  const payrollRuns = isDemoMode ? mockPayrollRuns : (firestorePayrollRuns || []);
 
   // Calculate current month route count for subscription limits
   const currentMonthRouteCount = useMemo(() => {
@@ -296,7 +299,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [routeStatusFilter, setRouteStatusFilter] = useState<RouteStatusFilter>('All');
   const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
   const [invoiceView, setInvoiceView] = useState<InvoiceView>('list');
@@ -331,16 +333,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
                 const [
                     invoicesData,
                     notificationsData,
-                    payrollData,
                 ] = await Promise.all([
                     getInvoices(),
                     getNotifications(),
-                    getPayrollRuns(),
                 ]);
 
                 setInvoices(invoicesData as Invoice[]);
                 setNotifications(notificationsData as Notification[]);
-                setPayrollRuns(payrollData as PayrollRun[]);
             } catch (err) {
                 setError("Failed to load partner data. Please refresh the page.");
                 console.error(err);
@@ -380,7 +379,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
             setMockInvoices(invoicesData as Invoice[]);
             setInvoices(invoicesData as Invoice[]);
             setNotifications(notificationsData as Notification[]);
-            setPayrollRuns(payrollData as PayrollRun[]);
             setMockPayrollRuns(payrollData as PayrollRun[]);
             rawPerformanceData = generateDriverPerformanceData(typedDriversData);
 
@@ -865,17 +863,37 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   };
 
   const handleCreatePayrollRun = async (periodStart: string, periodEnd: string) => {
-    const newPayslips = await calculatePayslipsForPeriod(drivers, periodStart, periodEnd);
-    const newRun: PayrollRun = {
-        id: `PR-${new Date().getFullYear()}-${new Date().getMonth() + 1}`,
-        periodStart,
-        periodEnd,
-        payDate: new Date(new Date(periodEnd).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 5 days after period end
-        status: 'Draft',
-        payslips: newPayslips,
-    };
-    setPayrollRuns(prev => [newRun, ...prev]);
-    setActiveModal(null);
+    if (isDemoMode) {
+      // Demo mode: use mock calculation
+      const newPayslips = await calculatePayslipsForPeriod(drivers, periodStart, periodEnd);
+      const newRun: PayrollRun = {
+          id: `PR-${new Date().getFullYear()}-${new Date().getMonth() + 1}`,
+          periodStart,
+          periodEnd,
+          payDate: new Date(new Date(periodEnd).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 5 days after period end
+          status: 'Draft',
+          payslips: newPayslips,
+      };
+      setMockPayrollRuns(prev => [newRun, ...prev]);
+      setActiveModal(null);
+    } else {
+      // Production mode: use Firestore
+      try {
+        if (!organizationId || !currentUser) {
+          alert('Organization or user information is missing. Please refresh the page.');
+          return;
+        }
+
+        // Create payroll run in Firestore (will fetch drivers with their pay info)
+        await createPayrollRun(organizationId, periodStart, periodEnd, drivers, currentUser.uid);
+
+        setActiveModal(null);
+        alert('Payroll run created successfully!');
+      } catch (error) {
+        console.error('Error creating payroll run:', error);
+        alert('Failed to create payroll run. Please ensure all drivers have pay information set.');
+      }
+    }
   };
 
   const filteredRoutes = routes.filter(route => {

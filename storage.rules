@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Organization-scoped storage
+    match /organizations/{organizationId}/{allPaths=**} {
+      // Allow authenticated users to read files from their organization
+      allow read: if request.auth != null;
+
+      // Allow authenticated users to write files to their organization
+      // In production, you may want to add organizationId validation
+      allow write: if request.auth != null;
+    }
+
+    // For backward compatibility - allow authenticated users general access
+    // Remove this in production and use only organization-scoped rules
+    match /{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}

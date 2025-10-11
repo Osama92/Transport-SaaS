@@ -42,6 +42,13 @@ const PayslipPreview: React.FC<PayslipPreviewProps> = ({ payslip }) => {
                         <h4 className="text-xs uppercase font-bold text-gray-500 mb-1">Employee</h4>
                         <p className="font-semibold">{payslip.driverName}</p>
                         <p className="text-sm">Driver ID: {payslip.driverId}</p>
+                        {payslip.bankInfo && (
+                            <div className="mt-2 text-sm">
+                                <p className="font-medium">{payslip.bankInfo.bankName}</p>
+                                <p>{payslip.bankInfo.accountNumber}</p>
+                                <p className="text-xs text-gray-600">{payslip.bankInfo.accountName}</p>
+                            </div>
+                        )}
                     </div>
                     <div>
                         <h4 className="text-xs uppercase font-bold text-gray-500 mb-1">Pay Period</h4>

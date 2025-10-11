@@ -103,7 +103,7 @@ export const createDriver = async (
         const driverRef = doc(db, DRIVERS_COLLECTION, driverId);
 
         // Structure the data for Firestore
-        const newDriver = {
+        const newDriver: any = {
             organizationId,
             name: driverData.name,
             email: driverData.email || '',
@@ -121,14 +121,24 @@ export const createDriver = async (
             } : null,
             safetyScore: driverData.safetyScore || 0,
             payrollInfo: {
-                baseSalary: driverData.baseSalary || driverData.payrollInfo?.baseSalary || 0,
-                pensionContributionRate: driverData.pensionContributionRate || driverData.payrollInfo?.pensionContributionRate || 8,
-                nhfContributionRate: driverData.nhfContributionRate || driverData.payrollInfo?.nhfContributionRate || 2.5,
+                baseSalary: driverData.payrollInfo?.baseSalary || driverData.baseSalary || 0,
+                pensionContributionRate: driverData.payrollInfo?.pensionContributionRate || driverData.pensionContributionRate || 8,
+                nhfContributionRate: driverData.payrollInfo?.nhfContributionRate || driverData.nhfContributionRate || 2.5,
             },
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             createdBy: userId,
         };
+
+        // Add bank info if provided
+        if (driverData.bankInfo) {
+            newDriver.bankInfo = {
+                accountNumber: driverData.bankInfo.accountNumber,
+                accountName: driverData.bankInfo.accountName,
+                bankName: driverData.bankInfo.bankName,
+                bankCode: driverData.bankInfo.bankCode || null,
+            };
+        }
 
         // Use setDoc with the readable ID
         await setDoc(driverRef, newDriver);

@@ -106,7 +106,7 @@ const calculatePayslips = (
 
         const netPay = monthlyGrossPay - monthlyTax - monthlyPension - monthlyNhf;
 
-        return {
+        const payslip: Payslip = {
             id: `PS-${driver.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             driverId: typeof driver.id === 'string' ? parseInt(driver.id.replace(/\D/g, '')) || 0 : driver.id,
             driverName: driver.name,
@@ -121,6 +121,17 @@ const calculatePayslips = (
             netPay: Math.round(netPay),
             status: 'Draft' as const,
         };
+
+        // Add bank info if available
+        if (driver.bankInfo) {
+            payslip.bankInfo = {
+                accountNumber: driver.bankInfo.accountNumber,
+                accountName: driver.bankInfo.accountName,
+                bankName: driver.bankInfo.bankName,
+            };
+        }
+
+        return payslip;
     });
 };
 

@@ -5,6 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { createDriver } from '../../services/firestore/drivers';
 import { canAddResource, getSubscriptionLimits } from '../../services/firestore/subscriptions';
 import LimitReachedModal from '../LimitReachedModal';
+import { verifyBankAccount, NIGERIAN_BANKS } from '../../services/bankVerification';
+import { uploadDriverPhoto, uploadDriverLicense } from '../../services/firestore/storage';
 
 interface AddDriverModalProps {
     onClose: () => void;
@@ -26,6 +28,9 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
+    const [verifying, setVerifying] = useState(false);
+    const [accountName, setAccountName] = useState('');
+    const [selectedBankCode, setSelectedBankCode] = useState('');
 
     // Get subscription limits
     const subscriptionPlan = organization?.subscription?.plan || 'basic';
@@ -42,6 +47,39 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
     };
 
     const driverPhotoPreview = driverPhoto ? URL.createObjectURL(driverPhoto) : null;
+
+    const handleVerifyAccount = async () => {
+        const accountNumberInput = document.getElementById('accountNumber') as HTMLInputElement;
+        const accountNumber = accountNumberInput?.value;
+
+        if (!accountNumber || accountNumber.length !== 10) {
+            setError('Please enter a valid 10-digit account number');
+            return;
+        }
+
+        if (!selectedBankCode) {
+            setError('Please select a bank first');
+            return;
+        }
+
+        setVerifying(true);
+        setError(null);
+
+        try {
+            const result = await verifyBankAccount(accountNumber, selectedBankCode);
+
+            if (result) {
+                setAccountName(result.accountName);
+                setError(null);
+            } else {
+                setError('Could not verify account. Please check the details and try again.');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to verify account');
+        } finally {
+            setVerifying(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -67,6 +105,12 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
             const license = formData.get('license') as string;
             const nin = formData.get('nin') as string;
             const baseSalary = formData.get('baseSalary') as string;
+            const pensionRate = formData.get('pensionRate') as string;
+            const nhfRate = formData.get('nhfRate') as string;
+            const accountNumber = formData.get('accountNumber') as string;
+            const accountName = formData.get('accountName') as string;
+            const bankName = formData.get('bankName') as string;
+            const bankCode = formData.get('bankCode') as string;
 
             if (!fullName || !phone) {
                 setError('Name and phone are required');
@@ -74,34 +118,69 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
                 return;
             }
 
-            // Create driver in Firestore
-            await createDriver(
+            if (!baseSalary || Number(baseSalary) <= 0) {
+                setError('Please enter a valid base salary');
+                setLoading(false);
+                return;
+            }
+
+            // Step 1: Create driver in Firestore to get the driver ID
+            const driverId = await createDriver(
                 organizationId,
                 {
                     name: fullName,
                     phone: phone,
                     licenseNumber: license || '',
                     nin: nin || '',
-                    status: 'Available',
-                    email: '',
-                    address: '',
-                    dateOfBirth: '',
-                    hireDate: new Date().toISOString(),
-                    vehicleId: null,
-                    currentRouteId: null,
-                    totalRoutes: 0,
-                    completedRoutes: 0,
-                    rating: 5.0,
-                    photoURL: driverPhoto ? URL.createObjectURL(driverPhoto) : undefined,
+                    status: 'Idle',
+                    location: '',
+                    avatar: '',
+                    licensePhotoUrl: '',
                     payrollInfo: {
-                        baseSalary: baseSalary ? Number(baseSalary) : 150000,
-                        pensionContributionRate: 0.08,
-                        nhfContributionRate: 0.025,
+                        baseSalary: Number(baseSalary),
+                        pensionContributionRate: pensionRate ? Number(pensionRate) : 8,
+                        nhfContributionRate: nhfRate ? Number(nhfRate) : 2.5,
                     },
-                    locationData: undefined,
+                    bankInfo: accountNumber && accountName && bankName ? {
+                        accountNumber: accountNumber,
+                        accountName: accountName,
+                        bankName: bankName,
+                        bankCode: bankCode || undefined,
+                    } : undefined,
                 },
                 currentUser.uid
             );
+
+            // Step 2: Upload photos to Firebase Storage if provided
+            let photoURL = '';
+            let licensePhotoURL = '';
+
+            if (driverPhoto) {
+                try {
+                    photoURL = await uploadDriverPhoto(driverPhoto, driverId, organizationId);
+                } catch (uploadError) {
+                    console.error('Error uploading driver photo:', uploadError);
+                    // Don't fail the entire operation if photo upload fails
+                }
+            }
+
+            if (licensePhoto) {
+                try {
+                    licensePhotoURL = await uploadDriverLicense(licensePhoto, driverId, organizationId);
+                } catch (uploadError) {
+                    console.error('Error uploading license photo:', uploadError);
+                    // Don't fail the entire operation if license upload fails
+                }
+            }
+
+            // Step 3: Update driver with photo URLs if uploads were successful
+            if (photoURL || licensePhotoURL) {
+                const { updateDriver } = await import('../../services/firestore/drivers');
+                await updateDriver(driverId, {
+                    avatar: photoURL,
+                    licensePhotoUrl: licensePhotoURL,
+                });
+            }
 
             onClose();
         } catch (err: any) {
@@ -136,7 +215,87 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
                 <InputField label={t('modals.addDriver.phone')} id="phone" type="tel" placeholder="e.g., (555) 123-4567" />
                 <InputField label={t('modals.addDriver.license')} id="license" placeholder="Enter license number" />
                 <InputField label={`${t('modals.addDriver.nin')} (${t('common.optional')})`} id="nin" placeholder="Enter National Identification Number" />
-                <InputField label="Base Salary (₦)" id="baseSalary" type="number" placeholder="e.g., 150000" />
+
+                <div className="border-t pt-4 mt-4 dark:border-slate-700">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Payroll Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <InputField label="Annual Base Salary (₦)" id="baseSalary" type="number" placeholder="e.g., 3600000" />
+                        <InputField label="Pension Rate (%)" id="pensionRate" type="number" placeholder="e.g., 8" />
+                        <InputField label="NHF Rate (%)" id="nhfRate" type="number" placeholder="e.g., 2.5" />
+                    </div>
+                </div>
+
+                <div className="border-t pt-4 mt-4 dark:border-slate-700">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Bank Account Details</h3>
+
+                    {/* Bank Selection */}
+                    <div className="mb-4">
+                        <label htmlFor="bankSelect" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Bank</label>
+                        <select
+                            id="bankSelect"
+                            value={selectedBankCode}
+                            onChange={(e) => {
+                                setSelectedBankCode(e.target.value);
+                                const selectedBank = NIGERIAN_BANKS.find(b => b.code === e.target.value);
+                                const bankNameInput = document.getElementById('bankName') as HTMLInputElement;
+                                if (bankNameInput && selectedBank) {
+                                    bankNameInput.value = selectedBank.name;
+                                }
+                                setAccountName(''); // Reset account name when bank changes
+                            }}
+                            className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200"
+                        >
+                            <option value="">-- Select a bank --</option>
+                            {NIGERIAN_BANKS.map(bank => (
+                                <option key={bank.code} value={bank.code}>
+                                    {bank.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        {/* Account Number */}
+                        <div>
+                            <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Account Number</label>
+                            <input
+                                type="text"
+                                id="accountNumber"
+                                name="accountNumber"
+                                maxLength={10}
+                                placeholder="e.g., 0123456789"
+                                className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200"
+                                onChange={() => setAccountName('')} // Clear name when account number changes
+                            />
+                        </div>
+
+                        {/* Verify Button */}
+                        <div className="flex items-end">
+                            <button
+                                type="button"
+                                onClick={handleVerifyAccount}
+                                disabled={verifying}
+                                className="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {verifying ? 'Verifying...' : 'Verify Account'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Account Name (Auto-populated after verification) */}
+                    {accountName && (
+                        <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                            <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                                ✓ Account verified: {accountName}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Hidden fields for submission */}
+                    <input type="hidden" id="accountName" name="accountName" value={accountName} />
+                    <input type="hidden" id="bankName" name="bankName" />
+                    <input type="hidden" id="bankCode" name="bankCode" value={selectedBankCode} />
+                </div>
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('modals.addDriver.photo')}</label>

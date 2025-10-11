@@ -31,7 +31,8 @@ const StatusBadge: React.FC<{ status: PayrollRun['status'] }> = ({ status }) => 
 const PayrollRunDetailsScreen: React.FC<PayrollRunDetailsScreenProps> = ({ payrollRun, onBack, onViewPayslip }) => {
     const { t } = useTranslation();
     const [isGeneratingAllPdf, setIsGeneratingAllPdf] = useState(false);
-    const totalAmount = payrollRun.payslips.reduce((sum, p) => sum + p.netPay, 0);
+    const payslips = payrollRun.payslips || [];
+    const totalAmount = payslips.reduce((sum, p) => sum + p.netPay, 0);
 
     const handleDownloadAllPayslips = () => {
         setIsGeneratingAllPdf(true);
@@ -42,7 +43,7 @@ const PayrollRunDetailsScreen: React.FC<PayrollRunDetailsScreenProps> = ({ payro
         
         const generatePdf = async () => {
             const pdf = new jsPDF('p', 'mm', 'a4');
-            const payslipIds = payrollRun.payslips.map(p => p.id);
+            const payslipIds = payslips.map(p => p.id);
 
             for (let i = 0; i < payslipIds.length; i++) {
                 const payslipElement = document.getElementById(`payslip-pdf-${payslipIds[i]}`);
@@ -102,7 +103,7 @@ const PayrollRunDetailsScreen: React.FC<PayrollRunDetailsScreenProps> = ({ payro
 
             {/* Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <InfoPill label={t('screens.payroll.period')} value={payrollRun.payslips[0]?.payPeriod || 'N/A'} />
+                <InfoPill label={t('screens.payroll.period')} value={payslips[0]?.payPeriod || 'N/A'} />
                 <InfoPill label={t('screens.payroll.payDate')} value={payrollRun.payDate} />
                 <InfoPill label={t('screens.payroll.totalAmount')} value={formatCurrency(totalAmount)} />
                 <div className="bg-gray-100 dark:bg-slate-700/50 p-3 rounded-lg">
@@ -126,7 +127,7 @@ const PayrollRunDetailsScreen: React.FC<PayrollRunDetailsScreenProps> = ({ payro
                             </tr>
                         </thead>
                         <tbody>
-                            {payrollRun.payslips.map((payslip) => (
+                            {payslips.map((payslip) => (
                                 <tr key={payslip.id} className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                     <td className="py-3 px-4 font-semibold text-gray-800 dark:text-gray-100">{payslip.driverName}</td>
                                     <td className="py-3 px-4 text-gray-600 dark:text-gray-300 text-right">{formatCurrency(payslip.basePay)}</td>
@@ -143,13 +144,19 @@ const PayrollRunDetailsScreen: React.FC<PayrollRunDetailsScreenProps> = ({ payro
                             ))}
                         </tbody>
                     </table>
+                    {payslips.length === 0 && (
+                        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                            <h3 className="text-lg font-semibold">No payslips found</h3>
+                            <p className="mt-1">This payroll run has no payslips associated with it.</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* Off-screen renderer for PDF generation */}
             {isGeneratingAllPdf && (
                 <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '210mm' }}>
-                    {payrollRun.payslips.map(p => (
+                    {payslips.map(p => (
                         <div key={p.id} id={`payslip-pdf-${p.id}`}>
                             <PayslipPreview payslip={p} />
                         </div>

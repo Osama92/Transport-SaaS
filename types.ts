@@ -157,6 +157,12 @@ export interface Driver extends FirestoreDocument {
         pensionContributionRate: number; // Employee's contribution percentage, e.g., 8 for 8%
         nhfContributionRate: number; // National Housing Fund contribution, e.g., 2.5 for 2.5%
     };
+    bankInfo?: {
+        accountNumber: string;
+        accountName: string;
+        bankName: string;
+        bankCode?: string; // For Nigerian banks (e.g., GTB = 058)
+    };
     // Deprecated fields (for backward compatibility)
     lat?: number;
     lng?: number;
@@ -367,6 +373,11 @@ export interface Payslip {
     nhf: number; // National Housing Fund
     netPay: number; // gross - tax - pension - nhf
     status: 'Draft' | 'Paid';
+    bankInfo?: {
+        accountNumber: string;
+        accountName: string;
+        bankName: string;
+    };
 }
 
 export interface PayrollRun extends FirestoreDocument {
