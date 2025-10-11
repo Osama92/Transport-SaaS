@@ -42,20 +42,24 @@ const AppContent: React.FC = () => {
 
     // User is logged in
     if (currentUser) {
-        // Check if user has completed onboarding and has a subscription
-        const hasCompletedOnboarding = userRole && organization?.subscription?.plan;
-
-        // User hasn't completed onboarding or doesn't have a subscription
-        if (!hasCompletedOnboarding || isOnboarding || isSubscription) {
-            // If in subscription flow
-            if (isSubscription) {
-                return <SubscriptionPage roleId={userRole || 'business'} onComplete={handleSubscriptionComplete} onBack={handleBackToOnboarding} />
-            }
-            // Default to onboarding
+        // If explicitly in onboarding or subscription flow, show those pages
+        if (isOnboarding && !userRole) {
             return <OnboardingPage onComplete={handleRoleSelection} />;
         }
 
-        // User is fully authenticated with a role and subscription
+        if (isSubscription) {
+            return <SubscriptionPage roleId={userRole || 'business'} onComplete={handleSubscriptionComplete} onBack={handleBackToOnboarding} />
+        }
+
+        // Check if user has completed onboarding (must have a role)
+        const hasCompletedOnboarding = !!userRole;
+
+        // User hasn't completed onboarding - show onboarding page
+        if (!hasCompletedOnboarding) {
+            return <OnboardingPage onComplete={handleRoleSelection} />;
+        }
+
+        // User is fully authenticated with a role - go to dashboard
         return <Dashboard role={userRole} />;
     }
 

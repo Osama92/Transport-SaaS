@@ -32,7 +32,7 @@ import { useDrivers, useVehicles, useRoutes, useClients } from '../../hooks/useF
 import { useAuth } from '../../contexts/AuthContext';
 import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
 // Import Firestore functions
-import { deleteDriver } from '../../services/firestore/drivers';
+import { deleteDriver, updateDriver } from '../../services/firestore/drivers';
 import { deleteVehicle } from '../../services/firestore/vehicles';
 import { deleteRoute, assignRouteResources, startRoute, updateRoute, addRouteExpense, completeRoute } from '../../services/firestore/routes';
 import { createClient, updateClient as updateClientFirestore, deleteClient, updateClientStatus } from '../../services/firestore/clients';
@@ -672,12 +672,29 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     }
   };
 
-  const handleUpdateDriverPay = (driverId: number, newPayInfo: { baseSalary: number, pensionContributionRate: number, nhfContributionRate: number }) => {
+  const handleUpdateDriverPay = async (driverId: number, newPayInfo: { baseSalary: number, pensionContributionRate: number, nhfContributionRate: number }) => {
     if (isDemoMode) {
       setMockDrivers(prev => prev.map(d => d.id === driverId ? { ...d, ...newPayInfo } : d));
+      setActiveModal(null);
+    } else {
+      try {
+        // Convert driverId to string for Firestore
+        const driverIdStr = typeof driverId === 'string' ? driverId : `DRV-${driverId}`;
+
+        // Update driver payroll info in Firestore
+        await updateDriver(driverIdStr, {
+          baseSalary: newPayInfo.baseSalary,
+          pensionContributionRate: newPayInfo.pensionContributionRate,
+          nhfContributionRate: newPayInfo.nhfContributionRate,
+        });
+
+        setActiveModal(null);
+        alert('Driver pay information updated successfully!');
+      } catch (error) {
+        console.error('Error updating driver pay:', error);
+        alert('Failed to update driver pay. Please try again.');
+      }
     }
-    // For production mode, update happens through Firestore
-    setActiveModal(null);
   };
   
   const handleShowModal = (modalType: ModalType, item?: any) => {

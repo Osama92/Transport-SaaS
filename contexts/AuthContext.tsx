@@ -85,15 +85,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         // Update last login
                         await updateLastLogin(firebaseUser.uid);
 
-                        // Set role and organization
+                        // Set role and organization from user profile
                         setUserRole(userProfile.role);
-                        // Use email as organizationId for better traceability
-                        const orgId = firebaseUser.email || userProfile.organizationId;
-                        setOrganizationId(orgId);
 
-                        // Load organization if exists
-                        if (orgId) {
-                            const org = await getOrganizationById(orgId);
+                        // Use organizationId from user profile (not email)
+                        if (userProfile.organizationId) {
+                            setOrganizationId(userProfile.organizationId);
+
+                            // Load organization if exists
+                            const org = await getOrganizationById(userProfile.organizationId);
                             setOrganizationState(org);
                         }
                     }
@@ -177,21 +177,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         try {
-            // Create organization in Firestore
+            // Use user email as organization ID for consistency
+            const emailBasedOrgId = currentUser.email;
+
+            if (!emailBasedOrgId) {
+                throw new Error("User email is required");
+            }
+
+            // Check if organization already exists
+            const existingOrg = await getOrganizationById(emailBasedOrgId);
+
+            if (existingOrg) {
+                console.log('Organization already exists for this user, skipping creation');
+                // Just update the role
+                await updateUserRoleAndOrganization(
+                    currentUser.uid,
+                    role as 'individual' | 'business' | 'partner',
+                    emailBasedOrgId
+                );
+                setUserRole(role);
+                setOrganizationId(emailBasedOrgId);
+                setOrganizationState(existingOrg);
+                return;
+            }
+
+            // Create organization with email as ID
+            console.log('Creating new organization with ID:', emailBasedOrgId);
             const organizationData = {
-                name: `${currentUser.displayName}'s ${role} Organization`,
+                name: `${currentUser.displayName}'s ${role.charAt(0).toUpperCase() + role.slice(1)} Organization`,
                 type: role as Organization['type'],
-                ownerId: currentUser.uid,
-                settings: {
-                    currency: 'NGN',
-                    timezone: 'Africa/Lagos',
-                    language: 'en',
-                },
-                subscription: {
-                    plan: 'trial',
-                    status: 'trial',
-                    startDate: new Date().toISOString(),
-                },
+                role: role as 'individual' | 'business' | 'partner',
                 companyDetails: {
                     address: '',
                     email: currentUser.email,
@@ -199,21 +214,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 },
             };
 
-            const orgId = await createOrganization(currentUser.uid, organizationData);
+            // Pass email as custom org ID
+            await createOrganization(currentUser.uid, organizationData, emailBasedOrgId);
 
             // Update user role and organization in Firestore
             await updateUserRoleAndOrganization(
                 currentUser.uid,
                 role as 'individual' | 'business' | 'partner',
-                orgId
+                emailBasedOrgId
             );
 
             // Load the created organization
-            const org = await getOrganizationById(orgId);
+            const org = await getOrganizationById(emailBasedOrgId);
 
             // Update local state
             setUserRole(role);
-            setOrganizationId(orgId);
+            setOrganizationId(emailBasedOrgId);
             setOrganizationState(org);
         } catch (error: any) {
             console.error('Error updating user role:', error);

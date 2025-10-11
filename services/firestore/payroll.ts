@@ -19,90 +19,109 @@ const PAYROLL_RUNS_COLLECTION = 'payrollRuns';
 
 /**
  * Nigerian PAYE Tax Calculation (2026 Reform)
- * Progressive tax brackets:
- * - First ₦800,000: 10%
- * - Next ₦800,000 (₦800,001 - ₦1,600,000): 15%
- * - Next ₦1,400,000 (₦1,600,001 - ₦3,000,000): 20%
- * - Next ₦2,000,000 (₦3,000,001 - ₦5,000,000): 25%
- * - Next ₦5,000,000 (₦5,000,001 - ₦10,000,000): 30%
- * - Above ₦10,000,000: 35%
+ * Progressive tax brackets with CRA and deductions
  */
-const calculatePAYE = (annualGrossIncome: number): number => {
-    let tax = 0;
+const calculateNigerianPAYE = (
+    annualGrossIncome: number,
+    pensionContribution: number,
+    nhfContribution: number
+): number => {
+    // 1. Calculate Consolidated Relief Allowance (CRA)
+    const cra = 200000 + (0.20 * annualGrossIncome);
 
-    if (annualGrossIncome <= 800000) {
-        tax = annualGrossIncome * 0.10;
-    } else if (annualGrossIncome <= 1600000) {
-        tax = 800000 * 0.10 + (annualGrossIncome - 800000) * 0.15;
-    } else if (annualGrossIncome <= 3000000) {
-        tax = 800000 * 0.10 + 800000 * 0.15 + (annualGrossIncome - 1600000) * 0.20;
-    } else if (annualGrossIncome <= 5000000) {
-        tax = 800000 * 0.10 + 800000 * 0.15 + 1400000 * 0.20 + (annualGrossIncome - 3000000) * 0.25;
-    } else if (annualGrossIncome <= 10000000) {
-        tax = 800000 * 0.10 + 800000 * 0.15 + 1400000 * 0.20 + 2000000 * 0.25 + (annualGrossIncome - 5000000) * 0.30;
-    } else {
-        tax = 800000 * 0.10 + 800000 * 0.15 + 1400000 * 0.20 + 2000000 * 0.25 + 5000000 * 0.30 + (annualGrossIncome - 10000000) * 0.35;
+    // 2. Determine Total Reliefs
+    const totalReliefs = cra + pensionContribution + nhfContribution;
+
+    // 3. Calculate Taxable Income
+    let taxableIncome = annualGrossIncome - totalReliefs;
+    if (taxableIncome <= 0) {
+        return Math.max(0.01 * annualGrossIncome, 0); // Minimum tax is 1% of gross income
     }
 
-    return Math.round(tax * 100) / 100;
+    // 4. Apply Tax Brackets (Proposed Annual)
+    let tax = 0;
+
+    if (taxableIncome > 20000000) {
+        tax += (taxableIncome - 20000000) * 0.35;
+        taxableIncome = 20000000;
+    }
+    if (taxableIncome > 12000000) {
+        tax += (taxableIncome - 12000000) * 0.30;
+        taxableIncome = 12000000;
+    }
+    if (taxableIncome > 8000000) {
+        tax += (taxableIncome - 8000000) * 0.25;
+        taxableIncome = 8000000;
+    }
+    if (taxableIncome > 4000000) {
+        tax += (taxableIncome - 4000000) * 0.20;
+        taxableIncome = 4000000;
+    }
+    if (taxableIncome > 2000000) {
+        tax += (taxableIncome - 2000000) * 0.15;
+        taxableIncome = 2000000;
+    }
+    if (taxableIncome > 0) {
+        tax += taxableIncome * 0.10;
+    }
+
+    // 5. Apply Minimum Tax Rule
+    const minimumTax = 0.01 * annualGrossIncome;
+    return Math.max(tax, minimumTax);
 };
 
 /**
- * Calculate payslip for a driver
+ * Calculate payslips for drivers - matches types.ts schema
  */
-export const calculatePayslip = (
-    driver: Driver,
+const calculatePayslips = (
+    drivers: Driver[],
     periodStart: string,
-    periodEnd: string,
-    bonuses: number = 0,
-    deductions: number = 0
-): Omit<Payslip, 'id' | 'payrollRunId'> => {
-    const baseSalary = driver.payrollInfo?.baseSalary || driver.baseSalary || 0;
+    periodEnd: string
+): Payslip[] => {
+    const payPeriodDate = new Date(periodStart);
+    const payPeriod = `${payPeriodDate.toLocaleString('default', { month: 'short' })} ${payPeriodDate.getFullYear()}`;
+    const payDate = new Date(new Date(periodEnd).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    // Calculate pension (8% employee + 10% employer = 18% total, but employee pays 8%)
-    const pensionRate = driver.payrollInfo?.pensionContributionRate || 0.08;
-    const pensionContribution = baseSalary * pensionRate;
+    return drivers.map(driver => {
+        // Use default values if fields are missing
+        const annualGross = driver.baseSalary || 0;
+        const pensionRate = driver.pensionContributionRate || 8;
+        const nhfRate = driver.nhfContributionRate || 2.5;
 
-    // Calculate NHF (2.5% of basic salary)
-    const nhfRate = driver.payrollInfo?.nhfContributionRate || 0.025;
-    const nhfContribution = baseSalary * nhfRate;
+        const monthlyBasePay = annualGross / 12;
+        const bonuses = Math.random() > 0.5 ? Math.round(Math.random() * (monthlyBasePay * 0.1)) : 0;
+        const monthlyGrossPay = monthlyBasePay + bonuses;
 
-    // Gross income
-    const grossIncome = baseSalary + bonuses;
+        // Calculate annual deductions for tax calculation
+        const annualPension = annualGross * (pensionRate / 100);
+        const annualNhf = annualGross * (nhfRate / 100);
 
-    // Annual gross for PAYE calculation
-    const annualGross = grossIncome * 12;
+        // Calculate annual tax
+        const annualTax = calculateNigerianPAYE(annualGross, annualPension, annualNhf);
 
-    // Calculate annual PAYE
-    const annualPAYE = calculatePAYE(annualGross);
+        // Convert to monthly
+        const monthlyTax = annualTax / 12;
+        const monthlyPension = annualPension / 12;
+        const monthlyNhf = annualNhf / 12;
 
-    // Monthly PAYE
-    const payeDeduction = annualPAYE / 12;
+        const netPay = monthlyGrossPay - monthlyTax - monthlyPension - monthlyNhf;
 
-    // Total deductions
-    const totalDeductions = pensionContribution + nhfContribution + payeDeduction + deductions;
-
-    // Net pay
-    const netPay = grossIncome - totalDeductions;
-
-    return {
-        driverId: driver.id,
-        driverName: driver.name,
-        periodStart,
-        periodEnd,
-        baseSalary,
-        bonuses,
-        grossIncome,
-        pensionContribution,
-        nhfContribution,
-        payeDeduction,
-        otherDeductions: deductions,
-        totalDeductions,
-        netPay,
-        status: 'Pending',
-        paidDate: null,
-        pdfUrl: null,
-    };
+        return {
+            id: `PS-${driver.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            driverId: typeof driver.id === 'string' ? parseInt(driver.id.replace(/\D/g, '')) || 0 : driver.id,
+            driverName: driver.name,
+            payPeriod,
+            payDate,
+            basePay: Math.round(monthlyBasePay),
+            bonuses: Math.round(bonuses),
+            grossPay: Math.round(monthlyGrossPay),
+            tax: Math.round(monthlyTax),
+            pension: Math.round(monthlyPension),
+            nhf: Math.round(monthlyNhf),
+            netPay: Math.round(netPay),
+            status: 'Draft' as const,
+        };
+    });
 };
 
 /**
@@ -204,35 +223,32 @@ export const createPayrollRun = async (
     periodStart: string,
     periodEnd: string,
     drivers: Driver[],
-    userId: string,
-    bonusesMap?: Record<string, number>,
-    deductionsMap?: Record<string, number>
+    userId: string
 ): Promise<string> => {
     try {
         const payrollRunsRef = collection(db, PAYROLL_RUNS_COLLECTION);
 
         // Calculate payslips for all drivers
-        const payslipsData = drivers.map(driver => {
-            const bonuses = bonusesMap?.[driver.id] || 0;
-            const deductions = deductionsMap?.[driver.id] || 0;
-            return calculatePayslip(driver, periodStart, periodEnd, bonuses, deductions);
-        });
+        const payslipsData = calculatePayslips(drivers, periodStart, periodEnd);
 
         // Calculate totals
-        const totalGross = payslipsData.reduce((sum, ps) => sum + ps.grossIncome, 0);
-        const totalDeductions = payslipsData.reduce((sum, ps) => sum + ps.totalDeductions, 0);
-        const totalNet = payslipsData.reduce((sum, ps) => sum + ps.netPay, 0);
+        const totalGrossPay = payslipsData.reduce((sum, ps) => sum + ps.grossPay, 0);
+        const totalNetPay = payslipsData.reduce((sum, ps) => sum + ps.netPay, 0);
+        const totalTax = payslipsData.reduce((sum, ps) => sum + ps.tax, 0);
+        const totalDeductions = payslipsData.reduce((sum, ps) => sum + (ps.tax + ps.pension + ps.nhf), 0);
+
+        const payDate = payslipsData[0]?.payDate || new Date().toISOString().split('T')[0];
 
         const newPayrollRun = {
             organizationId,
             periodStart,
             periodEnd,
-            status: 'Draft',
-            totalGross,
+            payDate,
+            status: 'Draft' as const,
+            totalGrossPay,
+            totalNetPay,
+            totalTax,
             totalDeductions,
-            totalNet,
-            employeeCount: drivers.length,
-            processedDate: null,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             createdBy: userId,
@@ -300,7 +316,6 @@ export const processPayrollRun = async (payrollRunId: string): Promise<void> => 
         const payrollRunRef = doc(db, PAYROLL_RUNS_COLLECTION, payrollRunId);
         await updateDoc(payrollRunRef, {
             status: 'Processed',
-            processedDate: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
     } catch (error) {
@@ -310,25 +325,27 @@ export const processPayrollRun = async (payrollRunId: string): Promise<void> => 
 };
 
 /**
- * Complete payroll run (mark all payslips as paid)
+ * Mark payroll run as paid (mark all payslips as paid)
  */
-export const completePayrollRun = async (payrollRunId: string): Promise<void> => {
+export const markPayrollRunAsPaid = async (payrollRunId: string): Promise<void> => {
     try {
         // Update all payslips to paid
         const payslips = await getPayslipsByPayrollRun(payrollRunId);
         for (const payslip of payslips) {
-            await updatePayslipStatus(payrollRunId, payslip.id!, 'Paid');
+            if (payslip.id) {
+                await updatePayslipStatus(payrollRunId, payslip.id, 'Paid');
+            }
         }
 
         // Update payroll run status
         const payrollRunRef = doc(db, PAYROLL_RUNS_COLLECTION, payrollRunId);
         await updateDoc(payrollRunRef, {
-            status: 'Completed',
+            status: 'Paid',
             updatedAt: serverTimestamp(),
         });
     } catch (error) {
-        console.error('Error completing payroll run:', error);
-        throw new Error('Failed to complete payroll run');
+        console.error('Error marking payroll run as paid:', error);
+        throw new Error('Failed to mark payroll run as paid');
     }
 };
 
@@ -456,13 +473,14 @@ export const getPayslipById = async (
 /**
  * Add a payslip to a payroll run
  */
-export const addPayslip = async (
+const addPayslip = async (
     payrollRunId: string,
-    payslipData: Omit<Payslip, 'id' | 'payrollRunId'>
+    payslipData: Payslip
 ): Promise<string> => {
     try {
         const payslipsRef = collection(db, PAYROLL_RUNS_COLLECTION, payrollRunId, 'payslips');
-        const docRef = await addDoc(payslipsRef, payslipData);
+        const { id, ...dataWithoutId } = payslipData;
+        const docRef = await addDoc(payslipsRef, dataWithoutId);
         return docRef.id;
     } catch (error) {
         console.error('Error adding payslip:', error);

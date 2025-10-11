@@ -43,31 +43,36 @@ const VehicleAnalytics: React.FC<VehicleAnalyticsProps> = ({ vehicles, dateRange
             ? vehicles
             : vehicles.filter(v => v.id === selectedVehicleId);
 
-        const logs = filteredVehicles.flatMap(v => v.maintenanceLogs)
+        const logs = filteredVehicles
+            .flatMap(v => v.maintenanceLogs || [])
+            .filter(log => log && log.date)
             .filter(log => {
                 const logDate = new Date(log.date);
                 return logDate >= dateRange.start && logDate <= dateRange.end;
             });
 
-        const totalSpending = logs.reduce((sum, log) => sum + log.cost, 0);
-        const fuelSpending = logs.filter(log => log.type === 'Fuel').reduce((sum, log) => sum + log.cost, 0);
+        const totalSpending = logs.reduce((sum, log) => sum + (log.cost || 0), 0);
+        const fuelSpending = logs.filter(log => log.type === 'Fuel').reduce((sum, log) => sum + (log.cost || 0), 0);
         const maintenanceSpending = totalSpending - fuelSpending;
 
         const categoryCosts = logs.reduce((acc, log) => {
-            acc[log.type] = (acc[log.type] || 0) + log.cost;
+            const type = log.type || 'Other';
+            acc[type] = (acc[type] || 0) + (log.cost || 0);
             return acc;
         }, {} as Record<string, number>);
 
         const spendingByCategory = Object.entries(categoryCosts).map(([name, value]) => ({ name, value }));
 
         const costPerVehicle = vehicles.map(vehicle => {
-            const vehicleLogs = vehicle.maintenanceLogs.filter(log => {
-                 const logDate = new Date(log.date);
-                return logDate >= dateRange.start && logDate <= dateRange.end;
-            });
+            const vehicleLogs = (vehicle.maintenanceLogs || [])
+                .filter(log => log && log.date)
+                .filter(log => {
+                    const logDate = new Date(log.date);
+                    return logDate >= dateRange.start && logDate <= dateRange.end;
+                });
             return {
                 name: vehicle.plateNumber,
-                cost: vehicleLogs.reduce((sum, log) => sum + log.cost, 0)
+                cost: vehicleLogs.reduce((sum, log) => sum + (log.cost || 0), 0)
             }
         }).sort((a,b) => b.cost - a.cost);
 

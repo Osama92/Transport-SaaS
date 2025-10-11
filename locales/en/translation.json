@@ -29,7 +29,8 @@
     "submit": "Submit",
     "optional": "Optional",
     "chooseFile": "Choose File",
-    "noFileChosen": "No file chosen"
+    "noFileChosen": "No file chosen",
+    "license": "License"
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -45,6 +46,7 @@
     "invoices": "Invoices",
     "transporters": "Transporters",
     "contacts": "Contacts",
+    "payroll": "Payroll",
     "logout": "Logout"
   },
   "header": {
@@ -429,6 +431,13 @@
       "title": "Mark as {{status}}?",
       "message": "Are you sure you want to mark <strong>{{name}}</strong> as {{status}}?",
       "button": "Mark as {{status}}"
+    },
+    "createPayrollRun": {
+      "title": "Create New Payroll Run",
+      "subtitle": "Select the pay period for this payroll run.",
+      "periodStart": "Period Start Date",
+      "periodEnd": "Period End Date",
+      "createButton": "Create Payroll Run"
     }
   },
   "screens": {
@@ -543,6 +552,39 @@
       "savedContactPlaceholder": "Select a contact to auto-fill...",
       "savedMaterialPlaceholder": "Select a material...",
       "addItemToDispatchTitle": "Add Delivery Stop"
+    },
+    "payroll": {
+      "title": "Payroll Management",
+      "subtitle": "View and manage payroll runs for your drivers.",
+      "runNew": "Run New Payroll",
+      "period": "Period",
+      "payDate": "Pay Date",
+      "payslips": "Payslips",
+      "totalAmount": "Total Amount",
+      "runDetailsTitle": "Payroll Run Details",
+      "runDetailsSubtitle": "View and manage individual payslips for this payroll run.",
+      "processPayroll": "Process Payroll",
+      "markAsPaid": "Mark as Paid",
+      "downloadAll": "Download All Payslips",
+      "generating": "Generating...",
+      "driverName": "Name",
+      "basePay": "Base Pay",
+      "bonuses": "Bonuses",
+      "totalDeductions": "Total Deductions",
+      "netPay": "Net Pay",
+      "payslipTitle": "Payslip for",
+      "earnings": "Earnings",
+      "grossPay": "Gross Pay",
+      "deductions": "Deductions",
+      "tax": "Tax (PAYE)",
+      "pension": "Pension",
+      "nhf": "NHF",
+      "print": "Print Payslip",
+      "editPayTitle": "Edit Pay for {{name}}",
+      "editPay": "Edit Pay",
+      "annualSalary": "Annual Salary (₦)",
+      "pensionRate": "Pension Contribution Rate (%)",
+      "nhfRate": "NHF Contribution Rate (%)"
     }
   },
   "components": {

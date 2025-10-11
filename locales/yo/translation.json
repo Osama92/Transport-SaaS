@@ -20,7 +20,17 @@
     "edit": "Ṣatunṣe",
     "view": "Wo",
     "saveChanges": "Fipamọ Awọn Ayipada",
-    "submit": "Gbigbe"
+    "yes": "Bẹẹni",
+    "no": "Rara",
+    "ok": "O dara",
+    "error": "Aṣiṣe",
+    "success": "Aṣeyọri",
+    "loading": "N ṣiṣẹ...",
+    "submit": "Gbigbe",
+    "optional": "Aṣayan",
+    "chooseFile": "Yan faili",
+    "noFileChosen": "Ko si faili ti a yan",
+    "license": "Iwe-aṣẹ"
   },
   "sidebar": {
     "dashboard": "Dasibodu",
@@ -34,7 +44,9 @@
     "routes": "Awọn ipa-ọna",
     "clients": "Awọn onibara",
     "invoices": "Awọn risiti",
+    "transporters": "Awọn oluṣiṣẹ gbigbe",
     "contacts": "Awọn olubasọrọ",
+    "payroll": "Owo-oṣiṣẹ",
     "logout": "Jade"
   },
   "header": {
@@ -98,6 +110,39 @@
       "tableHeaderName": "Orukọ",
       "tableHeaderRecipient": "Olugba",
       "tableHeaderAddress": "Adirẹsi"
+    },
+    "payroll": {
+      "title": "Iṣakoso Owo-oṣiṣẹ",
+      "subtitle": "Wo ati ṣakoso awọn iṣẹ owo-oṣiṣẹ fun awọn awakọ rẹ.",
+      "runNew": "Ṣe Owo-oṣiṣẹ Tuntun",
+      "period": "Akoko",
+      "payDate": "Ọjọ Isanwo",
+      "payslips": "Awọn Iwe Owo-oṣiṣẹ",
+      "totalAmount": "Apapọ Owo",
+      "runDetailsTitle": "Awọn Alaye Owo-oṣiṣẹ",
+      "runDetailsSubtitle": "Wo ati ṣakoso awọn iwe owo-oṣiṣẹ fun iṣẹ owo-oṣiṣẹ yii.",
+      "processPayroll": "Ṣe Ilana Owo-oṣiṣẹ",
+      "markAsPaid": "Samisi bi Ti San",
+      "downloadAll": "Gba Gbogbo Awọn Iwe Owo-oṣiṣẹ",
+      "generating": "N ṣẹda...",
+      "driverName": "Orukọ",
+      "basePay": "Owo Ipilẹ",
+      "bonuses": "Awọn Ere",
+      "totalDeductions": "Apapọ Awọn Iyokuro",
+      "netPay": "Owo Net",
+      "payslipTitle": "Iwe Owo-oṣiṣẹ fun",
+      "earnings": "Awọn Ere",
+      "grossPay": "Owo Gross",
+      "deductions": "Awọn Iyokuro",
+      "tax": "Owo-ori (PAYE)",
+      "pension": "Ipamọ Ipele",
+      "nhf": "NHF",
+      "print": "Tẹ Iwe Owo-oṣiṣẹ",
+      "editPayTitle": "Ṣatunṣe Owo fun {{name}}",
+      "editPay": "Ṣatunṣe Owo",
+      "annualSalary": "Owo-oṣu Ọdọọdun (₦)",
+      "pensionRate": "Oṣuwọn Ifunni Ipamọ (%)",
+      "nhfRate": "Oṣuwọn Ifunni NHF (%)"
     }
   },
   "components": {

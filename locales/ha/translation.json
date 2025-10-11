@@ -20,7 +20,17 @@
     "edit": "Gyara",
     "view": "Duba",
     "saveChanges": "Adana Canje-canje",
-    "submit": "Miƙa"
+    "yes": "Eh",
+    "no": "A'a",
+    "ok": "To madalla",
+    "error": "Kuskure",
+    "success": "Nasara",
+    "loading": "Ana lodi...",
+    "submit": "Miƙa",
+    "optional": "Na zaɓi",
+    "chooseFile": "Zaɓi fayil",
+    "noFileChosen": "Ba a zaɓi fayil ba",
+    "license": "Lasisi"
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -34,7 +44,9 @@
     "routes": "Hanyoyi",
     "clients": "Abokan Ciniki",
     "invoices": "Rasitoci",
+    "transporters": "Masu jigilar kaya",
     "contacts": "Lambobin sadarwa",
+    "payroll": "Biyan albashi",
     "logout": "Fita"
   },
   "header": {
@@ -98,6 +110,39 @@
       "tableHeaderName": "Suna",
       "tableHeaderRecipient": "Mai Karɓa",
       "tableHeaderAddress": "Adireshi"
+    },
+    "payroll": {
+      "title": "Sarrafa Biyan Albashi",
+      "subtitle": "Duba da sarrafa biyan albashi na direbobi.",
+      "runNew": "Yi Sabon Biyan Albashi",
+      "period": "Lokaci",
+      "payDate": "Ranar Biya",
+      "payslips": "Takardun Albashi",
+      "totalAmount": "Jimlar Kuɗi",
+      "runDetailsTitle": "Bayanan Biyan Albashi",
+      "runDetailsSubtitle": "Duba da sarrafa takardun albashi na wannan biyan albashi.",
+      "processPayroll": "Sarrafa Biyan Albashi",
+      "markAsPaid": "Yi Alama A Matsayin An Biya",
+      "downloadAll": "Sauke Duk Takardun Albashi",
+      "generating": "Ana samarwa...",
+      "driverName": "Suna",
+      "basePay": "Albashi na Asali",
+      "bonuses": "Kari",
+      "totalDeductions": "Jimlar Rage",
+      "netPay": "Albashi Net",
+      "payslipTitle": "Takardar Albashi na",
+      "earnings": "Abubuwan da aka samu",
+      "grossPay": "Albashi Gross",
+      "deductions": "Ragewa",
+      "tax": "Haraji (PAYE)",
+      "pension": "Fansho",
+      "nhf": "NHF",
+      "print": "Buga Takardar Albashi",
+      "editPayTitle": "Gyara Albashi na {{name}}",
+      "editPay": "Gyara Albashi",
+      "annualSalary": "Albashin Shekara (₦)",
+      "pensionRate": "Kimar Gudummawar Fansho (%)",
+      "nhfRate": "Kimar Gudummawar NHF (%)"
     }
   },
   "components": {

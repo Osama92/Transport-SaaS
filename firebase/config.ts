@@ -427,14 +427,18 @@ export const calculatePayslipsForPeriod = async (drivers: Driver[], periodStart:
 
     const payslips: Payslip[] = drivers.map(driver => {
         // Assume baseSalary is annual. Calculate monthly figures.
-        const annualGross = driver.baseSalary;
+        // Use default values if fields are missing
+        const annualGross = driver.baseSalary || 0;
+        const pensionRate = driver.pensionContributionRate || 8;
+        const nhfRate = driver.nhfContributionRate || 2.5;
+
         const monthlyBasePay = annualGross / 12;
         const bonuses = Math.random() > 0.5 ? Math.round(Math.random() * (monthlyBasePay * 0.1)) : 0; // Random bonus up to 10%
         const monthlyGrossPay = monthlyBasePay + bonuses;
 
         // Calculate annual deductions for tax calculation
-        const annualPension = annualGross * (driver.pensionContributionRate / 100);
-        const annualNhf = annualGross * (driver.nhfContributionRate / 100);
+        const annualPension = annualGross * (pensionRate / 100);
+        const annualNhf = annualGross * (nhfRate / 100);
         
         // Calculate annual tax using the dedicated function
         const annualTax = calculateNigerianPAYE(annualGross, annualPension, annualNhf);

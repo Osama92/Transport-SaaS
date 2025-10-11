@@ -49,10 +49,12 @@ export const createOrganization = async (
         type: Organization['type'];
         role: 'individual' | 'business' | 'partner';
         companyDetails?: Organization['companyDetails'];
-    }
+    },
+    customOrgId?: string
 ): Promise<string> => {
     try {
-        const organizationId = generateOrganizationId();
+        // Use custom ID if provided (e.g., user email), otherwise generate random ID
+        const organizationId = customOrgId || generateOrganizationId();
         const orgRef = doc(db, ORGANIZATIONS_COLLECTION, organizationId);
 
         const newOrg: Omit<Organization, 'id'> = {

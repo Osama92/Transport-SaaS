@@ -20,7 +20,17 @@
     "edit": "Dezie",
     "view": "Lelee",
     "saveChanges": "Chekwaa Mgbanwe",
-    "submit": "Nyefee"
+    "yes": "Ee",
+    "no": "Mba",
+    "ok": "Ọ dị mma",
+    "error": "Njehie",
+    "success": "Ihe ịga nke ọma",
+    "loading": "Na-ebu...",
+    "submit": "Nyefee",
+    "optional": "Nhọrọ",
+    "chooseFile": "Họrọ faịlụ",
+    "noFileChosen": "Enweghị faịlụ ahọpụtara",
+    "license": "Ikike"
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -34,7 +44,9 @@
     "routes": "Ụzọ",
     "clients": "Ndị ahịa",
     "invoices": "Akwụkwọ ọnụahịa",
+    "transporters": "Ndị na-ebu ibu",
     "contacts": "Ndi ana-akpo",
+    "payroll": "Ụgwọ ọrụ",
     "logout": "Wepụ"
   },
   "header": {
@@ -98,6 +110,39 @@
       "tableHeaderName": "Aha",
       "tableHeaderRecipient": "Onye nnata",
       "tableHeaderAddress": "Adreesị"
+    },
+    "payroll": {
+      "title": "Njikwa Ụgwọ Ọrụ",
+      "subtitle": "Lelee ma jikwaa ụgwọ ọrụ maka ndị ọkwọ ụgbọala gị.",
+      "runNew": "Mee Ụgwọ Ọrụ Ọhụrụ",
+      "period": "Oge",
+      "payDate": "Ụbọchị Ụgwọ",
+      "payslips": "Mpempe Akwụkwọ Ụgwọ",
+      "totalAmount": "Ngụkọta Ego",
+      "runDetailsTitle": "Nkọwa Ụgwọ Ọrụ",
+      "runDetailsSubtitle": "Lelee ma jikwaa mpempe akwụkwọ ụgwọ maka ụgwọ ọrụ a.",
+      "processPayroll": "Hazie Ụgwọ Ọrụ",
+      "markAsPaid": "Kaa dị ka akwụgoro ụgwọ",
+      "downloadAll": "Budata Mpempe Akwụkwọ Ụgwọ Niile",
+      "generating": "Na-emepụta...",
+      "driverName": "Aha",
+      "basePay": "Ụgwọ Ntọala",
+      "bonuses": "Ego Nrite",
+      "totalDeductions": "Mwepu Niile",
+      "netPay": "Ụgwọ Net",
+      "payslipTitle": "Mpempe Akwụkwọ Ụgwọ maka",
+      "earnings": "Ego Inwetara",
+      "grossPay": "Ụgwọ Gross",
+      "deductions": "Mwepu",
+      "tax": "Ụtụ Isi (PAYE)",
+      "pension": "Ezumike Nka",
+      "nhf": "NHF",
+      "print": "Bipụta Mpempe Akwụkwọ Ụgwọ",
+      "editPayTitle": "Dezie Ụgwọ maka {{name}}",
+      "editPay": "Dezie Ụgwọ",
+      "annualSalary": "Ụgwọ Ọrụ Kwa Afọ (₦)",
+      "pensionRate": "Ọnụego Ntinye Ezumike Nka (%)",
+      "nhfRate": "Ọnụego Ntinye NHF (%)"
     }
   },
   "components": {
