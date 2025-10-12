@@ -9,7 +9,8 @@ import {
     updatePassword as firebaseUpdatePassword,
     User as FirebaseUser,
 } from 'firebase/auth';
-import { auth } from '../firebase/firebaseConfig';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, storage } from '../firebase/firebaseConfig';
 import {
     getUserProfile,
     createOrUpdateUserProfile,
@@ -283,9 +284,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         try {
-            // In production, upload to Firebase Storage
-            // For now, create a local URL
-            const photoURL = URL.createObjectURL(file);
+            // Upload to Firebase Storage
+            const storageRef = ref(storage, `profile-images/${currentUser.uid}`);
+            await uploadBytes(storageRef, file);
+            const photoURL = await getDownloadURL(storageRef);
 
             // Update in Firebase Auth
             await updateProfile(auth.currentUser, { photoURL });

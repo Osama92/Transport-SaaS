@@ -17,6 +17,8 @@ export interface UserProfile {
     photoURL?: string;
     role: 'individual' | 'business' | 'partner' | null;
     organizationId: string | null;
+    whatsappNumber?: string; // WhatsApp number for receiving notifications
+    whatsappOptIn?: boolean; // Whether user wants WhatsApp notifications
     createdAt: Timestamp | string;
     updatedAt: Timestamp | string;
     lastLoginAt?: Timestamp | string;
@@ -148,5 +150,39 @@ export const updateUserProfile = async (
     } catch (error) {
         console.error('Error updating user profile:', error);
         throw new Error('Failed to update user profile');
+    }
+};
+
+/**
+ * Update user's WhatsApp preferences
+ */
+export const updateWhatsAppPreferences = async (
+    uid: string,
+    whatsappNumber: string,
+    whatsappOptIn: boolean
+): Promise<void> => {
+    try {
+        const userRef = doc(db, USERS_COLLECTION, uid);
+        await updateDoc(userRef, {
+            whatsappNumber,
+            whatsappOptIn,
+            updatedAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error('Error updating WhatsApp preferences:', error);
+        throw new Error('Failed to update WhatsApp preferences');
+    }
+};
+
+/**
+ * Get user's WhatsApp number (only if opted in)
+ */
+export const getUserWhatsAppNumber = async (uid: string): Promise<string | null> => {
+    try {
+        const user = await getUserProfile(uid);
+        return user?.whatsappOptIn && user?.whatsappNumber ? user.whatsappNumber : null;
+    } catch (error) {
+        console.error('Error getting user WhatsApp number:', error);
+        return null;
     }
 };

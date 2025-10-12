@@ -1,20 +1,22 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
 import { useDrivers, useVehicles, useRoutes, useClients } from '../../hooks/useFirestore';
+import { getUserProfile, updateWhatsAppPreferences } from '../../services/firestore/users';
+import { whatsAppService } from '../../services/whatsapp/whatsappService';
 import { ArrowLeftIcon } from '../Icons';
-import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 
 interface SettingsScreenProps {
     onBack: () => void;
     onManageSubscription: () => void;
+    onTestWhatsApp?: () => void;
     initialTab?: 'general' | 'password' | 'orgGeneral' | 'billing' | 'team';
 }
 
-const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscription, initialTab = 'general' }) => {
+const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscription, onTestWhatsApp, initialTab = 'general' }) => {
     const { t } = useTranslation();
-    const { userRole, organization, organizationId, currentUser } = useAuth();
+    const { userRole, organization, organizationId, currentUser, updateDisplayName: updateDisplayNameAuth, updateProfilePicture } = useAuth();
     const [activeTab, setActiveTab] = useState<'general' | 'password' | 'orgGeneral' | 'billing' | 'team'>(initialTab);
 
     // Form states for profile
@@ -23,7 +25,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
     const [whatsapp, setWhatsapp] = useState('');
     const [whatsappOptIn, setWhatsappOptIn] = useState(false);
     const [profileImage, setProfileImage] = useState(currentUser?.photoURL || '');
+    const [profileImageFile, setProfileImageFile] = useState<File | null>(null); // Store the actual file
     const [isSaving, setIsSaving] = useState(false);
+
+    // Track initial values for unsaved changes detection
+    const [initialDisplayName, setInitialDisplayName] = useState('');
+    const [initialWhatsapp, setInitialWhatsapp] = useState('');
+    const [initialWhatsappOptIn, setInitialWhatsappOptIn] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
     // Form states for password
     const [currentPassword, setCurrentPassword] = useState('');
@@ -34,6 +43,45 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
 
     // File upload ref
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Load user WhatsApp preferences on mount and set initial values
+    useEffect(() => {
+        const loadUserPreferences = async () => {
+            if (currentUser) {
+                try {
+                    const userProfile = await getUserProfile(currentUser.uid);
+                    if (userProfile) {
+                        const whatsappNum = userProfile.whatsappNumber || '';
+                        const whatsappOpt = userProfile.whatsappOptIn || false;
+
+                        setWhatsapp(whatsappNum);
+                        setWhatsappOptIn(whatsappOpt);
+
+                        // Set initial values for change detection
+                        setInitialWhatsapp(whatsappNum);
+                        setInitialWhatsappOptIn(whatsappOpt);
+                    }
+
+                    // Set initial display name
+                    setInitialDisplayName(currentUser.displayName || '');
+                } catch (error) {
+                    console.error('Error loading user preferences:', error);
+                }
+            }
+        };
+        loadUserPreferences();
+    }, [currentUser]);
+
+    // Detect unsaved changes
+    useEffect(() => {
+        const hasChanges =
+            displayName !== initialDisplayName ||
+            whatsapp !== initialWhatsapp ||
+            whatsappOptIn !== initialWhatsappOptIn ||
+            profileImageFile !== null;
+
+        setHasUnsavedChanges(hasChanges);
+    }, [displayName, whatsapp, whatsappOptIn, profileImageFile, initialDisplayName, initialWhatsapp, initialWhatsappOptIn]);
 
     // Get current data counts
     const { data: firestoreVehicles } = useVehicles(organizationId);
@@ -83,6 +131,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
     const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Store the file for upload
+            setProfileImageFile(file);
+
+            // Create preview
             const reader = new FileReader();
             reader.onloadend = () => {
                 setProfileImage(reader.result as string);
@@ -96,17 +148,69 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
 
         setIsSaving(true);
         try {
-            await updateProfile(currentUser, {
-                displayName: displayName,
-                photoURL: profileImage,
-            });
-            alert('Profile updated successfully!');
+            // Update profile picture if changed
+            if (profileImageFile) {
+                await updateProfilePicture(profileImageFile);
+                setProfileImageFile(null);
+            }
+
+            // Update display name if changed
+            if (displayName !== initialDisplayName) {
+                await updateDisplayNameAuth(displayName);
+                setInitialDisplayName(displayName);
+            }
+
+            // Update WhatsApp preferences if changed
+            const whatsappChanged = whatsapp !== initialWhatsapp || whatsappOptIn !== initialWhatsappOptIn;
+            if (whatsappChanged) {
+                if (whatsappOptIn && whatsapp) {
+                    await updateWhatsAppPreferences(currentUser.uid, whatsapp, whatsappOptIn);
+
+                    // Send confirmation message to WhatsApp number
+                    try {
+                        const result = await whatsAppService.sendText(
+                            whatsapp,
+                            `Hello ${displayName}! 🎉\n\nYour WhatsApp notifications have been successfully activated. You will now receive important updates about your shipments, drivers, and vehicles.\n\nThank you for using our service!`
+                        );
+
+                        if (result.success) {
+                            alert('Profile updated successfully! A confirmation message has been sent to your WhatsApp number.');
+                        } else {
+                            alert('Profile updated successfully! However, we could not send a confirmation to your WhatsApp number: ' + result.error);
+                        }
+                    } catch (whatsappError) {
+                        console.error('WhatsApp notification failed:', whatsappError);
+                        alert('Profile updated successfully! However, we could not send a confirmation to your WhatsApp number.');
+                    }
+                } else {
+                    await updateWhatsAppPreferences(currentUser.uid, '', false);
+                    alert('Profile updated successfully!');
+                }
+
+                // Update initial values
+                setInitialWhatsapp(whatsapp);
+                setInitialWhatsappOptIn(whatsappOptIn);
+            } else {
+                alert('Profile updated successfully!');
+            }
+
+            setHasUnsavedChanges(false);
         } catch (error: any) {
             console.error('Error updating profile:', error);
             alert('Failed to update profile: ' + error.message);
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleBack = () => {
+        if (hasUnsavedChanges) {
+            const confirmDiscard = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
+            if (!confirmDiscard) {
+                return;
+            }
+        }
+        onBack();
     };
 
     const handleChangePassword = async (e: React.FormEvent) => {
@@ -156,7 +260,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
                 <div className="flex items-center gap-4">
-                    <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700">
+                    <button onClick={handleBack} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700">
                         <ArrowLeftIcon className="w-6 h-6 text-gray-700 dark:text-gray-300" />
                     </button>
                     <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{t('settings.title')}</h1>
@@ -515,7 +619,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                                         />
                                     )}
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                        {whatsappOptIn ? 'Enter your WhatsApp number to receive notifications' : 'Enable WhatsApp integration to receive real-time updates'}
+                                        {whatsappOptIn && whatsapp
+                                            ? 'A confirmation message will be sent when you save your changes.'
+                                            : whatsappOptIn
+                                            ? 'Enter your WhatsApp number to receive notifications'
+                                            : 'Enable WhatsApp integration to receive real-time updates'}
                                     </p>
                                 </div>
 

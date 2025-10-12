@@ -20,8 +20,8 @@ const NotificationIcon: React.FC<{ iconName: string; className: string }> = ({ i
 
 interface AllNotificationsScreenProps {
     notifications: Notification[];
-    onUpdateNotification: (id: number, updates: Partial<Notification>) => void;
-    onDeleteNotification: (id: number) => void;
+    onUpdateNotification: (id: number | string, updates: Partial<Notification>) => void;
+    onDeleteNotification: (id: number | string) => void;
     onReadAll: () => void;
 }
 

@@ -13,13 +13,16 @@ import AnalyticsScreen from '../screens/AnalyticsScreen';
 import MaterialsScreen from '../screens/MaterialsScreen';
 import DeliveryContactsScreen from '../screens/DeliveryContactsScreen';
 // FIX: Update import path from firebase/firestore to firebase/config
-import { getTransporters, getShipments, getDeliveryContacts, getNotifications, getMaterials } from '../../firebase/config'; 
+import { getTransporters, getShipments, getDeliveryContacts, getNotifications, getMaterials } from '../../firebase/config';
 import type { Notification, Shipment, DeliveryStop, Transporter, TrackingEvent, DeliveryContact, Material } from '../../types';
 import ModalBase from '../modals/ModalBase';
 import ConfirmActionModal from '../modals/ConfirmActionModal';
 import AddTransporterModal from '../modals/AddTransporterModal';
 import EditTransporterModal from '../modals/EditTransporterModal';
 import WaybillModal from '../modals/WaybillModal';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../hooks/useFirestore';
+import { markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } from '../../services/firestore/notifications';
 
 // --- MODAL COMPONENTS (Scoped to this dashboard) ---
 
@@ -149,12 +152,20 @@ type ModalType = 'viewShipment' | 'deleteShipment' | 'assignShipment' | 'addTran
 
 const IndividualDashboard: React.FC<IndividualDashboardProps> = ({ onLogout, role }) => {
   const { t } = useTranslation();
+  const { currentUser } = useAuth();
   const [activeNav, setActiveNav] = useState('Dashboard');
   const [view, setView] = useState<IndividualView>('dashboard');
   const today = new Date();
   const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
   const [dateRange, setDateRange] = useState({ start: lastMonth, end: today });
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // Check if demo mode
+  const isDemoMode = currentUser?.email === 'demo@example.com';
+
+  // Use Firestore hook for notifications (only if not demo mode)
+  const { data: firestoreNotifications } = useNotifications(isDemoMode ? null : currentUser?.uid || null);
+  const [mockNotifications, setMockNotifications] = useState<Notification[]>([]);
+  const notifications = isDemoMode ? mockNotifications : (firestoreNotifications || []);
   
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [transporters, setTransporters] = useState<Transporter[]>([]);
@@ -193,7 +204,10 @@ const IndividualDashboard: React.FC<IndividualDashboardProps> = ({ onLogout, rol
             setTransporters(transportersData as Transporter[]);
             setShipments(shipmentsTyped);
             setDeliveryContacts(contactsData as DeliveryContact[]);
-            setNotifications(notificationsData.slice(0, 5) as Notification[]); // Smaller subset
+            // Only set mock notifications in demo mode
+            if (isDemoMode) {
+              setMockNotifications(notificationsData.slice(0, 5) as Notification[]); // Smaller subset
+            }
             setMaterials(materialsData as Material[]);
 
             setTrackedShipment(shipmentsTyped.find(s => s.status === 'In Transit') || shipmentsTyped[0] || null);
@@ -206,7 +220,7 @@ const IndividualDashboard: React.FC<IndividualDashboardProps> = ({ onLogout, rol
         }
     };
     loadAllData();
-  }, []);
+  }, [isDemoMode]);
 
   const filteredShipments = useMemo(() => {
     return shipments.filter(shipment => {
@@ -233,14 +247,44 @@ const IndividualDashboard: React.FC<IndividualDashboardProps> = ({ onLogout, rol
     return [...existingHistory, newEvent];
   };
 
-  const handleUpdateNotification = (id: number, updates: Partial<Notification>) => {
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, ...updates } : n)));
+  const handleUpdateNotification = async (id: number | string, updates: Partial<Notification>) => {
+    if (isDemoMode) {
+      setMockNotifications(prev => prev.map(n => (n.id === id ? { ...n, ...updates } : n)));
+    } else {
+      if (typeof id === 'string' && updates.read !== undefined) {
+        try {
+          await markNotificationAsRead(id);
+        } catch (error) {
+          console.error('Error updating notification:', error);
+        }
+      }
+    }
   };
-  const handleDeleteNotification = (id: number) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const handleDeleteNotification = async (id: number | string) => {
+    if (isDemoMode) {
+      setMockNotifications(prev => prev.filter(n => n.id !== id));
+    } else {
+      if (typeof id === 'string') {
+        try {
+          await deleteNotification(id);
+        } catch (error) {
+          console.error('Error deleting notification:', error);
+        }
+      }
+    }
   };
-  const handleReadAll = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const handleReadAll = async () => {
+    if (isDemoMode) {
+      setMockNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } else {
+      if (currentUser) {
+        try {
+          await markAllNotificationsAsRead(currentUser.uid);
+        } catch (error) {
+          console.error('Error marking all notifications as read:', error);
+        }
+      }
+    }
   };
 
   const handleOpenProfileSettings = () => {

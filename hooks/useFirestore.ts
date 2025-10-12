@@ -168,14 +168,108 @@ export function usePayrollRuns(organizationId: string | null) {
 
 /**
  * Hook for fetching user notifications with real-time updates
+ * Maps Firestore notification data to match the Notification type
  */
 export function useNotifications(userId: string | null) {
-    const constraints = useMemo(
-        () => userId
-            ? [where('userId', '==', userId), orderBy('timestamp', 'desc')]
-            : [],
-        [userId]
-    );
+    const [data, setData] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
 
-    return useFirestoreCollection('notifications', constraints);
+    useEffect(() => {
+        if (!userId) {
+            setData([]);
+            setLoading(false);
+            return;
+        }
+
+        let unsubscribe: Unsubscribe;
+
+        const setupListener = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+
+                const notificationsRef = collection(db, 'notifications');
+                const q = query(
+                    notificationsRef,
+                    where('userId', '==', userId),
+                    orderBy('timestamp', 'desc')
+                );
+
+                unsubscribe = onSnapshot(
+                    q,
+                    (querySnapshot) => {
+                        const notifications: any[] = [];
+                        querySnapshot.forEach((doc) => {
+                            const data = doc.data();
+                            // Map Firestore data to Notification type
+                            notifications.push({
+                                id: doc.id, // Keep as string
+                                title: data.title,
+                                description: data.message, // Map message to description
+                                icon: data.icon,
+                                iconBg: getIconBg(data.type), // Generate iconBg based on type
+                                type: mapNotificationType(data.type), // Map type to NotificationType
+                                timestamp: data.timestamp?.toDate?.()?.toISOString() || new Date().toISOString(),
+                                read: data.read || false,
+                            });
+                        });
+                        setData(notifications);
+                        setLoading(false);
+                    },
+                    (err) => {
+                        console.error('Error listening to notifications:', err);
+                        setError(err as Error);
+                        setLoading(false);
+                    }
+                );
+            } catch (err) {
+                console.error('Error setting up notifications listener:', err);
+                setError(err as Error);
+                setLoading(false);
+            }
+        };
+
+        setupListener();
+
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        };
+    }, [userId]);
+
+    return { data, loading, error };
+}
+
+/**
+ * Helper function to get iconBg color based on notification type
+ */
+function getIconBg(type: string): string {
+    const iconBgMap: Record<string, string> = {
+        order: 'bg-blue-100',
+        route: 'bg-blue-100',
+        driver: 'bg-green-100',
+        vehicle: 'bg-orange-100',
+        payment: 'bg-green-100',
+        maintenance: 'bg-yellow-100',
+        system: 'bg-gray-100',
+    };
+    return iconBgMap[type] || 'bg-gray-100';
+}
+
+/**
+ * Helper function to map Firestore notification type to NotificationType
+ */
+function mapNotificationType(type: string): string {
+    const typeMap: Record<string, string> = {
+        order: 'Order',
+        route: 'Order', // Route notifications shown as Order type
+        driver: 'Driver',
+        vehicle: 'Vehicle',
+        payment: 'System',
+        maintenance: 'Vehicle',
+        system: 'System',
+    };
+    return typeMap[type] || 'System';
 }

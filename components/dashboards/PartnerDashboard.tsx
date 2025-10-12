@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import DashboardLayout from '../DashboardLayout';
+import TestWhatsApp from '../TestWhatsApp';
 import AddVehicleModal from '../modals/AddVehicleModal';
 import AddDriverModal from '../modals/AddDriverModal';
 import CreateRouteModal from '../modals/CreateRouteModal';
@@ -28,7 +29,7 @@ import RouteAssignmentTable from '../RouteAssignmentTable';
 import StatCard from '../StatCard';
 import type { Route, Driver, Vehicle, Client, DriverPerformanceData, MaintenanceLog, VehicleDocument, Invoice, InvoiceItem, Expense, Notification, PayrollRun, Payslip } from '../../types';
 // Import Firestore hooks
-import { useDrivers, useVehicles, useRoutes, useClients, usePayrollRuns } from '../../hooks/useFirestore';
+import { useDrivers, useVehicles, useRoutes, useClients, usePayrollRuns, useNotifications } from '../../hooks/useFirestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
 // Import Firestore functions
@@ -37,6 +38,9 @@ import { deleteVehicle } from '../../services/firestore/vehicles';
 import { deleteRoute, assignRouteResources, startRoute, updateRoute, addRouteExpense, completeRoute } from '../../services/firestore/routes';
 import { createClient, updateClient as updateClientFirestore, deleteClient, updateClientStatus } from '../../services/firestore/clients';
 import { createPayrollRun } from '../../services/firestore/payroll';
+// Import notification triggers and handlers
+import { notifyDriverAssigned, notifyRouteCompleted, notifyNewRoute, notifyDriverOnboarded, notifyExpenseAdded, notifyClientAdded, notifyPayrollGenerated } from '../../services/notificationTriggers';
+import { markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } from '../../services/firestore/notifications';
 // Keep mock data functions for demo mode
 import {
     generateDriverPerformanceData,
@@ -263,6 +267,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const { data: firestoreRoutes, loading: routesLoading } = useRoutes(isDemoMode ? null : organizationId);
   const { data: firestoreClients, loading: clientsLoading } = useClients(isDemoMode ? null : organizationId);
   const { data: firestorePayrollRuns, loading: payrollLoading } = usePayrollRuns(isDemoMode ? null : organizationId);
+  const { data: firestoreNotifications, loading: notificationsLoading } = useNotifications(isDemoMode ? null : currentUser?.uid || null);
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [activeNav, setActiveNav] = useState('Dashboard');
@@ -275,6 +280,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const [mockClients, setMockClients] = useState<Client[]>([]);
   const [mockInvoices, setMockInvoices] = useState<Invoice[]>([]);
   const [mockPayrollRuns, setMockPayrollRuns] = useState<PayrollRun[]>([]);
+  const [mockNotifications, setMockNotifications] = useState<Notification[]>([]);
 
   // Use appropriate data source based on mode
   const routes = isDemoMode ? mockRoutes : (firestoreRoutes || []);
@@ -282,6 +288,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const vehicles = isDemoMode ? mockVehicles : (firestoreVehicles || []);
   const clients = isDemoMode ? mockClients : (firestoreClients || []);
   const payrollRuns = isDemoMode ? mockPayrollRuns : (firestorePayrollRuns || []);
+  const notifications = isDemoMode ? mockNotifications : (firestoreNotifications || []);
 
   // Calculate current month route count for subscription limits
   const currentMonthRouteCount = useMemo(() => {
@@ -298,7 +305,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const subscriptionLimits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [routeStatusFilter, setRouteStatusFilter] = useState<RouteStatusFilter>('All');
   const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
   const [invoiceView, setInvoiceView] = useState<InvoiceView>('list');
@@ -306,7 +312,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const [invoicedRouteIds, setInvoicedRouteIds] = useState<Set<string>>(new Set());
   const [viewingRoute, setViewingRoute] = useState<Route | null>(null);
   const [viewingPayrollRun, setViewingPayrollRun] = useState<PayrollRun | null>(null);
-  
+  const [showWhatsAppTest, setShowWhatsAppTest] = useState(false); // Toggle for WhatsApp test component
+
   // Data Fetching State
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -326,20 +333,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     const loadAllData = async () => {
         // Only load mock data if in demo mode
         if (!isDemoMode) {
-            // For production mode, just load invoices, notifications, payroll (clients handled by hook)
+            // For production mode, just load invoices (everything else handled by hooks)
             try {
                 setLoading(true);
                 setError(null);
-                const [
-                    invoicesData,
-                    notificationsData,
-                ] = await Promise.all([
-                    getInvoices(),
-                    getNotifications(),
-                ]);
-
+                const invoicesData = await getInvoices();
                 setInvoices(invoicesData as Invoice[]);
-                setNotifications(notificationsData as Notification[]);
             } catch (err) {
                 setError("Failed to load partner data. Please refresh the page.");
                 console.error(err);
@@ -378,7 +377,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
             setMockRoutes(routesData as Route[]);
             setMockInvoices(invoicesData as Invoice[]);
             setInvoices(invoicesData as Invoice[]);
-            setNotifications(notificationsData as Notification[]);
+            setMockNotifications(notificationsData as Notification[]);
             setMockPayrollRuns(payrollData as PayrollRun[]);
             rawPerformanceData = generateDriverPerformanceData(typedDriversData);
 
@@ -565,6 +564,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
 
                   // Start the route
                   await startRoute(routeId);
+
+                  // Send notification to user
+                  if (currentUser && organizationId) {
+                      await notifyDriverAssigned(currentUser.uid, organizationId, driver.name, routeId);
+                  }
 
                   console.log('Successfully assigned driver and vehicle to route:', { routeId, driverId, vehicleId });
               } catch (error) {
@@ -794,6 +798,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     } else {
       try {
         await createClient(organizationId!, newClientData, currentUser!.uid);
+
+        // Send notification about new client
+        await notifyClientAdded(currentUser!.uid, organizationId!, newClientData.name);
       } catch (error) {
         console.error('Error creating client:', error);
         alert('Failed to create client. Please try again.');
@@ -850,16 +857,52 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     setActiveModal(null);
   };
 
-  const handleUpdateNotification = (id: number, updates: Partial<Notification>) => {
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, ...updates } : n)));
+  const handleUpdateNotification = async (id: number | string, updates: Partial<Notification>) => {
+    if (isDemoMode) {
+      // Mock mode - update state locally
+      setMockNotifications(prev => prev.map(n => (n.id === id ? { ...n, ...updates } : n)));
+    } else {
+      // Production mode - update Firestore
+      if (typeof id === 'string' && updates.read !== undefined) {
+        try {
+          await markNotificationAsRead(id);
+        } catch (error) {
+          console.error('Error updating notification:', error);
+        }
+      }
+    }
   };
 
-  const handleDeleteNotification = (id: number) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const handleDeleteNotification = async (id: number | string) => {
+    if (isDemoMode) {
+      // Mock mode - delete from state
+      setMockNotifications(prev => prev.filter(n => n.id !== id));
+    } else {
+      // Production mode - delete from Firestore
+      if (typeof id === 'string') {
+        try {
+          await deleteNotification(id);
+        } catch (error) {
+          console.error('Error deleting notification:', error);
+        }
+      }
+    }
   };
 
-  const handleReadAll = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const handleReadAll = async () => {
+    if (isDemoMode) {
+      // Mock mode - mark all as read in state
+      setMockNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } else {
+      // Production mode - mark all as read in Firestore
+      if (currentUser) {
+        try {
+          await markAllNotificationsAsRead(currentUser.uid);
+        } catch (error) {
+          console.error('Error marking all notifications as read:', error);
+        }
+      }
+    }
   };
 
   const handleCreatePayrollRun = async (periodStart: string, periodEnd: string) => {
@@ -1109,7 +1152,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
           />
         );
       case 'Settings':
-        return <SettingsScreen onBack={() => setActiveNav('Dashboard')} onManageSubscription={() => setActiveNav('Manage Subscription')} />;
+        return <SettingsScreen onBack={() => setActiveNav('Dashboard')} onManageSubscription={() => setActiveNav('Manage Subscription')} onTestWhatsApp={() => setShowWhatsAppTest(true)} />;
       case 'Manage Subscription':
         return <ManageSubscriptionScreen onBack={() => setActiveNav('Settings')} />;
       default:
@@ -1136,6 +1179,19 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
                  <InvoicePreview invoice={invoiceForPdf} />
               </div>
           </div>
+      )}
+      {/* WhatsApp Test Component - Toggle with button in Settings */}
+      {showWhatsAppTest && (
+        <div className="relative z-50">
+          <TestWhatsApp />
+          <button
+            onClick={() => setShowWhatsAppTest(false)}
+            className="fixed top-4 right-4 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full z-50"
+            title="Close WhatsApp Test"
+          >
+            ✕
+          </button>
+        </div>
       )}
       {renderContent()}
     </DashboardLayout>

@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { createVehicle } from '../../services/firestore/vehicles';
 import { canAddResource, getSubscriptionLimits } from '../../services/firestore/subscriptions';
 import LimitReachedModal from '../LimitReachedModal';
+import { notifyVehicleAdded } from '../../services/notificationTriggers';
 
 interface AddVehicleModalProps {
     onClose: () => void;
@@ -91,6 +92,9 @@ const AddVehicleModal: React.FC<AddVehicleModalProps> = ({ onClose, currentVehic
                 },
                 currentUser.uid
             );
+
+            // Send notification about new vehicle
+            await notifyVehicleAdded(currentUser.uid, organizationId, plate);
 
             onClose();
         } catch (err: any) {

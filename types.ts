@@ -52,7 +52,8 @@ export interface User {
     displayName: string;
     photoURL?: string;
     phone?: string;
-    whatsappOptIn?: boolean;
+    whatsappNumber?: string; // WhatsApp number for receiving notifications
+    whatsappOptIn?: boolean; // Whether user wants WhatsApp notifications
     organizationId?: string; // Link to organization
     role?: 'individual' | 'business' | 'partner';
     createdAt?: Timestamp | string;
@@ -330,7 +331,7 @@ export interface Invoice extends FirestoreDocument {
 export type NotificationType = 'Order' | 'Driver' | 'Vehicle' | 'System';
 
 export interface Notification {
-    id: number;
+    id: number | string; // Support both number (mock) and string (Firestore)
     icon: string; // Changed from React.ReactNode to string
     iconBg: string;
     title: string;
@@ -394,4 +395,64 @@ export interface PayrollRun extends FirestoreDocument {
     // Note: payslips moved to subcollection
     // Use Firestore subcollection: payrolls/{id}/payslips
     payslips?: Payslip[]; // Kept for backward compatibility
+}
+
+// API Integration Support
+export interface Integration extends FirestoreDocument {
+    id: string;
+    organizationId: string;
+    type: 'zoho_books' | 'quickbooks' | 'sage' | 'xero' | 'wave' | 'whatsapp' | 'twilio' | 'slack';
+    name: string; // User-friendly name
+    status: 'active' | 'inactive' | 'error' | 'pending';
+    credentials: {
+        accessToken?: string; // Encrypted
+        refreshToken?: string; // Encrypted
+        apiKey?: string; // Encrypted
+        webhookSecret?: string;
+        expiresAt?: string;
+        scope?: string[];
+    };
+    config: {
+        syncEnabled: boolean;
+        syncInterval: 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual';
+        lastSync?: string;
+        lastError?: string;
+        syncSettings: {
+            syncInvoices?: boolean;
+            syncPayments?: boolean;
+            syncCustomers?: boolean;
+            syncProducts?: boolean;
+            syncExpenses?: boolean;
+            autoCreateCustomers?: boolean;
+            autoSendInvoices?: boolean;
+        };
+        webhookUrl?: string;
+    };
+    fieldMappings?: Record<string, string>; // Map local fields to external API fields
+    metadata?: Record<string, any>; // Store any integration-specific data
+}
+
+// Sync Queue for API operations
+export interface SyncJob extends FirestoreDocument {
+    id: string;
+    organizationId: string;
+    integrationId: string;
+    type: 'export' | 'import' | 'sync';
+    entity: 'invoice' | 'payment' | 'customer' | 'driver' | 'vehicle' | 'route' | 'expense';
+    entityId: string;
+    status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+    priority: 'low' | 'normal' | 'high' | 'critical';
+    attempts: number;
+    maxAttempts: number;
+    payload: Record<string, any>;
+    result?: Record<string, any>;
+    error?: {
+        message: string;
+        code?: string;
+        details?: any;
+    };
+    scheduledAt: string;
+    startedAt?: string;
+    completedAt?: string;
+    nextRetryAt?: string;
 }

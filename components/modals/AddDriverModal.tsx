@@ -7,6 +7,7 @@ import { canAddResource, getSubscriptionLimits } from '../../services/firestore/
 import LimitReachedModal from '../LimitReachedModal';
 import { verifyBankAccount, NIGERIAN_BANKS } from '../../services/bankVerification';
 import { uploadDriverPhoto, uploadDriverLicense } from '../../services/firestore/storage';
+import { notifyDriverOnboarded } from '../../services/notificationTriggers';
 
 interface AddDriverModalProps {
     onClose: () => void;
@@ -181,6 +182,9 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
                     licensePhotoUrl: licensePhotoURL,
                 });
             }
+
+            // Step 4: Send notification about new driver
+            await notifyDriverOnboarded(currentUser.uid, organizationId, fullName);
 
             onClose();
         } catch (err: any) {
