@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Dashboard from './components/Dashboard';
 import LoginPage from './components/LoginPage';
@@ -7,7 +7,10 @@ import SignUpPage from './components/SignUpPage';
 import OnboardingPage from './components/OnboardingPage';
 import SubscriptionPage from './components/SubscriptionPage';
 import AuthLayout from './components/AuthLayout';
+import DriverPortalLogin from './components/DriverPortalLogin';
+import DriverPortal from './components/DriverPortal';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import type { Driver } from './types';
 
 const AppContent: React.FC = () => {
     const { t } = useTranslation();
@@ -15,6 +18,32 @@ const AppContent: React.FC = () => {
     const [authPage, setAuthPage] = useState<'login' | 'signup'>('login');
     const [isOnboarding, setIsOnboarding] = useState(false);
     const [isSubscription, setIsSubscription] = useState(false);
+
+    // Driver portal state
+    const [driverSession, setDriverSession] = useState<Driver | null>(null);
+    const [checkingDriverSession, setCheckingDriverSession] = useState(true);
+
+    // Check if URL is driver portal and check for existing session
+    useEffect(() => {
+        const path = window.location.pathname;
+
+        if (path === '/driver-portal' || path.startsWith('/driver-portal')) {
+            // Check for existing driver session
+            const savedSession = localStorage.getItem('driverSession');
+            if (savedSession) {
+                try {
+                    const session = JSON.parse(savedSession);
+                    // DriverPortalLogin already stores full driver object with id field
+                    setDriverSession(session as Driver);
+                } catch (error) {
+                    console.error('Error loading driver session:', error);
+                    localStorage.removeItem('driverSession');
+                }
+            }
+        }
+
+        setCheckingDriverSession(false);
+    }, []);
 
     const handleRoleSelection = (roleId: string) => {
         updateUserRole(roleId);
@@ -30,9 +59,18 @@ const AppContent: React.FC = () => {
         setIsSubscription(false);
         setIsOnboarding(true);
     };
-    
-    // Show a loading screen while checking for user session
-    if (loading) {
+
+    const handleDriverLogin = (driver: Driver) => {
+        setDriverSession(driver);
+    };
+
+    const handleDriverLogout = () => {
+        setDriverSession(null);
+        localStorage.removeItem('driverSession');
+    };
+
+    // Show a loading screen while checking for sessions
+    if (loading || checkingDriverSession) {
         return (
             <div className="flex h-screen items-center justify-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
@@ -40,6 +78,18 @@ const AppContent: React.FC = () => {
         );
     }
 
+    // Driver Portal Route
+    const isDriverPortalRoute = window.location.pathname === '/driver-portal' || window.location.pathname.startsWith('/driver-portal');
+
+    if (isDriverPortalRoute) {
+        if (driverSession) {
+            return <DriverPortal driver={driverSession} onLogout={handleDriverLogout} />;
+        } else {
+            return <DriverPortalLogin onLoginSuccess={handleDriverLogin} />;
+        }
+    }
+
+    // Regular user flow (admin portal)
     // User is logged in
     if (currentUser) {
         // If explicitly in onboarding or subscription flow, show those pages

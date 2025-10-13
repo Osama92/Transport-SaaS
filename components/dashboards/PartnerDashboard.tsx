@@ -499,18 +499,18 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       try {
         await completeRoute(route.id);
 
-        // Clear driver status and current route
-        if (route.driverId) {
-          await updateDriver(route.driverId, {
+        // Clear driver status and current route (use assignedDriverId)
+        if (route.assignedDriverId || route.driverId) {
+          await updateDriver(route.assignedDriverId || route.driverId!, {
             status: 'Idle',
             currentRouteId: undefined,
             currentRouteStatus: undefined
           });
         }
 
-        // Clear vehicle status and current route
-        if (route.vehicleId) {
-          await updateVehicle(route.vehicleId, {
+        // Clear vehicle status and current route (use assignedVehicleId)
+        if (route.assignedVehicleId || route.vehicleId) {
+          await updateVehicle(route.assignedVehicleId || route.vehicleId!, {
             status: 'Parked',
             currentRouteId: undefined,
             currentRouteStatus: undefined
