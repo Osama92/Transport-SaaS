@@ -66,13 +66,14 @@ const VehiclesTable: React.FC<VehiclesTableProps> = ({
                             <th className="py-3 px-4 font-medium">{t('components.vehiclesTable.headerPlate')}</th>
                             <th className="py-3 px-4 font-medium">{t('components.vehiclesTable.headerOdometer')}</th>
                             <th className="py-3 px-4 font-medium">{t('common.status')}</th>
+                            <th className="py-3 px-4 font-medium">Current Route</th>
                             <th className="py-3 px-4 font-medium">{t('common.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {vehicles.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="py-12 px-4 text-center">
+                                <td colSpan={6} className="py-12 px-4 text-center">
                                     <div className="flex flex-col items-center justify-center text-gray-400">
                                         <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -92,6 +93,22 @@ const VehiclesTable: React.FC<VehiclesTableProps> = ({
                                 <td className="py-3 px-4 text-gray-600 dark:text-gray-300 font-mono">{vehicle.plateNumber}</td>
                                 <td className="py-3 px-4 text-gray-600 dark:text-gray-300">{(vehicle.telematics?.odometer || 0).toLocaleString()} km</td>
                                 <td className="py-3 px-4"><StatusBadge status={vehicle.status} /></td>
+                                <td className="py-3 px-4">
+                                    {vehicle.currentRouteId ? (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-mono bg-indigo-100 text-indigo-700 px-2 py-1 rounded dark:bg-indigo-900/50 dark:text-indigo-300">
+                                                {vehicle.currentRouteId}
+                                            </span>
+                                            {vehicle.currentRouteStatus && (
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                    ({vehicle.currentRouteStatus})
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
+                                    )}
+                                </td>
                                 <td className="py-3 px-4">
                                    <div className="relative">
                                         <button onClick={() => handleMenuClick(vehicle.id)} className="text-gray-500 hover:text-gray-800 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700">

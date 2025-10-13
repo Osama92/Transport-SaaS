@@ -35,7 +35,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
 // Import Firestore functions
 import { deleteDriver, updateDriver } from '../../services/firestore/drivers';
-import { deleteVehicle } from '../../services/firestore/vehicles';
+import { deleteVehicle, updateVehicle } from '../../services/firestore/vehicles';
 import { deleteRoute, assignRouteResources, startRoute, updateRoute, addRouteExpense, completeRoute, getRouteById } from '../../services/firestore/routes';
 import { createClient, updateClient as updateClientFirestore, deleteClient, updateClientStatus } from '../../services/firestore/clients';
 import { createPayrollRun } from '../../services/firestore/payroll';
@@ -295,37 +295,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
 
   // Calculate current month route count for subscription limits
   const currentMonthRouteCount = useMemo(() => {
-    console.log('[PartnerDashboard] Calculating route count...');
-    console.log('[PartnerDashboard] Total routes:', routes.length);
-    console.log('[PartnerDashboard] All routes:', routes.map(r => ({ id: r.id, createdAt: r.createdAt })));
-
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    console.log('[PartnerDashboard] Start of month:', startOfMonth.toISOString());
-
     const monthRoutes = routes.filter(route => {
-      console.log(`[PartnerDashboard] Checking route ${route.id}:`, route.createdAt);
-
-      if (!route.createdAt) {
-        console.log(`[PartnerDashboard] Route ${route.id} - NO createdAt`);
-        return false;
-      }
-
+      if (!route.createdAt) return false;
       const createdAt = new Date(route.createdAt);
-      console.log(`[PartnerDashboard] Route ${route.id} - Parsed date:`, createdAt, 'Valid:', !isNaN(createdAt.getTime()));
-
-      if (isNaN(createdAt.getTime())) {
-        console.log(`[PartnerDashboard] Route ${route.id} - INVALID date`);
-        return false;
-      }
-
-      const isThisMonth = createdAt >= startOfMonth;
-      console.log(`[PartnerDashboard] Route ${route.id} - Is this month:`, isThisMonth);
-
-      return isThisMonth;
+      if (isNaN(createdAt.getTime())) return false;
+      return createdAt >= startOfMonth;
     });
-
-    console.log('[PartnerDashboard] This month routes:', monthRoutes.length);
     return monthRoutes.length;
   }, [routes]);
 
@@ -521,6 +498,25 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       // For production mode, complete route in Firestore
       try {
         await completeRoute(route.id);
+
+        // Clear driver status and current route
+        if (route.driverId) {
+          await updateDriver(route.driverId, {
+            status: 'Idle',
+            currentRouteId: undefined,
+            currentRouteStatus: undefined
+          });
+        }
+
+        // Clear vehicle status and current route
+        if (route.vehicleId) {
+          await updateVehicle(route.vehicleId, {
+            status: 'Parked',
+            currentRouteId: undefined,
+            currentRouteStatus: undefined
+          });
+        }
+
         console.log('Successfully completed route:', route.id);
       } catch (error) {
         console.error('Error completing route:', error);
@@ -591,6 +587,21 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
                       vehicleId: String(vehicleId),
                   });
 
+                  // Update driver status and current route
+                  await updateDriver(String(driverId), {
+                      status: 'On-route',
+                      currentRouteId: routeId,
+                      currentRouteStatus: 'In Progress'
+                  });
+
+                  // Update vehicle status and current route
+                  await updateVehicle(String(vehicleId), {
+                      status: 'On the Move',
+                      currentRouteId: routeId,
+                      currentRouteStatus: 'In Progress',
+                      assignedDriverId: String(driverId)
+                  });
+
                   // Start the route
                   await startRoute(routeId);
 
@@ -647,7 +658,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
           setViewingRoute(updatedViewedRoute);
       }
     } else {
-      // For production mode, add expense to Firestore
       try {
         await addRouteExpense(routeId, {
           type: newExpense.type,
@@ -655,13 +665,15 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
           amount: newExpense.amount,
           date: newExpense.date,
         });
-        console.log('Successfully added expense to route:', routeId);
 
-        // Manually fetch updated route with expenses since useRoutes hook doesn't watch subcollections
+        // Fetch updated route with expenses for viewing
         const updatedRoute = await getRouteById(routeId);
         if (updatedRoute && viewingRoute && viewingRoute.id === routeId) {
           setViewingRoute(updatedRoute);
         }
+
+        // Trigger refresh of routes list to pick up new expense
+        window.dispatchEvent(new CustomEvent('refreshRoutes'));
       } catch (error) {
         console.error('Error adding expense:', error);
         alert('Failed to add expense. Please try again.');

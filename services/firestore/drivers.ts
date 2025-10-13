@@ -283,3 +283,92 @@ export const getDriversByStatus = async (
         throw new Error('Failed to fetch drivers by status');
     }
 };
+
+/**
+ * Simple password hashing function using Web Crypto API
+ */
+async function hashPassword(password: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+/**
+ * Set driver portal credentials (username and password)
+ */
+export const setDriverCredentials = async (
+    driverId: string,
+    username: string,
+    password: string
+): Promise<void> => {
+    try {
+        // Hash the password
+        const hashedPassword = await hashPassword(password);
+
+        // Update driver with credentials
+        const driverRef = doc(db, DRIVERS_COLLECTION, driverId);
+        await updateDoc(driverRef, {
+            username,
+            hashedPassword,
+            'portalAccess.enabled': true,
+            'portalAccess.whatsappNotifications': true,
+            updatedAt: serverTimestamp()
+        });
+    } catch (error) {
+        console.error('Error setting driver credentials:', error);
+        throw new Error('Failed to set driver credentials');
+    }
+};
+
+/**
+ * Authenticate driver with username and password
+ */
+export const authenticateDriver = async (
+    username: string,
+    password: string
+): Promise<Driver | null> => {
+    try {
+        // Query for driver by username
+        const driversRef = collection(db, DRIVERS_COLLECTION);
+        const q = query(driversRef, where('username', '==', username));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            return null;
+        }
+
+        const driverDoc = querySnapshot.docs[0];
+        const driverData = driverDoc.data();
+
+        // Hash the provided password and compare
+        const hashedPassword = await hashPassword(password);
+
+        if (driverData.hashedPassword !== hashedPassword) {
+            return null;
+        }
+
+        // Update last login
+        await updateDoc(driverDoc.ref, {
+            'portalAccess.lastLogin': serverTimestamp()
+        });
+
+        // Return driver data
+        return {
+            id: driverDoc.id,
+            ...driverData,
+            createdAt: driverData.createdAt instanceof Timestamp ? driverData.createdAt.toDate().toISOString() : driverData.createdAt,
+            updatedAt: driverData.updatedAt instanceof Timestamp ? driverData.updatedAt.toDate().toISOString() : driverData.updatedAt,
+            lat: driverData.locationData?.lat,
+            lng: driverData.locationData?.lng,
+            baseSalary: driverData.payrollInfo?.baseSalary,
+            pensionContributionRate: driverData.payrollInfo?.pensionContributionRate,
+            nhfContributionRate: driverData.payrollInfo?.nhfContributionRate,
+        } as Driver;
+    } catch (error) {
+        console.error('Error authenticating driver:', error);
+        throw new Error('Failed to authenticate driver');
+    }
+};

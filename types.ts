@@ -148,6 +148,8 @@ export interface Driver extends FirestoreDocument {
     phone: string;
     nin?: string;
     licensePhotoUrl?: string;
+    currentRouteId?: string; // Currently assigned route
+    currentRouteStatus?: 'Pending' | 'In Progress' | 'Completed'; // Status of current route
     locationData?: {
         lat: number;
         lng: number;
@@ -242,6 +244,8 @@ export interface Vehicle extends FirestoreDocument {
   status: 'On the Move' | 'Parked' | 'Idle' | 'Inactive' | 'In-Shop';
   group?: string;
   assignedDriverId?: string; // Currently assigned driver
+  currentRouteId?: string; // Currently assigned route
+  currentRouteStatus?: 'Pending' | 'In Progress' | 'Completed'; // Status of current route
   telematics: {
     odometer: number;
     odometerHistory?: { today: number; yesterday: number };

@@ -36,23 +36,12 @@ export const getRoutesByOrganization = async (organizationId: string): Promise<R
 
         for (const docSnap of querySnapshot.docs) {
             const data = docSnap.data();
-
-            console.log(`[Firestore Routes] Route ${docSnap.id} raw data:`, {
-                createdAt: data.createdAt,
-                createdAtType: data.createdAt?.constructor?.name,
-                isTimestamp: data.createdAt instanceof Timestamp
-            });
-
-            // Fetch expenses subcollection
             const expenses = await getRouteExpenses(docSnap.id);
-
-            const convertedCreatedAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt;
-            console.log(`[Firestore Routes] Route ${docSnap.id} converted createdAt:`, convertedCreatedAt);
 
             routes.push({
                 ...data,
                 id: docSnap.id,
-                createdAt: convertedCreatedAt,
+                createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
                 updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
                 estimatedDepartureTime: data.estimatedDepartureTime instanceof Timestamp
                     ? data.estimatedDepartureTime.toDate().toISOString()
@@ -68,8 +57,6 @@ export const getRoutesByOrganization = async (organizationId: string): Promise<R
                     : data.actualArrivalTime,
                 expenses,
             } as Route);
-
-            console.log(`[Firestore Routes] Route ${docSnap.id} final object createdAt:`, routes[routes.length - 1].createdAt);
         }
 
         return routes;

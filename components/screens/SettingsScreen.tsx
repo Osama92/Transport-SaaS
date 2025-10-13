@@ -97,37 +97,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
 
     // Calculate current month route count
     const currentMonthRouteCount = useMemo(() => {
-        console.log('[SettingsScreen] Calculating route count...');
-        console.log('[SettingsScreen] Total routes:', routes.length);
-        console.log('[SettingsScreen] All routes:', routes.map(r => ({ id: r.id, createdAt: r.createdAt })));
-
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        console.log('[SettingsScreen] Start of month:', startOfMonth.toISOString());
-
         const monthRoutes = routes.filter(route => {
-            console.log(`[SettingsScreen] Checking route ${route.id}:`, route.createdAt);
-
-            if (!route.createdAt) {
-                console.log(`[SettingsScreen] Route ${route.id} - NO createdAt`);
-                return false;
-            }
-
+            if (!route.createdAt) return false;
             const createdAt = new Date(route.createdAt);
-            console.log(`[SettingsScreen] Route ${route.id} - Parsed date:`, createdAt, 'Valid:', !isNaN(createdAt.getTime()));
-
-            if (isNaN(createdAt.getTime())) {
-                console.log(`[SettingsScreen] Route ${route.id} - INVALID date`);
-                return false;
-            }
-
-            const isThisMonth = createdAt >= startOfMonth;
-            console.log(`[SettingsScreen] Route ${route.id} - Is this month:`, isThisMonth);
-
-            return isThisMonth;
+            if (isNaN(createdAt.getTime())) return false;
+            return createdAt >= startOfMonth;
         });
-
-        console.log('[SettingsScreen] This month routes:', monthRoutes.length);
         return monthRoutes.length;
     }, [routes]);
 

@@ -5,6 +5,7 @@ import {
     where,
     orderBy,
     onSnapshot,
+    getDocs,
     QueryConstraint,
     Unsubscribe,
     Timestamp
@@ -149,16 +150,105 @@ export function useVehicles(organizationId: string | null) {
 
 /**
  * Hook for fetching routes with real-time updates
+ * Fetches routes AND their expenses subcollections
  */
 export function useRoutes(organizationId: string | null) {
-    const constraints = useMemo(
-        () => organizationId
-            ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
-            : [],
+    const [data, setData] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+    const [refreshCounter, setRefreshCounter] = useState(0);
+
+    const constraintsKey = useMemo(
+        () => organizationId ? `routes-${organizationId}` : 'routes-null',
         [organizationId]
     );
 
-    return useFirestoreCollection('routes', constraints);
+    useEffect(() => {
+        if (!organizationId) {
+            setData([]);
+            setLoading(false);
+            return;
+        }
+
+        let unsubscribe: Unsubscribe;
+        const expenseUnsubscribes: Unsubscribe[] = [];
+
+        const fetchRoutesWithExpenses = async (querySnapshot: any) => {
+            const routesPromises = querySnapshot.docs.map(async (doc: any) => {
+                const rawData = doc.data();
+                const convertedData = convertTimestamps(rawData);
+
+                // Fetch expenses subcollection for this route
+                const expensesRef = collection(db, 'routes', doc.id, 'expenses');
+                const expensesQuery = query(expensesRef, orderBy('date', 'desc'));
+                const expensesSnapshot = await getDocs(expensesQuery);
+
+                const expenses = expensesSnapshot.docs.map(expenseDoc => {
+                    const expenseData = expenseDoc.data();
+                    return {
+                        id: expenseDoc.id,
+                        ...convertTimestamps(expenseData)
+                    };
+                });
+
+                return {
+                    id: doc.id,
+                    ...convertedData,
+                    expenses,
+                };
+            });
+
+            const routes = await Promise.all(routesPromises);
+            setData(routes);
+            setLoading(false);
+        };
+
+        const setupListener = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+
+                const routesRef = collection(db, 'routes');
+                const q = query(
+                    routesRef,
+                    where('organizationId', '==', organizationId),
+                    orderBy('createdAt', 'desc')
+                );
+
+                unsubscribe = onSnapshot(
+                    q,
+                    fetchRoutesWithExpenses,
+                    (err) => {
+                        console.error('Error listening to routes:', err);
+                        setError(err as Error);
+                        setLoading(false);
+                    }
+                );
+            } catch (err) {
+                console.error('Error setting up routes listener:', err);
+                setError(err as Error);
+                setLoading(false);
+            }
+        };
+
+        setupListener();
+
+        // Listen for custom refresh event (triggered when expense is added)
+        const handleRefresh = () => {
+            setRefreshCounter(prev => prev + 1);
+        };
+        window.addEventListener('refreshRoutes', handleRefresh);
+
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+            expenseUnsubscribes.forEach(unsub => unsub());
+            window.removeEventListener('refreshRoutes', handleRefresh);
+        };
+    }, [constraintsKey, refreshCounter]);
+
+    return { data, loading, error };
 }
 
 /**

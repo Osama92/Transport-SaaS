@@ -2,7 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDrivers } from '../../hooks/useFirestore';
+import { setDriverCredentials } from '../../services/firestore/drivers';
 import type { Driver } from '../../types';
+import SetDriverCredentialsModal from '../modals/SetDriverCredentialsModal';
 import {
     PlusIcon,
     CheckCircleIcon,
@@ -25,6 +27,13 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
     const [showInviteModal, setShowInviteModal] = useState(false);
+    const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+    const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+
+    const handleSetCredentials = async (driverId: string, username: string, password: string) => {
+        await setDriverCredentials(driverId, username, password);
+        alert(`Credentials set successfully!\n\nUsername: ${username}\nPassword: ${password}\n\nShare these with the driver. They can login at /driver-portal`);
+    };
 
     // Filter drivers
     const filteredDrivers = useMemo(() => {
@@ -116,7 +125,7 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
 
             {/* Drivers Table */}
             <div className="p-6">
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-hidden">
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-x-auto">
                     {loading ? (
                         <div className="p-8 text-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -128,7 +137,7 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
                             <p className="text-gray-500 dark:text-gray-400">No drivers found</p>
                         </div>
                     ) : (
-                        <table className="w-full">
+                        <table className="w-full min-w-[900px]">
                             <thead className="bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Driver</th>
@@ -141,7 +150,14 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
                                 {filteredDrivers.map((driver) => (
-                                    <DriverRow key={driver.id} driver={driver} />
+                                    <DriverRow
+                                        key={driver.id}
+                                        driver={driver}
+                                        onSetCredentials={() => {
+                                            setSelectedDriver(driver);
+                                            setShowCredentialsModal(true);
+                                        }}
+                                    />
                                 ))}
                             </tbody>
                         </table>
@@ -164,12 +180,24 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
                     </ul>
                 </div>
             </div>
+
+            {/* Credentials Modal */}
+            {showCredentialsModal && selectedDriver && (
+                <SetDriverCredentialsModal
+                    driver={selectedDriver}
+                    onClose={() => {
+                        setShowCredentialsModal(false);
+                        setSelectedDriver(null);
+                    }}
+                    onSave={handleSetCredentials}
+                />
+            )}
         </div>
     );
 };
 
 // Driver Row Component
-const DriverRow: React.FC<{ driver: Driver }> = ({ driver }) => {
+const DriverRow: React.FC<{ driver: Driver; onSetCredentials: () => void }> = ({ driver, onSetCredentials }) => {
     const [showActions, setShowActions] = useState(false);
 
     // Check if phone is WhatsApp capable (basic validation)
@@ -233,6 +261,7 @@ const DriverRow: React.FC<{ driver: Driver }> = ({ driver }) => {
             <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
                     <button
+                        onClick={onSetCredentials}
                         className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-colors"
                         title="Edit credentials"
                     >
