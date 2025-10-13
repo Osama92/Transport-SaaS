@@ -109,20 +109,55 @@ type ModalType = 'addVehicle' | 'addDriver' | 'editDriver' | 'createRoute' | 'ad
 type RouteStatusFilter = 'All' | 'Pending' | 'In Progress' | 'Completed';
 type InvoiceView = 'list' | 'create' | 'edit';
 
-const WalletCard: React.FC = () => {
+const WalletCard: React.FC<{ routes: Route[] }> = ({ routes }) => {
     const { t } = useTranslation();
+
+    // Calculate expected earnings from completed routes
+    const completedRoutes = routes.filter(r => r.status === 'Completed');
+    const expectedEarnings = completedRoutes.reduce((total, route) => {
+        // Calculate revenue from route rate
+        const revenue = route.rate || 0;
+
+        // Calculate total expenses for this route
+        const totalExpenses = (route.expenses || []).reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+        // Net profit = revenue - expenses
+        const netProfit = revenue - totalExpenses;
+
+        return total + netProfit;
+    }, 0);
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(amount);
+    };
+
     return (
-        <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300">
-            <div className="flex items-center gap-3 sm:gap-4">
+        <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col gap-4">
+            {/* Top Section - Available Balance */}
+            <div className="flex items-center gap-3 sm:gap-4 pb-4 border-b border-gray-200 dark:border-slate-700">
                 <div className="p-2 sm:p-2.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex-shrink-0">
                     <WalletIcon className="w-6 h-6 sm:w-7 sm:h-7 text-indigo-500 dark:text-indigo-400" />
                 </div>
-                <div>
+                <div className="flex-1">
                     <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('partnerDashboard.availableBalance')}</p>
                     <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 my-0.5">₦1,250,750</h2>
                     <button className="text-xs sm:text-sm text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">
                         Manage Funds
                     </button>
+                </div>
+            </div>
+
+            {/* Bottom Section - Expected Earnings */}
+            <div className="flex items-center gap-3 sm:gap-4">
+                <div className="p-2 sm:p-2.5 rounded-lg bg-green-100 dark:bg-green-900/50 flex-shrink-0">
+                    <svg className="w-6 h-6 sm:w-7 sm:h-7 text-green-500 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div className="flex-1">
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Expected Earnings (Net Profit)</p>
+                    <h3 className="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400 my-0.5">{formatCurrency(expectedEarnings)}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{completedRoutes.length} completed routes</p>
                 </div>
             </div>
         </div>
@@ -174,7 +209,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
         <div className="flex flex-col gap-8">
         {/* Stat Cards Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-            <WalletCard />
+            <WalletCard routes={routes} />
             <StatCard
                 title={t('partnerDashboard.totalRouteAssigned')}
                 value={totalRoutesAssigned.toString()}
