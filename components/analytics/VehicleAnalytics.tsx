@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import type { Vehicle } from '../../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { Vehicle, Route, RouteExpense } from '../../types';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { CurrencyDollarIcon, WrenchScrewdriverIcon } from '../Icons';
+import { useAuth } from '../../contexts/AuthContext';
+import { getRoutesByOrganization } from '../../services/firestore/routes';
 
 interface VehicleAnalyticsProps {
     vehicles: Vehicle[];
@@ -33,48 +35,91 @@ const SummaryCard: React.FC<{ title: string, value: string, icon: React.ReactNod
 
 const VehicleAnalytics: React.FC<VehicleAnalyticsProps> = ({ vehicles, dateRange }) => {
     const [selectedVehicleId, setSelectedVehicleId] = useState('all');
-    
+    const [routes, setRoutes] = useState<Route[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { organizationId } = useAuth();
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(amount);
     };
 
-    const { summaryData, spendingByCategory, costPerVehicle } = useMemo(() => {
-        const filteredVehicles = selectedVehicleId === 'all'
-            ? vehicles
-            : vehicles.filter(v => v.id === selectedVehicleId);
+    // Fetch routes with expenses from Firestore
+    useEffect(() => {
+        const fetchRoutes = async () => {
+            if (!organizationId) return;
 
-        const logs = filteredVehicles
-            .flatMap(v => v.maintenanceLogs || [])
-            .filter(log => log && log.date)
-            .filter(log => {
-                const logDate = new Date(log.date);
-                return logDate >= dateRange.start && logDate <= dateRange.end;
+            try {
+                setLoading(true);
+                const fetchedRoutes = await getRoutesByOrganization(organizationId);
+                setRoutes(fetchedRoutes);
+            } catch (error) {
+                console.error('Error fetching routes:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchRoutes();
+    }, [organizationId]);
+
+    const { summaryData, spendingByCategory, costPerVehicle } = useMemo(() => {
+        // Filter routes by selected vehicle
+        const filteredRoutes = selectedVehicleId === 'all'
+            ? routes
+            : routes.filter(r => r.assignedVehicleId === selectedVehicleId || r.vehicleId === selectedVehicleId);
+
+        // Get all expenses from filtered routes within date range
+        const expenses: RouteExpense[] = filteredRoutes
+            .flatMap(route => route.expenses || [])
+            .filter(expense => expense && expense.date)
+            .filter(expense => {
+                const expenseDate = new Date(expense.date);
+                return expenseDate >= dateRange.start && expenseDate <= dateRange.end;
             });
 
-        const totalSpending = logs.reduce((sum, log) => sum + (log.cost || 0), 0);
-        const fuelSpending = logs.filter(log => log.type === 'Fuel').reduce((sum, log) => sum + (log.cost || 0), 0);
-        const maintenanceSpending = totalSpending - fuelSpending;
+        // Calculate total spending
+        const totalSpending = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
 
-        const categoryCosts = logs.reduce((acc, log) => {
-            const type = log.type || 'Other';
-            acc[type] = (acc[type] || 0) + (log.cost || 0);
+        // Calculate fuel spending
+        const fuelSpending = expenses
+            .filter(expense => expense.type === 'Fuel')
+            .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+        // Calculate maintenance spending
+        const maintenanceSpending = expenses
+            .filter(expense => expense.type === 'Maintenance')
+            .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+        // Group expenses by category
+        const categoryCosts = expenses.reduce((acc, expense) => {
+            const type = expense.type || 'Other';
+            acc[type] = (acc[type] || 0) + (expense.amount || 0);
             return acc;
         }, {} as Record<string, number>);
 
         const spendingByCategory = Object.entries(categoryCosts).map(([name, value]) => ({ name, value }));
 
+        // Calculate cost per vehicle
         const costPerVehicle = vehicles.map(vehicle => {
-            const vehicleLogs = (vehicle.maintenanceLogs || [])
-                .filter(log => log && log.date)
-                .filter(log => {
-                    const logDate = new Date(log.date);
-                    return logDate >= dateRange.start && logDate <= dateRange.end;
+            // Find all routes for this vehicle
+            const vehicleRoutes = routes.filter(
+                r => r.assignedVehicleId === vehicle.id || r.vehicleId === vehicle.id
+            );
+
+            // Get all expenses for this vehicle's routes within date range
+            const vehicleExpenses = vehicleRoutes
+                .flatMap(route => route.expenses || [])
+                .filter(expense => expense && expense.date)
+                .filter(expense => {
+                    const expenseDate = new Date(expense.date);
+                    return expenseDate >= dateRange.start && expenseDate <= dateRange.end;
                 });
+
             return {
                 name: vehicle.plateNumber,
-                cost: vehicleLogs.reduce((sum, log) => sum + (log.cost || 0), 0)
-            }
-        }).sort((a,b) => b.cost - a.cost);
+                cost: vehicleExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)
+            };
+        }).sort((a, b) => b.cost - a.cost);
 
         return {
             summaryData: { totalSpending, fuelSpending, maintenanceSpending },
@@ -82,7 +127,15 @@ const VehicleAnalytics: React.FC<VehicleAnalyticsProps> = ({ vehicles, dateRange
             costPerVehicle
         };
 
-    }, [vehicles, selectedVehicleId, dateRange]);
+    }, [vehicles, routes, selectedVehicleId, dateRange]);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-6">

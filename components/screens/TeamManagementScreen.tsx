@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDrivers } from '../../hooks/useFirestore';
-import { setDriverCredentials } from '../../services/firestore/drivers';
+import { setDriverCredentials, updateDriver } from '../../services/firestore/drivers';
 import type { Driver } from '../../types';
 import SetDriverCredentialsModal from '../modals/SetDriverCredentialsModal';
 import {
@@ -33,6 +33,22 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
     const handleSetCredentials = async (driverId: string, username: string, password: string) => {
         await setDriverCredentials(driverId, username, password);
         alert(`Credentials set successfully!\n\nUsername: ${username}\nPassword: ${password}\n\nShare these with the driver. They can login at /driver-portal`);
+    };
+
+    const handleResetDriverStatus = async (driver: Driver) => {
+        if (confirm(`Reset status for ${driver.name}?\n\nThis will:\n• Set status to "Idle"\n• Clear current route assignment\n\nThis is useful if a driver is stuck in "On-route" status.`)) {
+            try {
+                await updateDriver(driver.id, {
+                    status: 'Idle',
+                    currentRouteId: undefined,
+                    currentRouteStatus: undefined
+                });
+                alert('Driver status reset successfully!');
+            } catch (error) {
+                console.error('Error resetting driver status:', error);
+                alert('Failed to reset driver status. Please try again.');
+            }
+        }
     };
 
     // Filter drivers
@@ -157,6 +173,7 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
                                             setSelectedDriver(driver);
                                             setShowCredentialsModal(true);
                                         }}
+                                        onResetStatus={() => handleResetDriverStatus(driver)}
                                     />
                                 ))}
                             </tbody>
@@ -197,7 +214,11 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
 };
 
 // Driver Row Component
-const DriverRow: React.FC<{ driver: Driver; onSetCredentials: () => void }> = ({ driver, onSetCredentials }) => {
+const DriverRow: React.FC<{
+    driver: Driver;
+    onSetCredentials: () => void;
+    onResetStatus: () => void;
+}> = ({ driver, onSetCredentials, onResetStatus }) => {
     const [showActions, setShowActions] = useState(false);
 
     // Check if phone is WhatsApp capable (basic validation)
@@ -267,14 +288,17 @@ const DriverRow: React.FC<{ driver: Driver; onSetCredentials: () => void }> = ({
                     >
                         <PencilIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                     </button>
-                    <button
-                        className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-colors"
-                        title="Reset password"
-                    >
-                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                    </button>
+                    {(driver.status === 'On-route' || driver.currentRouteId) && (
+                        <button
+                            onClick={onResetStatus}
+                            className="p-1.5 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded transition-colors"
+                            title="Reset driver status (clear stuck route)"
+                        >
+                            <svg className="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+                    )}
                     <button
                         className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
                         title="Revoke access"

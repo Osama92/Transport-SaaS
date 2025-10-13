@@ -6,6 +6,7 @@ import {
     setDoc,
     updateDoc,
     deleteDoc,
+    deleteField,
     query,
     where,
     orderBy,
@@ -171,6 +172,13 @@ export const updateVehicle = async (
             ...updates,
             updatedAt: serverTimestamp(),
         };
+
+        // Convert undefined values to deleteField()
+        Object.keys(updateData).forEach(key => {
+            if (updateData[key] === undefined) {
+                updateData[key] = deleteField();
+            }
+        });
 
         // Handle nested telematics
         if (updates.odometer !== undefined || updates.currentSpeed !== undefined) {

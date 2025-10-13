@@ -5,6 +5,7 @@ import VehicleAnalytics from '../analytics/VehicleAnalytics';
 import { TruckIcon, ChartPieIcon, MapIcon } from '../Icons';
 import type { Vehicle } from '../../types';
 import FleetTrackingScreen from './FleetTrackingScreen';
+import { updateVehicle } from '../../services/firestore/vehicles';
 
 interface VehiclesScreenProps {
     vehicles: Vehicle[];
@@ -24,6 +25,22 @@ const VehiclesScreen: React.FC<VehiclesScreenProps> = ({ vehicles, onVehicleUpda
 
     const handleUpdateStatus = (vehicle: Vehicle) => {
         setActiveModal('updateVehicleStatus', vehicle);
+    };
+
+    const handleResetVehicleStatus = async (vehicle: Vehicle) => {
+        if (confirm(`Reset status for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber})?\n\nThis will:\n• Set status to "Parked"\n• Clear current route assignment\n\nThis is useful if a vehicle is stuck in "On the Move" status.`)) {
+            try {
+                await updateVehicle(vehicle.id, {
+                    status: 'Parked',
+                    currentRouteId: undefined,
+                    currentRouteStatus: undefined
+                });
+                alert('Vehicle status reset successfully!');
+            } catch (error) {
+                console.error('Error resetting vehicle status:', error);
+                alert('Failed to reset vehicle status. Please try again.');
+            }
+        }
     };
 
     if (selectedVehicle) {
@@ -98,6 +115,7 @@ const VehiclesScreen: React.FC<VehiclesScreenProps> = ({ vehicles, onVehicleUpda
                         onViewDetails={handleViewDetails}
                         onUpdateStatus={handleUpdateStatus}
                         onRemove={onRemove}
+                        onResetStatus={handleResetVehicleStatus}
                     />
                 )}
                 {activeTab === 'analytics' && (

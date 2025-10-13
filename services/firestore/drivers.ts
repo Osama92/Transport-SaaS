@@ -6,6 +6,7 @@ import {
     setDoc,
     updateDoc,
     deleteDoc,
+    deleteField,
     query,
     where,
     orderBy,
@@ -164,6 +165,13 @@ export const updateDriver = async (
             ...updates,
             updatedAt: serverTimestamp(),
         };
+
+        // Convert undefined values to deleteField()
+        Object.keys(updateData).forEach(key => {
+            if (updateData[key] === undefined) {
+                updateData[key] = deleteField();
+            }
+        });
 
         // Handle nested locationData
         if (updates.lat !== undefined || updates.lng !== undefined) {

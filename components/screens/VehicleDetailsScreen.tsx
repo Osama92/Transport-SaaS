@@ -62,10 +62,10 @@ const VehicleDetailsScreen: React.FC<VehicleDetailsScreenProps> = ({ vehicle, on
 
             {/* Vehicle Info Card */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm grid grid-cols-2 md:grid-cols-4 gap-6">
-                <Stat label="Odometer" value={`${vehicle.odometer.toLocaleString()} km`} />
-                <Stat label="VIN" value={vehicle.vin} />
-                <Stat label="Last Service" value={new Date(vehicle.lastServiceDate).toLocaleDateString()} />
-                <Stat label="Next Service Due" value={new Date(vehicle.nextServiceDate).toLocaleDateString()} />
+                <Stat label="Odometer" value={vehicle.odometer ? `${vehicle.odometer.toLocaleString()} km` : 'N/A'} />
+                <Stat label="VIN" value={vehicle.vin || 'N/A'} />
+                <Stat label="Last Service" value={vehicle.lastServiceDate ? new Date(vehicle.lastServiceDate).toLocaleDateString() : 'N/A'} />
+                <Stat label="Next Service Due" value={vehicle.nextServiceDate ? new Date(vehicle.nextServiceDate).toLocaleDateString() : 'N/A'} />
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

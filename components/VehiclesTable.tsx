@@ -22,6 +22,7 @@ interface VehiclesTableProps {
     onViewDetails: (vehicle: Vehicle) => void;
     onUpdateStatus: (vehicle: Vehicle) => void;
     onRemove?: (vehicle: Vehicle) => void;
+    onResetStatus?: (vehicle: Vehicle) => void;
 }
 
 const VehiclesTable: React.FC<VehiclesTableProps> = ({
@@ -30,7 +31,8 @@ const VehiclesTable: React.FC<VehiclesTableProps> = ({
     onViewAll,
     onViewDetails,
     onUpdateStatus,
-    onRemove
+    onRemove,
+    onResetStatus
 }) => {
     const { t } = useTranslation();
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -122,6 +124,14 @@ const VehiclesTable: React.FC<VehiclesTableProps> = ({
                                                 <button onClick={() => { onUpdateStatus(vehicle); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800">
                                                     <PencilIcon className="w-5 h-5 text-gray-500"/> {t('components.vehiclesTable.updateStatus')}
                                                 </button>
+                                                {onResetStatus && (vehicle.status === 'On the Move' || vehicle.currentRouteId) && (
+                                                    <button onClick={() => { onResetStatus(vehicle); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                        </svg>
+                                                        Reset Status
+                                                    </button>
+                                                )}
                                                 {onRemove && (
                                                     <button onClick={() => { onRemove(vehicle); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
                                                         <TrashIcon className="w-5 h-5"/> Remove Vehicle

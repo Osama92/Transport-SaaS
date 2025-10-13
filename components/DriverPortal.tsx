@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
-import { startRoute, completeRoute } from '../services/firestore/routes';
+import { startRoute, completeRoute, updateRouteProgress } from '../services/firestore/routes';
+import { updateDriver } from '../services/firestore/drivers';
+import { updateVehicle } from '../services/firestore/vehicles';
 import type { Driver, Route, Payslip } from '../types';
 
 interface DriverPortalProps {
@@ -14,6 +16,14 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
     const [completedRoutes, setCompletedRoutes] = useState<Route[]>([]);
     const [activeView, setActiveView] = useState<'dashboard' | 'history' | 'earnings' | 'profile'>('dashboard');
     const [loading, setLoading] = useState(true);
+    const [progressSlider, setProgressSlider] = useState(0);
+    const [updatingProgress, setUpdatingProgress] = useState(false);
+    const [showPodModal, setShowPodModal] = useState(false);
+    const [podFile, setPodFile] = useState<File | null>(null);
+    const [podPreview, setPodPreview] = useState<string | null>(null);
+    const [uploadingPod, setUploadingPod] = useState(false);
+    const [showNotification, setShowNotification] = useState(false);
+    const [notificationMessage, setNotificationMessage] = useState('');
 
     // Listen to driver's active route
     useEffect(() => {
@@ -38,10 +48,24 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             if (!snapshot.empty) {
                 const routeDoc = snapshot.docs[0];
-                setActiveRoute({
+                const newRoute = {
                     id: routeDoc.id,
                     ...routeDoc.data()
-                } as Route);
+                } as Route;
+
+                // Check if this is a new route assignment (different from current)
+                if (activeRoute && activeRoute.id !== newRoute.id) {
+                    setNotificationMessage(`New route assigned: ${newRoute.origin} → ${newRoute.destination}`);
+                    setShowNotification(true);
+                    setTimeout(() => setShowNotification(false), 5000);
+                } else if (!activeRoute && newRoute) {
+                    // First route assignment
+                    setNotificationMessage(`Route assigned: ${newRoute.origin} → ${newRoute.destination}`);
+                    setShowNotification(true);
+                    setTimeout(() => setShowNotification(false), 5000);
+                }
+
+                setActiveRoute(newRoute);
             } else {
                 setActiveRoute(null);
             }
@@ -87,6 +111,70 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
         fetchCompletedRoutes();
     }, [driver?.id]);
 
+    // Sync progress slider with active route
+    useEffect(() => {
+        if (activeRoute) {
+            setProgressSlider(activeRoute.progress || 0);
+        }
+    }, [activeRoute]);
+
+    const handleUpdateProgress = async () => {
+        if (activeRoute && !updatingProgress) {
+            setUpdatingProgress(true);
+            try {
+                await updateRouteProgress(activeRoute.id, progressSlider);
+                // The onSnapshot listener will update activeRoute automatically
+            } catch (error) {
+                console.error('Error updating progress:', error);
+                alert('Failed to update progress. Please try again.');
+            } finally {
+                setUpdatingProgress(false);
+            }
+        }
+    };
+
+    const handleGetDirections = () => {
+        if (activeRoute) {
+            // Open Google Maps with directions from origin to destination
+            const origin = encodeURIComponent(activeRoute.origin);
+            const destination = encodeURIComponent(activeRoute.destination);
+            const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+            window.open(mapsUrl, '_blank');
+        }
+    };
+
+    const handlePodFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setPodFile(file);
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPodPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleUploadPod = async () => {
+        if (!podFile || !activeRoute) return;
+
+        setUploadingPod(true);
+        try {
+            // For now, we'll just simulate upload and store the preview URL
+            // In production, you would upload to Firebase Storage
+            alert('POD uploaded successfully! (Note: In production, this would upload to Firebase Storage)');
+            setShowPodModal(false);
+            setPodFile(null);
+            setPodPreview(null);
+        } catch (error) {
+            console.error('Error uploading POD:', error);
+            alert('Failed to upload POD. Please try again.');
+        } finally {
+            setUploadingPod(false);
+        }
+    };
+
     const handleStartRoute = async () => {
         if (activeRoute) {
             try {
@@ -101,7 +189,28 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
     const handleCompleteRoute = async () => {
         if (activeRoute && confirm('Are you sure you want to complete this route?')) {
             try {
+                // Complete the route
                 await completeRoute(activeRoute.id);
+
+                // Update driver status to Idle and clear current route
+                if (driver?.id) {
+                    await updateDriver(driver.id, {
+                        status: 'Idle',
+                        currentRouteId: undefined,
+                        currentRouteStatus: undefined
+                    });
+                }
+
+                // Update vehicle status to Parked and clear current route
+                if (activeRoute.assignedVehicleId || activeRoute.vehicleId) {
+                    const vehicleId = activeRoute.assignedVehicleId || activeRoute.vehicleId;
+                    await updateVehicle(vehicleId!, {
+                        status: 'Parked',
+                        currentRouteId: undefined,
+                        currentRouteStatus: undefined
+                    });
+                }
+
                 alert('Route completed successfully!');
                 setActiveRoute(null);
 
@@ -121,6 +230,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
                     setCompletedRoutes(routes.slice(0, 10));
                 }
             } catch (error) {
+                console.error('Error completing route:', error);
                 alert('Failed to complete route. Please try again.');
             }
         }
@@ -143,6 +253,28 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20">
+            {/* Notification Banner */}
+            {showNotification && (
+                <div className="fixed top-0 left-0 right-0 z-50 animate-slide-down">
+                    <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-4 shadow-lg">
+                        <div className="max-w-4xl mx-auto flex items-center gap-3">
+                            <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            <p className="flex-1 font-semibold">{notificationMessage}</p>
+                            <button
+                                onClick={() => setShowNotification(false)}
+                                className="p-1 hover:bg-white/20 rounded transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-4 py-6 shadow-lg">
                 <div className="flex items-center justify-between max-w-4xl mx-auto">
@@ -221,12 +353,53 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
                                         </div>
                                     </div>
 
+                                    {/* Progress Update Slider (only show if route is In Progress) */}
+                                    {activeRoute.status === 'In Progress' && (
+                                        <div className="border-t pt-4 mt-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Update Progress: {progressSlider}%
+                                            </label>
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    value={progressSlider}
+                                                    onChange={(e) => setProgressSlider(Number(e.target.value))}
+                                                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                                />
+                                                <button
+                                                    onClick={handleUpdateProgress}
+                                                    disabled={updatingProgress || progressSlider === activeRoute.progress}
+                                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-sm font-semibold rounded-lg transition-colors"
+                                                >
+                                                    {updatingProgress ? 'Updating...' : 'Update'}
+                                                </button>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                Slide to update your delivery progress
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {/* Action Buttons */}
-                                    <div className="flex gap-3 pt-2">
+                                    <div className="flex flex-col gap-3 pt-2">
+                                        {/* Navigation Button - Always visible */}
+                                        <button
+                                            onClick={handleGetDirections}
+                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                            </svg>
+                                            Get Directions
+                                        </button>
+
+                                        {/* Status-specific buttons */}
                                         {activeRoute.status === 'Pending' && (
                                             <button
                                                 onClick={handleStartRoute}
-                                                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -236,15 +409,27 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
                                             </button>
                                         )}
                                         {activeRoute.status === 'In Progress' && (
-                                            <button
-                                                onClick={handleCompleteRoute}
-                                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                Complete Route
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={() => setShowPodModal(true)}
+                                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                    Upload Proof of Delivery
+                                                </button>
+                                                <button
+                                                    onClick={handleCompleteRoute}
+                                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Complete Route
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -303,6 +488,80 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
                                     </div>
                                 ))
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {activeView === 'earnings' && (
+                    <div className="space-y-6">
+                        {/* Earnings Summary Card */}
+                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold">Total Earnings</h2>
+                                <svg className="w-8 h-8 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <p className="text-4xl font-bold mb-2">
+                                ₦{completedRoutes.reduce((total, route) => total + (route.distanceKm * 1250 || 0), 0).toLocaleString()}
+                            </p>
+                            <p className="text-green-100 text-sm">From {completedRoutes.length} completed routes</p>
+                        </div>
+
+                        {/* Earnings Breakdown */}
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                            <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-4">
+                                <h2 className="text-xl font-bold">Earnings Breakdown</h2>
+                                <p className="text-sm text-orange-100 mt-1">Per route earnings</p>
+                            </div>
+                            <div className="divide-y max-h-96 overflow-y-auto">
+                                {completedRoutes.length === 0 ? (
+                                    <div className="p-8 text-center text-gray-500">
+                                        No earnings yet. Complete routes to start earning!
+                                    </div>
+                                ) : (
+                                    completedRoutes.map((route) => {
+                                        const routeEarnings = route.distanceKm * 1250;
+                                        return (
+                                            <div key={route.id} className="p-4 hover:bg-gray-50">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex-1">
+                                                        <p className="font-semibold text-gray-900">{route.origin} → {route.destination}</p>
+                                                        <p className="text-xs text-gray-500 mt-1">{route.id} • {route.distanceKm} km</p>
+                                                        {route.actualArrivalTime && (
+                                                            <p className="text-xs text-gray-400 mt-1">
+                                                                Completed: {new Date(route.actualArrivalTime).toLocaleDateString()}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right ml-4">
+                                                        <p className="font-bold text-green-600">₦{routeEarnings.toLocaleString()}</p>
+                                                        <p className="text-xs text-gray-500">@₦1,250/km</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white rounded-xl shadow p-4">
+                                <p className="text-xs text-gray-500 uppercase mb-1">Avg per Route</p>
+                                <p className="text-2xl font-bold text-gray-900">
+                                    ₦{completedRoutes.length > 0 ? Math.round(completedRoutes.reduce((total, route) => total + (route.distanceKm * 1250 || 0), 0) / completedRoutes.length).toLocaleString() : '0'}
+                                </p>
+                                <p className="text-xs text-blue-600 mt-1">Average</p>
+                            </div>
+                            <div className="bg-white rounded-xl shadow p-4">
+                                <p className="text-xs text-gray-500 uppercase mb-1">Total Distance</p>
+                                <p className="text-2xl font-bold text-gray-900">
+                                    {completedRoutes.reduce((total, route) => total + (route.distanceKm || 0), 0).toLocaleString()} km
+                                </p>
+                                <p className="text-xs text-purple-600 mt-1">Driven</p>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -389,6 +648,68 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
                     </button>
                 </div>
             </div>
+
+            {/* POD Upload Modal */}
+            {showPodModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-4 rounded-t-xl">
+                            <h2 className="text-xl font-bold">Upload Proof of Delivery</h2>
+                            <p className="text-sm text-purple-100 mt-1">Take or upload a photo</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {/* File Input */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Select Image
+                                </label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    onChange={handlePodFileChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    On mobile, you can take a photo directly
+                                </p>
+                            </div>
+
+                            {/* Image Preview */}
+                            {podPreview && (
+                                <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                                    <img
+                                        src={podPreview}
+                                        alt="POD Preview"
+                                        className="w-full h-64 object-cover"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Buttons */}
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    onClick={() => {
+                                        setShowPodModal(false);
+                                        setPodFile(null);
+                                        setPodPreview(null);
+                                    }}
+                                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleUploadPod}
+                                    disabled={!podFile || uploadingPod}
+                                    className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+                                >
+                                    {uploadingPod ? 'Uploading...' : 'Upload'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
