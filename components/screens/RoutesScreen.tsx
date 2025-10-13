@@ -18,11 +18,14 @@ interface RoutesScreenProps {
     onSelectAllCompleted: () => void;
     onCreateInvoiceFromSelection: () => void;
     invoicedRouteIds: Set<string>;
+    onEdit?: (route: Route) => void;
+    onDelete?: (route: Route) => void;
 }
 
-const RoutesScreen: React.FC<RoutesScreenProps> = ({ 
+const RoutesScreen: React.FC<RoutesScreenProps> = ({
     setActiveModal, routes, onAssign, onViewDetails, onComplete, onFilterChange, activeFilter,
-    selectedRoutes, onSelectRoute, onSelectAllCompleted, onCreateInvoiceFromSelection, invoicedRouteIds
+    selectedRoutes, onSelectRoute, onSelectAllCompleted, onCreateInvoiceFromSelection, invoicedRouteIds,
+    onEdit, onDelete
 }) => {
     return (
         <div className="flex flex-col gap-8">
@@ -44,9 +47,9 @@ const RoutesScreen: React.FC<RoutesScreenProps> = ({
                     </button>
                 </div>
             </div>
-            <RouteAssignmentTable 
-                routes={routes} 
-                onAssign={onAssign} 
+            <RouteAssignmentTable
+                routes={routes}
+                onAssign={onAssign}
                 onViewDetails={onViewDetails}
                 onComplete={onComplete}
                 onFilterChange={onFilterChange}
@@ -55,6 +58,8 @@ const RoutesScreen: React.FC<RoutesScreenProps> = ({
                 onSelectRoute={onSelectRoute}
                 onSelectAllCompleted={onSelectAllCompleted}
                 invoicedRouteIds={invoicedRouteIds}
+                onEdit={onEdit}
+                onDelete={onDelete}
             />
         </div>
     );

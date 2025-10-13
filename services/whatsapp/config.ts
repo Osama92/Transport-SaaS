@@ -97,6 +97,92 @@ export const WHATSAPP_CONFIG = {
                     ]
                 }
             ]
+        },
+        // Driver Templates
+        routeAssigned: {
+            name: 'route_assigned',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' }, // Route ID
+                        { type: 'text', text: '{{2}}' }, // Origin
+                        { type: 'text', text: '{{3}}' }, // Destination
+                        { type: 'text', text: '{{4}}' }, // Pickup Time
+                    ]
+                }
+            ]
+        },
+        routeCompleted: {
+            name: 'route_completed',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' }, // Route ID
+                        { type: 'text', text: '{{2}}' }, // Earnings
+                        { type: 'text', text: '{{3}}' }, // Completion Time
+                    ]
+                }
+            ]
+        },
+        paymentReceived: {
+            name: 'payment_received',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' }, // Amount
+                        { type: 'text', text: '{{2}}' }, // New Balance
+                        { type: 'text', text: '{{3}}' }, // Payment Date
+                    ]
+                }
+            ]
+        },
+        maintenanceDue: {
+            name: 'maintenance_due',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' }, // Vehicle Plate
+                        { type: 'text', text: '{{2}}' }, // Maintenance Type
+                        { type: 'text', text: '{{3}}' }, // Due Date
+                    ]
+                }
+            ]
+        },
+        driverCredentials: {
+            name: 'driver_credentials',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' }, // Driver Name
+                        { type: 'text', text: '{{2}}' }, // Username
+                        { type: 'text', text: '{{3}}' }, // Password
+                        { type: 'text', text: '{{4}}' }, // Login URL
+                    ]
+                }
+            ]
+        },
+        emergencyAlert: {
+            name: 'emergency_alert',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' }, // Alert Message
+                        { type: 'text', text: '{{2}}' }, // Contact Number
+                    ]
+                }
+            ]
         }
     },
 

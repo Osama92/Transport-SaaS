@@ -37,13 +37,22 @@ export const getRoutesByOrganization = async (organizationId: string): Promise<R
         for (const docSnap of querySnapshot.docs) {
             const data = docSnap.data();
 
+            console.log(`[Firestore Routes] Route ${docSnap.id} raw data:`, {
+                createdAt: data.createdAt,
+                createdAtType: data.createdAt?.constructor?.name,
+                isTimestamp: data.createdAt instanceof Timestamp
+            });
+
             // Fetch expenses subcollection
             const expenses = await getRouteExpenses(docSnap.id);
 
+            const convertedCreatedAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt;
+            console.log(`[Firestore Routes] Route ${docSnap.id} converted createdAt:`, convertedCreatedAt);
+
             routes.push({
-                id: docSnap.id,
                 ...data,
-                createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+                id: docSnap.id,
+                createdAt: convertedCreatedAt,
                 updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
                 estimatedDepartureTime: data.estimatedDepartureTime instanceof Timestamp
                     ? data.estimatedDepartureTime.toDate().toISOString()
@@ -59,6 +68,8 @@ export const getRoutesByOrganization = async (organizationId: string): Promise<R
                     : data.actualArrivalTime,
                 expenses,
             } as Route);
+
+            console.log(`[Firestore Routes] Route ${docSnap.id} final object createdAt:`, routes[routes.length - 1].createdAt);
         }
 
         return routes;
@@ -84,8 +95,8 @@ export const getRouteById = async (routeId: string): Promise<Route | null> => {
         const expenses = await getRouteExpenses(routeId);
 
         return {
-            id: routeSnap.id,
             ...data,
+            id: routeSnap.id,
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
             estimatedDepartureTime: data.estimatedDepartureTime instanceof Timestamp
@@ -328,8 +339,8 @@ export const getRoutesByStatus = async (
             const expenses = await getRouteExpenses(docSnap.id);
 
             routes.push({
-                id: docSnap.id,
                 ...data,
+                id: docSnap.id,
                 createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
                 updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
                 estimatedDepartureTime: data.estimatedDepartureTime instanceof Timestamp
@@ -379,8 +390,8 @@ export const getRoutesByDriver = async (
             const expenses = await getRouteExpenses(docSnap.id);
 
             routes.push({
-                id: docSnap.id,
                 ...data,
+                id: docSnap.id,
                 createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
                 updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
                 estimatedDepartureTime: data.estimatedDepartureTime instanceof Timestamp
@@ -430,8 +441,8 @@ export const getRoutesByVehicle = async (
             const expenses = await getRouteExpenses(docSnap.id);
 
             routes.push({
-                id: docSnap.id,
                 ...data,
+                id: docSnap.id,
                 createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
                 updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
                 estimatedDepartureTime: data.estimatedDepartureTime instanceof Timestamp

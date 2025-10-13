@@ -6,9 +6,44 @@ import {
     orderBy,
     onSnapshot,
     QueryConstraint,
-    Unsubscribe
+    Unsubscribe,
+    Timestamp
 } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+
+/**
+ * Helper function to convert Firestore Timestamp objects to ISO strings
+ * Recursively handles nested objects and arrays
+ */
+function convertTimestamps(obj: any): any {
+    if (obj === null || obj === undefined) {
+        return obj;
+    }
+
+    // Handle Timestamp objects
+    if (obj instanceof Timestamp) {
+        return obj.toDate().toISOString();
+    }
+
+    // Handle arrays
+    if (Array.isArray(obj)) {
+        return obj.map(item => convertTimestamps(item));
+    }
+
+    // Handle plain objects
+    if (typeof obj === 'object' && obj.constructor === Object) {
+        const converted: any = {};
+        for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                converted[key] = convertTimestamps(obj[key]);
+            }
+        }
+        return converted;
+    }
+
+    // Return primitive values as-is
+    return obj;
+}
 
 /**
  * Custom hook for real-time Firestore queries
@@ -48,9 +83,11 @@ export function useFirestoreCollection<T>(
                     (querySnapshot) => {
                         const documents: T[] = [];
                         querySnapshot.forEach((doc) => {
+                            const rawData = doc.data();
+                            const convertedData = convertTimestamps(rawData);
                             documents.push({
                                 id: doc.id,
-                                ...doc.data(),
+                                ...convertedData,
                             } as T);
                         });
                         setData(documents);

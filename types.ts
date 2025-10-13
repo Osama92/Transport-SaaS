@@ -141,8 +141,9 @@ export interface Driver extends FirestoreDocument {
     name: string;
     email?: string;
     location: string;
-    status: 'On-route' | 'Idle' | 'Offline';
+    status: 'On-route' | 'Idle' | 'Offline' | 'Active' | 'Inactive';
     avatar: string;
+    photo?: string; // Alias for avatar
     licenseNumber: string;
     phone: string;
     nin?: string;
@@ -153,6 +154,14 @@ export interface Driver extends FirestoreDocument {
         lastUpdated: Timestamp | string;
     };
     safetyScore?: number;
+    // Driver Portal Access
+    username?: string; // For driver portal login
+    hashedPassword?: string; // Hashed password for security
+    portalAccess?: {
+        enabled: boolean;
+        lastLogin?: string;
+        whatsappNotifications: boolean;
+    };
     payrollInfo: {
         baseSalary: number; // Annual base salary
         pensionContributionRate: number; // Employee's contribution percentage, e.g., 8 for 8%
@@ -179,6 +188,9 @@ export interface Expense {
   amount: number;
   date: string; // YYYY-MM-DD
 }
+
+// Alias for route expenses (stored in Firestore subcollection)
+export type RouteExpense = Expense;
 
 export interface Route extends FirestoreDocument {
     id: string;

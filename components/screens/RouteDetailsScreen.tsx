@@ -40,8 +40,8 @@ const RouteDetailsScreen: React.FC<RouteDetailsScreenProps> = ({ route, onBack, 
                         <ArrowLeftIcon className="w-6 h-6 text-gray-700 dark:text-gray-300" />
                     </button>
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{t('screens.routeDetails.title')} <span className="font-mono">{route.id}</span></h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{t('screens.routeDetails.subtitle')}</p>
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{t('routeDetails.title')} <span className="font-mono">{route.id}</span></h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{t('routeDetails.subtitle')}</p>
                     </div>
                 </div>
             </div>
@@ -65,16 +65,16 @@ const RouteDetailsScreen: React.FC<RouteDetailsScreenProps> = ({ route, onBack, 
                             <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5">
                                 <div className="bg-indigo-600 h-2.5 rounded-full" style={{width: `${route.progress}%`}}></div>
                             </div>
-                            <div className="text-right text-sm text-gray-500 dark:text-gray-400 mt-1">{route.progress}% {t('modals.routeDetails.complete')}</div>
+                            <div className="text-right text-sm text-gray-500 dark:text-gray-400 mt-1">{route.progress}% {t('routeDetails.complete')}</div>
                         </div>
                     </div>
 
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm">
-                        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2">{t('screens.routeDetails.financials')}</h3>
-                        <InfoRow label={t('screens.routeDetails.routeRate')} value={formatCurrency(route.rate)} />
-                        <InfoRow label={t('screens.routeDetails.totalExpenses')} value={`-${formatCurrency(totalExpenses)}`} />
+                        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2">{t('routeDetails.financials')}</h3>
+                        <InfoRow label={t('routeDetails.routeRate')} value={formatCurrency(route.rate)} />
+                        <InfoRow label={t('routeDetails.totalExpenses')} value={`-${formatCurrency(totalExpenses)}`} />
                         <div className="flex justify-between items-center py-2 border-t-2 mt-2 dark:border-slate-600">
-                            <span className="text-sm font-bold text-gray-600 dark:text-gray-300">{t('screens.routeDetails.balance')}</span>
+                            <span className="text-sm font-bold text-gray-600 dark:text-gray-300">{t('routeDetails.balance')}</span>
                             <span className={`text-lg font-bold ${balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                 {formatCurrency(balance)}
                             </span>
@@ -86,11 +86,11 @@ const RouteDetailsScreen: React.FC<RouteDetailsScreenProps> = ({ route, onBack, 
                             <>
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                                     <ClipboardDocumentCheckIcon className="w-6 h-6 text-green-500" />
-                                    {t('screens.routeDetails.pod')}
+                                    {t('routeDetails.pod')}
                                 </h3>
                                 <div className="rounded-lg overflow-hidden border dark:border-slate-700">
                                      <a href={route.podUrl} target="_blank" rel="noopener noreferrer" title="View full image">
-                                        <img src={route.podUrl} alt={t('screens.routeDetails.pod')} className="w-full h-auto object-cover" />
+                                        <img src={route.podUrl} alt={t('routeDetails.pod')} className="w-full h-auto object-cover" />
                                     </a>
                                 </div>
                             </>
@@ -98,7 +98,7 @@ const RouteDetailsScreen: React.FC<RouteDetailsScreenProps> = ({ route, onBack, 
                             <div className="h-64 flex-grow flex items-center justify-center">
                                 <div className="text-center text-gray-500 dark:text-gray-400">
                                     <MapIcon className="w-16 h-16 mx-auto text-gray-400"/>
-                                    <p className="mt-2 font-semibold">{t('modals.routeDetails.mapPlaceholder')}</p>
+                                    <p className="mt-2 font-semibold">{t('routeDetails.mapPlaceholder')}</p>
                                     {route.status === 'Completed' && !route.podUrl && (
                                         <p className="text-sm mt-1">{t('modals.pod.noPod')}</p>
                                     )}
@@ -111,9 +111,9 @@ const RouteDetailsScreen: React.FC<RouteDetailsScreenProps> = ({ route, onBack, 
                 {/* Right Column: Expenses */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm h-full">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">{t('screens.routeDetails.expenses')}</h3>
+                        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">{t('routeDetails.expenses')}</h3>
                         <button onClick={onAddExpenseClick} className="flex items-center gap-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
-                            <PlusIcon className="w-5 h-5"/> {t('screens.routeDetails.addExpense')}
+                            <PlusIcon className="w-5 h-5"/> {t('routeDetails.addExpense')}
                         </button>
                     </div>
                     <div className="overflow-x-auto">
@@ -121,9 +121,9 @@ const RouteDetailsScreen: React.FC<RouteDetailsScreenProps> = ({ route, onBack, 
                             <thead className="border-b text-gray-500 dark:border-slate-700 dark:text-gray-400">
                                 <tr>
                                     <th className="py-3 px-4 font-medium">{t('common.date')}</th>
-                                    <th className="py-3 px-4 font-medium">{t('modals.addExpense.type')}</th>
+                                    <th className="py-3 px-4 font-medium">{t('addExpense.type')}</th>
                                     <th className="py-3 px-4 font-medium">{t('common.description')}</th>
-                                    <th className="py-3 px-4 font-medium text-right">{t('modals.addExpense.amount')}</th>
+                                    <th className="py-3 px-4 font-medium text-right">{t('addExpense.amount')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -137,12 +137,12 @@ const RouteDetailsScreen: React.FC<RouteDetailsScreenProps> = ({ route, onBack, 
                                         </tr>
                                     ))
                                 ) : (
-                                    <tr><td colSpan={4} className="text-center py-8 text-gray-500 dark:text-gray-400">{t('screens.routeDetails.noExpenses')}</td></tr>
+                                    <tr><td colSpan={4} className="text-center py-8 text-gray-500 dark:text-gray-400">{t('routeDetails.noExpenses')}</td></tr>
                                 )}
                             </tbody>
                              <tfoot>
                                 <tr className="border-t-2 dark:border-slate-600">
-                                    <td colSpan={3} className="py-3 px-4 text-right font-bold text-gray-800 dark:text-gray-100">{t('screens.routeDetails.totalExpenses')}</td>
+                                    <td colSpan={3} className="py-3 px-4 text-right font-bold text-gray-800 dark:text-gray-100">{t('routeDetails.totalExpenses')}</td>
                                     <td className="py-3 px-4 font-bold text-gray-800 dark:text-gray-100 text-right">{formatCurrency(totalExpenses)}</td>
                                 </tr>
                             </tfoot>

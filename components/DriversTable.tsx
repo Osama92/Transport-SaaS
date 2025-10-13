@@ -33,16 +33,18 @@ interface DriversTableProps {
     onViewDetails?: (driver: Driver) => void;
     onRemove?: (driver: Driver) => void;
     onEditPay?: (driver: Driver) => void;
+    onEditDriver?: (driver: Driver) => void;
 }
 
-const DriversTable: React.FC<DriversTableProps> = ({ 
-    drivers, 
-    showViewAllButton = true, 
+const DriversTable: React.FC<DriversTableProps> = ({
+    drivers,
+    showViewAllButton = true,
     onViewAll,
     onSendFunds,
     onViewDetails,
     onRemove,
-    onEditPay
+    onEditPay,
+    onEditDriver
 }) => {
     const { t } = useTranslation();
     const [openMenuId, setOpenMenuId] = useState<number | null>(null);
@@ -123,6 +125,9 @@ const DriversTable: React.FC<DriversTableProps> = ({
                                             <div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl z-10 border dark:border-slate-700">
                                                 <button onClick={() => { onSendFunds?.(driver); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800">
                                                     <CurrencyDollarIcon className="w-5 h-5 text-gray-500"/> {t('components.driversTable.sendFunds')}
+                                                </button>
+                                                <button onClick={() => { onEditDriver?.(driver); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800">
+                                                    <PencilIcon className="w-5 h-5 text-gray-500"/> Edit Driver Details
                                                 </button>
                                                 <button onClick={() => { onEditPay?.(driver); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800">
                                                     <PencilIcon className="w-5 h-5 text-gray-500"/> {t('screens.payroll.editPay')}

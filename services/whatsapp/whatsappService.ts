@@ -346,5 +346,106 @@ export const whatsAppNotifications = {
             `${driverName}'s Current Location`,
             'Track your delivery driver'
         );
+    },
+
+    /**
+     * ========== DRIVER NOTIFICATIONS ==========
+     */
+
+    /**
+     * Notify driver about new route assignment
+     */
+    async notifyDriverRouteAssigned(
+        driverPhone: string,
+        routeId: string,
+        origin: string,
+        destination: string,
+        pickupTime: string
+    ): Promise<WhatsAppResponse> {
+        return whatsAppService.sendTemplate(
+            driverPhone,
+            'route_assigned',
+            [routeId, origin, destination, pickupTime]
+        );
+    },
+
+    /**
+     * Notify driver about route completion
+     */
+    async notifyDriverRouteCompleted(
+        driverPhone: string,
+        routeId: string,
+        earnings: string,
+        completionTime: string
+    ): Promise<WhatsAppResponse> {
+        return whatsAppService.sendTemplate(
+            driverPhone,
+            'route_completed',
+            [routeId, earnings, completionTime]
+        );
+    },
+
+    /**
+     * Notify driver about wallet credit
+     */
+    async notifyDriverPaymentReceived(
+        driverPhone: string,
+        amount: string,
+        balance: string,
+        paymentDate: string
+    ): Promise<WhatsAppResponse> {
+        return whatsAppService.sendTemplate(
+            driverPhone,
+            'payment_received',
+            [amount, balance, paymentDate]
+        );
+    },
+
+    /**
+     * Notify driver about vehicle maintenance due
+     */
+    async notifyDriverMaintenanceDue(
+        driverPhone: string,
+        vehiclePlate: string,
+        maintenanceType: string,
+        dueDate: string
+    ): Promise<WhatsAppResponse> {
+        return whatsAppService.sendTemplate(
+            driverPhone,
+            'maintenance_due',
+            [vehiclePlate, maintenanceType, dueDate]
+        );
+    },
+
+    /**
+     * Send driver credentials (username/password)
+     */
+    async sendDriverCredentials(
+        driverPhone: string,
+        driverName: string,
+        username: string,
+        password: string,
+        loginUrl: string
+    ): Promise<WhatsAppResponse> {
+        return whatsAppService.sendTemplate(
+            driverPhone,
+            'driver_credentials',
+            [driverName, username, password, loginUrl]
+        );
+    },
+
+    /**
+     * Send emergency alert to driver
+     */
+    async sendDriverEmergencyAlert(
+        driverPhone: string,
+        alertMessage: string,
+        contactNumber: string
+    ): Promise<WhatsAppResponse> {
+        return whatsAppService.sendTemplate(
+            driverPhone,
+            'emergency_alert',
+            [alertMessage, contactNumber]
+        );
     }
 };

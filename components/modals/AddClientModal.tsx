@@ -83,6 +83,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient, c
                     notes: '',
                     contactPerson: formData.contactPerson,
                     taxId: formData.tin,
+                    tin: formData.tin, // Also use tin field
+                    cacNumber: formData.cacNumber,
                     paymentTerms: 'Net 30',
                     creditLimit: 0,
                     outstandingBalance: 0,
@@ -92,10 +94,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ onClose, onAddClient, c
                 currentUser.uid
             );
 
-            // Call legacy callback if provided (for demo mode)
-            if (onAddClient) {
-                onAddClient(formData);
-            }
+            // Don't call onAddClient callback - it causes duplicate creation
+            // The useFirestore hook will automatically update the list
 
             onClose();
         } catch (err: any) {

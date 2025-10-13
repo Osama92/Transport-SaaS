@@ -6,6 +6,7 @@ import { useDrivers, useVehicles, useRoutes, useClients } from '../../hooks/useF
 import { getUserProfile, updateWhatsAppPreferences } from '../../services/firestore/users';
 import { whatsAppService } from '../../services/whatsapp/whatsappService';
 import { ArrowLeftIcon } from '../Icons';
+import TeamManagementScreen from './TeamManagementScreen';
 
 interface SettingsScreenProps {
     onBack: () => void;
@@ -96,12 +97,38 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
 
     // Calculate current month route count
     const currentMonthRouteCount = useMemo(() => {
+        console.log('[SettingsScreen] Calculating route count...');
+        console.log('[SettingsScreen] Total routes:', routes.length);
+        console.log('[SettingsScreen] All routes:', routes.map(r => ({ id: r.id, createdAt: r.createdAt })));
+
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        return routes.filter(route => {
-            const createdAt = new Date(route.createdAt || '');
-            return createdAt >= startOfMonth;
-        }).length;
+        console.log('[SettingsScreen] Start of month:', startOfMonth.toISOString());
+
+        const monthRoutes = routes.filter(route => {
+            console.log(`[SettingsScreen] Checking route ${route.id}:`, route.createdAt);
+
+            if (!route.createdAt) {
+                console.log(`[SettingsScreen] Route ${route.id} - NO createdAt`);
+                return false;
+            }
+
+            const createdAt = new Date(route.createdAt);
+            console.log(`[SettingsScreen] Route ${route.id} - Parsed date:`, createdAt, 'Valid:', !isNaN(createdAt.getTime()));
+
+            if (isNaN(createdAt.getTime())) {
+                console.log(`[SettingsScreen] Route ${route.id} - INVALID date`);
+                return false;
+            }
+
+            const isThisMonth = createdAt >= startOfMonth;
+            console.log(`[SettingsScreen] Route ${route.id} - Is this month:`, isThisMonth);
+
+            return isThisMonth;
+        });
+
+        console.log('[SettingsScreen] This month routes:', monthRoutes.length);
+        return monthRoutes.length;
     }, [routes]);
 
     const currentPlanKey = organization?.subscription?.plan || 'basic';
@@ -416,8 +443,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                                                     </svg>
                                                 </button>
                                             </div>
-                                            <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-                                                {vehicles.length} <span className="text-gray-400">of {formatLimit(currentLimits?.vehicles)}</span>
+                                            <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                                                {vehicles.length} <span className="text-base text-gray-400">of {formatLimit(currentLimits?.vehicles)}</span>
                                             </p>
                                             <div className="mt-2 w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
                                                 <div
@@ -444,8 +471,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                                                     </svg>
                                                 </button>
                                             </div>
-                                            <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-                                                {drivers.length} <span className="text-gray-400">of {formatLimit(currentLimits?.drivers)}</span>
+                                            <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                                                {drivers.length} <span className="text-base text-gray-400">of {formatLimit(currentLimits?.drivers)}</span>
                                             </p>
                                             <div className="mt-2 w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
                                                 <div
@@ -466,14 +493,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                                         <div>
                                             <div className="flex items-center gap-1 mb-1">
                                                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Routes</p>
-                                                <button className="text-gray-400 hover:text-gray-600">
+                                                <button className="text-gray-400 hover:text-gray-600" title="Routes created this month">
                                                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                                     </svg>
                                                 </button>
                                             </div>
-                                            <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-                                                {currentMonthRouteCount} <span className="text-gray-400">of {formatLimit(currentLimits?.routes)}</span>
+                                            <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                                                {currentMonthRouteCount} <span className="text-base text-gray-400">of {formatLimit(currentLimits?.routes)}</span>
                                             </p>
                                             <div className="mt-2 w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
                                                 <div
@@ -500,8 +527,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                                                     </svg>
                                                 </button>
                                             </div>
-                                            <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-                                                {clients.length} <span className="text-gray-400">of {formatLimit(currentLimits?.clients)}</span>
+                                            <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                                                {clients.length} <span className="text-base text-gray-400">of {formatLimit(currentLimits?.clients)}</span>
                                             </p>
                                             <div className="mt-2 w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
                                                 <div
@@ -728,9 +755,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                         </div>
                     )}
 
-                    {activeTab !== 'billing' && activeTab !== 'general' && activeTab !== 'password' && (
+                    {activeTab === 'team' && (
+                        <TeamManagementScreen onBack={() => setActiveTab('general')} />
+                    )}
+
+                    {activeTab === 'orgGeneral' && (
                         <div className="text-center py-12">
-                            <p className="text-gray-500 dark:text-gray-400">This section is under development.</p>
+                            <p className="text-gray-500 dark:text-gray-400">Organization settings are under development.</p>
                         </div>
                     )}
                 </div>

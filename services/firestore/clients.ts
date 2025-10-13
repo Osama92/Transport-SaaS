@@ -96,6 +96,8 @@ export const createClient = async (
             notes: clientData.notes || '',
             contactPerson: clientData.contactPerson || '',
             taxId: clientData.taxId || '',
+            tin: clientData.tin || '',
+            cacNumber: clientData.cacNumber || '',
             paymentTerms: clientData.paymentTerms || 'Net 30',
             creditLimit: clientData.creditLimit || 0,
             outstandingBalance: clientData.outstandingBalance || 0,

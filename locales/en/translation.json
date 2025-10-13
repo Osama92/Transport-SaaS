@@ -18,6 +18,7 @@
     "viewAll": "View All",
     "remove": "Remove",
     "edit": "Edit",
+    "delete": "Delete",
     "view": "View",
     "saveChanges": "Save Changes",
     "yes": "Yes",
@@ -248,6 +249,36 @@
     "shipment_history_assign_action": "Assign Transporter",
     "shipment_history_delete_action": "Delete Shipment"
   },
+  "routeDetails": {
+    "title": "Route Details",
+    "subtitle": "View complete route information and manage expenses",
+    "financials": "Financials",
+    "routeRate": "Route Rate",
+    "totalExpenses": "Total Expenses",
+    "balance": "Balance",
+    "pod": "Proof of Delivery",
+    "expenses": "Expenses",
+    "addExpense": "Add Expense",
+    "noExpenses": "No expenses recorded for this route",
+    "mapPlaceholder": "Live Map Placeholder",
+    "stops": "Stops",
+    "progress": "Progress",
+    "complete": "Complete"
+  },
+  "addExpense": {
+    "title": "Add Route Expense",
+    "type": "Expense Type",
+    "description": "Description",
+    "amount": "Amount (₦)",
+    "date": "Date",
+    "saveButton": "Add Expense",
+    "types": {
+      "fuel": "Fuel",
+      "tolls": "Tolls",
+      "maintenance": "Maintenance",
+      "other": "Other"
+    }
+  },
   "modals": {
     "addVehicle": {
       "title": "Add New Vehicle",
@@ -316,8 +347,25 @@
       "podImage": "POD Image",
       "noPod": "No POD image available."
     },
+    "addExpense": {
+      "title": "Add Route Expense",
+      "type": "Expense Type",
+      "description": "Description",
+      "amount": "Amount (₦)",
+      "date": "Date",
+      "saveButton": "Add Expense"
+    },
     "routeDetails": {
-      "title": "Route Details: {{routeId}}",
+      "title": "Route Details",
+      "subtitle": "View complete route information and manage expenses",
+      "financials": "Financials",
+      "routeRate": "Route Rate",
+      "totalExpenses": "Total Expenses",
+      "balance": "Balance",
+      "pod": "Proof of Delivery",
+      "expenses": "Expenses",
+      "addExpense": "Add Expense",
+      "noExpenses": "No expenses recorded for this route",
       "mapPlaceholder": "Live Map Placeholder",
       "stops": "Stops",
       "progress": "Progress",

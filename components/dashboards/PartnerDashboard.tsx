@@ -4,6 +4,7 @@ import DashboardLayout from '../DashboardLayout';
 import TestWhatsApp from '../TestWhatsApp';
 import AddVehicleModal from '../modals/AddVehicleModal';
 import AddDriverModal from '../modals/AddDriverModal';
+import EditDriverModal from '../modals/EditDriverModal';
 import CreateRouteModal from '../modals/CreateRouteModal';
 import AddClientModal from '../modals/AddClientModal';
 import EditClientModal from '../modals/EditClientModal';
@@ -35,12 +36,14 @@ import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
 // Import Firestore functions
 import { deleteDriver, updateDriver } from '../../services/firestore/drivers';
 import { deleteVehicle } from '../../services/firestore/vehicles';
-import { deleteRoute, assignRouteResources, startRoute, updateRoute, addRouteExpense, completeRoute } from '../../services/firestore/routes';
+import { deleteRoute, assignRouteResources, startRoute, updateRoute, addRouteExpense, completeRoute, getRouteById } from '../../services/firestore/routes';
 import { createClient, updateClient as updateClientFirestore, deleteClient, updateClientStatus } from '../../services/firestore/clients';
 import { createPayrollRun } from '../../services/firestore/payroll';
 // Import notification triggers and handlers
 import { notifyDriverAssigned, notifyRouteCompleted, notifyNewRoute, notifyDriverOnboarded, notifyExpenseAdded, notifyClientAdded, notifyPayrollGenerated } from '../../services/notificationTriggers';
 import { markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } from '../../services/firestore/notifications';
+// Import WhatsApp notifications
+import { whatsAppNotifications } from '../../services/whatsapp/whatsappService';
 // Keep mock data functions for demo mode
 import {
     generateDriverPerformanceData,
@@ -102,7 +105,7 @@ interface PartnerDashboardProps {
   role: string;
 }
 
-type ModalType = 'addVehicle' | 'addDriver' | 'createRoute' | 'addClient' | 'editClient' | 'confirmDeleteClient' | 'confirmToggleClientStatus' | 'assignDriver' | 'viewPOD' | 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'updateVehicleStatus' | 'addMaintenanceLog' | 'uploadDocument' | 'emailInvoice' | 'confirmMarkAsPaid' | 'profileSettings' | 'addExpense' | 'viewPayslip' | 'createPayrollRun' | 'editDriverPay' | null;
+type ModalType = 'addVehicle' | 'addDriver' | 'editDriver' | 'createRoute' | 'addClient' | 'editClient' | 'confirmDeleteClient' | 'confirmToggleClientStatus' | 'assignDriver' | 'viewPOD' | 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'updateVehicleStatus' | 'addMaintenanceLog' | 'uploadDocument' | 'emailInvoice' | 'confirmMarkAsPaid' | 'profileSettings' | 'addExpense' | 'viewPayslip' | 'createPayrollRun' | 'editDriverPay' | null;
 type RouteStatusFilter = 'All' | 'Pending' | 'In Progress' | 'Completed';
 type InvoiceView = 'list' | 'create' | 'edit';
 
@@ -292,12 +295,38 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
 
   // Calculate current month route count for subscription limits
   const currentMonthRouteCount = useMemo(() => {
+    console.log('[PartnerDashboard] Calculating route count...');
+    console.log('[PartnerDashboard] Total routes:', routes.length);
+    console.log('[PartnerDashboard] All routes:', routes.map(r => ({ id: r.id, createdAt: r.createdAt })));
+
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    return routes.filter(route => {
-      const createdAt = new Date(route.createdAt || '');
-      return createdAt >= startOfMonth;
-    }).length;
+    console.log('[PartnerDashboard] Start of month:', startOfMonth.toISOString());
+
+    const monthRoutes = routes.filter(route => {
+      console.log(`[PartnerDashboard] Checking route ${route.id}:`, route.createdAt);
+
+      if (!route.createdAt) {
+        console.log(`[PartnerDashboard] Route ${route.id} - NO createdAt`);
+        return false;
+      }
+
+      const createdAt = new Date(route.createdAt);
+      console.log(`[PartnerDashboard] Route ${route.id} - Parsed date:`, createdAt, 'Valid:', !isNaN(createdAt.getTime()));
+
+      if (isNaN(createdAt.getTime())) {
+        console.log(`[PartnerDashboard] Route ${route.id} - INVALID date`);
+        return false;
+      }
+
+      const isThisMonth = createdAt >= startOfMonth;
+      console.log(`[PartnerDashboard] Route ${route.id} - Is this month:`, isThisMonth);
+
+      return isThisMonth;
+    });
+
+    console.log('[PartnerDashboard] This month routes:', monthRoutes.length);
+    return monthRoutes.length;
   }, [routes]);
 
   // Get subscription limits
@@ -570,6 +599,27 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
                       await notifyDriverAssigned(currentUser.uid, organizationId, driver.name, routeId);
                   }
 
+                  // Send WhatsApp notification to driver if phone number exists and notifications enabled
+                  if (driver.phone && driver.portalAccess?.whatsappNotifications !== false) {
+                      const route = routes.find(r => r.id === routeId);
+                      if (route) {
+                          try {
+                              const pickupTime = route.estimatedDepartureTime || 'TBD';
+                              await whatsAppNotifications.notifyDriverRouteAssigned(
+                                  driver.phone,
+                                  routeId,
+                                  route.origin,
+                                  route.destination,
+                                  pickupTime
+                              );
+                              console.log('WhatsApp notification sent to driver:', driver.phone);
+                          } catch (whatsappError) {
+                              console.error('Failed to send WhatsApp notification:', whatsappError);
+                              // Don't fail the assignment if WhatsApp fails
+                          }
+                      }
+                  }
+
                   console.log('Successfully assigned driver and vehicle to route:', { routeId, driverId, vehicleId });
               } catch (error) {
                   console.error('Error assigning route:', error);
@@ -606,7 +656,12 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
           date: newExpense.date,
         });
         console.log('Successfully added expense to route:', routeId);
-        // The useEffect watching routes will automatically update viewingRoute
+
+        // Manually fetch updated route with expenses since useRoutes hook doesn't watch subcollections
+        const updatedRoute = await getRouteById(routeId);
+        if (updatedRoute && viewingRoute && viewingRoute.id === routeId) {
+          setViewingRoute(updatedRoute);
+        }
       } catch (error) {
         console.error('Error adding expense:', error);
         alert('Failed to add expense. Please try again.');
@@ -640,7 +695,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     setRouteStatusFilter('Pending');
   };
 
-  const handleDriverAction = (action: 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'editDriverPay', driver: Driver) => {
+  const handleDriverAction = (action: 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'editDriverPay' | 'editDriver', driver: Driver) => {
     setSelectedItem(driver);
     setActiveModal(action);
   };
@@ -672,6 +727,23 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
         alert('Failed to delete vehicle. Please try again.');
       }
     }
+  };
+
+  const handleUpdateDriver = async (driverId: string, updates: Partial<Driver>) => {
+    if (isDemoMode) {
+      setMockDrivers(prev => prev.map(d => d.id === driverId ? { ...d, ...updates } : d));
+    } else {
+      try {
+        await updateDriver(driverId, updates);
+        setActiveModal(null);
+        alert('Driver details updated successfully!');
+      } catch (error) {
+        console.error('Error updating driver:', error);
+        alert('Failed to update driver details. Please try again.');
+        return;
+      }
+    }
+    setActiveModal(null);
   };
 
   const handleUpdateDriverPay = async (driverId: number, newPayInfo: { baseSalary: number, pensionContributionRate: number, nhfContributionRate: number }) => {
@@ -967,6 +1039,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
         return <AddVehicleModal onClose={() => setActiveModal(null)} currentVehicleCount={vehicles.length} />;
       case 'addDriver':
         return <AddDriverModal onClose={() => setActiveModal(null)} currentDriverCount={drivers.length} />;
+      case 'editDriver':
+        return <EditDriverModal driver={selectedItem as Driver} onClose={() => setActiveModal(null)} onSave={handleUpdateDriver} />;
       case 'createRoute':
         return <CreateRouteModal onClose={() => setActiveModal(null)} onAddRoute={handleCreateRoute} currentMonthRouteCount={currentMonthRouteCount} />;
       case 'addClient':
@@ -1072,7 +1146,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       case 'Map':
         return <MapScreen items={drivers} />;
       case 'Drivers':
-        return <DriversScreen setActiveModal={(modal) => handleShowModal(modal)} drivers={drivers} onSendFunds={(driver) => handleDriverAction('sendFunds', driver)} onViewDetails={(driver) => handleDriverAction('driverDetails', driver)} onRemove={(driver) => handleDriverAction('confirmRemoval', driver)} onEditPay={(driver) => handleDriverAction('editDriverPay', driver)} analyticsData={analyticsData} dateRange={dateRange} selectedDriver1={analyticsDriver1} onDriver1Change={setAnalyticsDriver1} selectedDriver2={analyticsDriver2} onDriver2Change={setAnalyticsDriver2} />;
+        return <DriversScreen setActiveModal={(modal) => handleShowModal(modal)} drivers={drivers} onSendFunds={(driver) => handleDriverAction('sendFunds', driver)} onViewDetails={(driver) => handleDriverAction('driverDetails', driver)} onRemove={(driver) => handleDriverAction('confirmRemoval', driver)} onEditPay={(driver) => handleDriverAction('editDriverPay', driver)} onEditDriver={(driver) => handleDriverAction('editDriver', driver)} analyticsData={analyticsData} dateRange={dateRange} selectedDriver1={analyticsDriver1} onDriver1Change={setAnalyticsDriver1} selectedDriver2={analyticsDriver2} onDriver2Change={setAnalyticsDriver2} />;
       case 'Vehicles':
         return <VehiclesScreen
           vehicles={vehicles}
@@ -1089,7 +1163,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
                 onAddExpenseClick={() => setActiveModal('addExpense')}
             />
         }
-        return <RoutesScreen setActiveModal={(modal) => handleShowModal(modal)} routes={filteredRoutes} onAssign={handleOpenAssignModal} onViewDetails={handleViewDetails} onComplete={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} selectedRoutes={selectedRoutes} onSelectRoute={handleSelectRoute} onSelectAllCompleted={handleSelectAllCompletedRoutes} onCreateInvoiceFromSelection={handleCreateInvoiceFromSelection} invoicedRouteIds={invoicedRouteIds} />;
+        return <RoutesScreen setActiveModal={(modal) => handleShowModal(modal)} routes={filteredRoutes} onAssign={handleOpenAssignModal} onViewDetails={handleViewDetails} onComplete={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} selectedRoutes={selectedRoutes} onSelectRoute={handleSelectRoute} onSelectAllCompleted={handleSelectAllCompletedRoutes} onCreateInvoiceFromSelection={handleCreateInvoiceFromSelection} invoicedRouteIds={invoicedRouteIds} onEdit={handleEditRoute} onDelete={handleDeleteRoute} />;
       case 'Clients':
         return <ClientsScreen 
             clients={clients} 
