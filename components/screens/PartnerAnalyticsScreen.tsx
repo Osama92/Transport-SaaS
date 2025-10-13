@@ -6,14 +6,13 @@ import CalendarPopover from '../CalendarPopover';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { CurrencyDollarIcon, MapPinIcon, TruckIcon, UserGroupIcon, WrenchScrewdriverIcon, CalendarDaysIcon, ArrowDownTrayIcon } from '../Icons';
+import { useAuth } from '../../contexts/AuthContext';
+import { getDriversByOrganization } from '../../services/firestore/drivers';
+import { getRoutesByOrganization } from '../../services/firestore/routes';
+import { getVehiclesByOrganization } from '../../services/firestore/vehicles';
 
 interface PartnerAnalyticsScreenProps {
-    drivers: Driver[];
-    routes: Route[];
-    vehicles: Vehicle[];
-    clients: Client[];
-    invoices: Invoice[];
-    payrollRuns: PayrollRun[];
+    // Props removed - component will fetch its own data
 }
 
 const ChartCard: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ title, children, className = '' }) => (
@@ -27,12 +26,43 @@ const ChartCard: React.FC<{ title: string; children: React.ReactNode; className?
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
-const PartnerAnalyticsScreen: React.FC<PartnerAnalyticsScreenProps> = ({ drivers, routes, vehicles, clients, invoices, payrollRuns }) => {
+const PartnerAnalyticsScreen: React.FC<PartnerAnalyticsScreenProps> = () => {
     const { t } = useTranslation();
+    const { organizationId } = useAuth();
     const [dateRange, setDateRange] = useState({ start: new Date(new Date().setMonth(new Date().getMonth() - 1)), end: new Date() });
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+    // Fetch data from Firestore
+    const [drivers, setDrivers] = useState<Driver[]>([]);
+    const [routes, setRoutes] = useState<Route[]>([]);
+    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!organizationId) return;
+
+            try {
+                setLoading(true);
+                const [fetchedDrivers, fetchedRoutes, fetchedVehicles] = await Promise.all([
+                    getDriversByOrganization(organizationId),
+                    getRoutesByOrganization(organizationId),
+                    getVehiclesByOrganization(organizationId)
+                ]);
+                setDrivers(fetchedDrivers);
+                setRoutes(fetchedRoutes);
+                setVehicles(fetchedVehicles);
+            } catch (error) {
+                console.error('Error fetching analytics data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [organizationId]);
 
      useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -52,73 +82,88 @@ const PartnerAnalyticsScreen: React.FC<PartnerAnalyticsScreenProps> = ({ drivers
     };
 
     const analyticsData = React.useMemo(() => {
+        // Filter completed routes by date range
         const filteredRoutes = routes.filter(r => {
-            if (!r.completionDate) return false;
-            const completionDate = new Date(r.completionDate);
+            if (r.status !== 'Completed') return false;
+
+            // Use actualArrivalTime or createdAt for date filtering
+            const completionDate = r.actualArrivalTime
+                ? new Date(r.actualArrivalTime)
+                : r.createdAt
+                    ? new Date(r.createdAt)
+                    : null;
+
+            if (!completionDate) return false;
             return completionDate >= dateRange.start && completionDate <= dateRange.end;
         });
 
-        const filteredInvoices = invoices.filter(i => {
-            const issuedDate = new Date(i.issuedDate);
-            return issuedDate >= dateRange.start && issuedDate <= dateRange.end;
-        });
-        
-        const filteredPayrollRuns = payrollRuns.filter(run => {
-            const payDate = new Date(run.payDate);
-            return run.status === 'Paid' && payDate >= dateRange.start && payDate <= dateRange.end;
-        });
+        // Financial Summary Calculations from Routes
+        const totalRevenue = filteredRoutes.reduce((sum, r) => sum + (r.rate || 0), 0);
+        const totalRouteExpenses = filteredRoutes.reduce((sum, r) => {
+            return sum + (r.expenses?.reduce((expSum, exp) => expSum + (exp.amount || 0), 0) || 0);
+        }, 0);
 
-        // Financial Summary Calculations
-        const totalRevenue = filteredRoutes.reduce((sum, r) => sum + r.rate, 0);
-        const totalRouteExpenses = filteredRoutes.reduce((sum, r) => sum + (r.expenses?.reduce((expSum, exp) => expSum + exp.amount, 0) || 0), 0);
         const totalMaintenanceCosts = vehicles.flatMap(v => v.maintenanceLogs || [])
             .filter(log => {
                 if (!log || !log.date) return false;
                 const logDate = new Date(log.date);
                 return logDate >= dateRange.start && logDate <= dateRange.end;
             })
-            .reduce((sum, log) => sum + log.cost, 0);
-        const totalPayrollPaid = filteredPayrollRuns.flatMap(run => run.payslips).reduce((sum, payslip) => sum + payslip.grossPay, 0);
-        const totalOperatingExpenses = totalRouteExpenses + totalMaintenanceCosts + totalPayrollPaid;
+            .reduce((sum, log) => sum + (log.cost || 0), 0);
+
+        const totalOperatingExpenses = totalRouteExpenses + totalMaintenanceCosts;
         const netOperatingProfit = totalRevenue - totalOperatingExpenses;
+
         const expenseBreakdownData = [
-            { name: 'Payroll', value: totalPayrollPaid },
-            { name: 'Maintenance', value: totalMaintenanceCosts },
             { name: 'Route Expenses', value: totalRouteExpenses },
+            { name: 'Maintenance', value: totalMaintenanceCosts },
         ].filter(item => item.value > 0);
 
         // Revenue Trends
         const monthlyData: { [key: string]: { revenue: number; profit: number } } = {};
         filteredRoutes.forEach(r => {
-            if (r.completionDate) {
-                const month = new Date(r.completionDate).toLocaleString('default', { month: 'short', year: '2-digit' });
+            const completionDate = r.actualArrivalTime
+                ? new Date(r.actualArrivalTime)
+                : r.createdAt
+                    ? new Date(r.createdAt)
+                    : null;
+
+            if (completionDate) {
+                const month = completionDate.toLocaleString('default', { month: 'short', year: '2-digit' });
                 if (!monthlyData[month]) monthlyData[month] = { revenue: 0, profit: 0 };
-                const routeExpenses = r.expenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
-                monthlyData[month].revenue += r.rate;
-                monthlyData[month].profit += (r.rate - routeExpenses);
+                const routeExpenses = r.expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+                monthlyData[month].revenue += (r.rate || 0);
+                monthlyData[month].profit += ((r.rate || 0) - routeExpenses);
             }
         });
         const revenueTrendData = Object.entries(monthlyData).map(([name, data]) => ({ name, ...data })).reverse();
 
         // Driver Performance
         const driverPerformance = drivers.map(driver => {
-            const driverRoutes = filteredRoutes.filter(r => r.driverName === driver.name);
-            const totalRate = driverRoutes.reduce((sum, r) => sum + r.rate, 0);
-            const driverExpenses = driverRoutes.reduce((sum, r) => sum + (r.expenses?.reduce((expSum, exp) => expSum + exp.amount, 0) || 0), 0);
+            const driverRoutes = filteredRoutes.filter(r =>
+                r.assignedDriverId === driver.id || r.driverId === driver.id
+            );
+            const totalRate = driverRoutes.reduce((sum, r) => sum + (r.rate || 0), 0);
+            const driverExpenses = driverRoutes.reduce((sum, r) => {
+                return sum + (r.expenses?.reduce((expSum, exp) => expSum + (exp.amount || 0), 0) || 0);
+            }, 0);
             return {
                 name: driver.name.split(' ')[0],
                 profitability: totalRate - driverExpenses,
             };
         }).sort((a,b) => b.profitability - a.profitability).slice(0, 5);
-        
-        // Client Insights
+
+        // Client Insights - Group by client from routes
         const clientRevenue: { [key: string]: number } = {};
-        filteredInvoices.forEach(invoice => {
-            const clientName = invoice.to.name;
+        filteredRoutes.forEach(route => {
+            const clientName = route.clientName || 'Unknown Client';
             if (!clientRevenue[clientName]) clientRevenue[clientName] = 0;
-            invoice.items.forEach(item => clientRevenue[clientName] += item.price);
+            clientRevenue[clientName] += (route.rate || 0);
         });
-        const clientRevenueData = Object.entries(clientRevenue).map(([name, value]) => ({name, value})).sort((a,b) => b.value - a.value);
+        const clientRevenueData = Object.entries(clientRevenue)
+            .map(([name, value]) => ({name, value}))
+            .sort((a,b) => b.value - a.value)
+            .slice(0, 5); // Top 5 clients
         
         // Fleet Utilization
         const fleetStatusData = Object.entries(
@@ -131,7 +176,7 @@ const PartnerAnalyticsScreen: React.FC<PartnerAnalyticsScreenProps> = ({ drivers
 
         return { totalRevenue, totalOperatingExpenses, netOperatingProfit, expenseBreakdownData, revenueTrendData, driverPerformance, clientRevenueData, fleetStatusData };
 
-    }, [drivers, routes, vehicles, clients, invoices, payrollRuns, dateRange]);
+    }, [drivers, routes, vehicles, dateRange]);
 
     const handleDownloadStatement = () => {
         const input = document.getElementById('financial-summary-section');
@@ -150,6 +195,14 @@ const PartnerAnalyticsScreen: React.FC<PartnerAnalyticsScreenProps> = ({ drivers
             .finally(() => setIsGeneratingPdf(false));
     };
 
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-8">

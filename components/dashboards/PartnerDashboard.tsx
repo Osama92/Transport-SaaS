@@ -200,10 +200,50 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
         }).length;
     }, [routes]);
 
-    // Calculate real-time stats from routes data
+    // Calculate real-time stats from routes data with month-over-month comparison
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    // Current month routes
+    const currentMonthRoutes = routes.filter(r => {
+        const createdAt = new Date(r.createdAt || '');
+        return createdAt >= currentMonthStart;
+    });
+
+    // Last month routes
+    const lastMonthRoutes = routes.filter(r => {
+        const createdAt = new Date(r.createdAt || '');
+        return createdAt >= lastMonthStart && createdAt <= lastMonthEnd;
+    });
+
+    // Calculate stats
     const totalRoutesAssigned = routes.filter(r => r.status === 'In Progress' || r.status === 'Completed').length;
     const totalCompletedRoutes = routes.filter(r => r.status === 'Completed').length;
     const totalPendingRoutes = routes.filter(r => r.status === 'Pending').length;
+
+    // Calculate month-over-month changes
+    const currentMonthAssigned = currentMonthRoutes.filter(r => r.status === 'In Progress' || r.status === 'Completed').length;
+    const lastMonthAssigned = lastMonthRoutes.filter(r => r.status === 'In Progress' || r.status === 'Completed').length;
+    const assignedChange = lastMonthAssigned > 0
+        ? ((currentMonthAssigned - lastMonthAssigned) / lastMonthAssigned * 100).toFixed(1)
+        : currentMonthAssigned > 0 ? '+100' : '0';
+    const assignedChangeType: 'increase' | 'decrease' = currentMonthAssigned >= lastMonthAssigned ? 'increase' : 'decrease';
+
+    const currentMonthCompleted = currentMonthRoutes.filter(r => r.status === 'Completed').length;
+    const lastMonthCompleted = lastMonthRoutes.filter(r => r.status === 'Completed').length;
+    const completedChange = lastMonthCompleted > 0
+        ? ((currentMonthCompleted - lastMonthCompleted) / lastMonthCompleted * 100).toFixed(1)
+        : currentMonthCompleted > 0 ? '+100' : '0';
+    const completedChangeType: 'increase' | 'decrease' = currentMonthCompleted >= lastMonthCompleted ? 'increase' : 'decrease';
+
+    const currentMonthPending = currentMonthRoutes.filter(r => r.status === 'Pending').length;
+    const lastMonthPending = lastMonthRoutes.filter(r => r.status === 'Pending').length;
+    const pendingChange = lastMonthPending > 0
+        ? ((currentMonthPending - lastMonthPending) / lastMonthPending * 100).toFixed(1)
+        : currentMonthPending > 0 ? '+100' : '0';
+    const pendingChangeType: 'increase' | 'decrease' = currentMonthPending >= lastMonthPending ? 'increase' : 'decrease';
 
     return (
         <div className="flex flex-col gap-8">
@@ -213,30 +253,33 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
             <StatCard
                 title={t('partnerDashboard.totalRouteAssigned')}
                 value={totalRoutesAssigned.toString()}
-                change="+5.2%"
-                changeType="increase"
+                change={`${assignedChangeType === 'increase' ? '+' : ''}${assignedChange}%`}
+                changeType={assignedChangeType}
                 description={t('partnerDashboard.thisMonth')}
                 icon={<MapPinIcon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-8 lg:h-8 text-blue-500" />}
                 iconBg="bg-blue-100"
+                tooltip={`This month: ${currentMonthAssigned} routes | Last month: ${lastMonthAssigned} routes. ${assignedChangeType === 'increase' ? 'Great job! Your route assignments are growing.' : 'Route assignments decreased compared to last month.'}`}
             />
             <StatCard
                 title={t('partnerDashboard.totalCompletedRoute')}
                 value={totalCompletedRoutes.toString()}
-                change="+10.1%"
-                changeType="increase"
+                change={`${completedChangeType === 'increase' ? '+' : ''}${completedChange}%`}
+                changeType={completedChangeType}
                 description={t('partnerDashboard.thisMonth')}
                 icon={<CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-8 lg:h-8 text-green-500" />}
                 iconBg="bg-green-100"
+                tooltip={`This month: ${currentMonthCompleted} completed | Last month: ${lastMonthCompleted} completed. This shows your delivery performance and operational efficiency.`}
             />
             <div onClick={onViewPendingRoutes} className="cursor-pointer" role="button" tabIndex={0} onKeyPress={(e) => { if (e.key === 'Enter') onViewPendingRoutes();}}>
                 <StatCard
                     title={t('partnerDashboard.pendingRoute')}
                     value={totalPendingRoutes.toString()}
-                    change="-2.5%"
-                    changeType="decrease"
+                    change={`${pendingChangeType === 'increase' ? '+' : ''}${pendingChange}%`}
+                    changeType={pendingChangeType}
                     description={t('partnerDashboard.awaitingStart')}
                     icon={<ClockIcon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-8 lg:h-8 text-orange-500" />}
                     iconBg="bg-orange-100"
+                    tooltip={`This month: ${currentMonthPending} pending | Last month: ${lastMonthPending} pending. ${pendingChangeType === 'decrease' ? 'Good! Fewer pending routes means better workflow efficiency.' : 'More pending routes - consider assigning drivers/vehicles.'}`}
                 />
             </div>
         </div>
@@ -1238,14 +1281,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
                 clients={clients}
                />;
       case 'Analytics':
-        return <PartnerAnalyticsScreen 
-            drivers={drivers}
-            routes={routes}
-            vehicles={vehicles}
-            clients={clients}
-            invoices={invoices}
-            payrollRuns={payrollRuns}
-        />;
+        return <PartnerAnalyticsScreen />;
       case 'Payroll':
         if (viewingPayrollRun) {
             return <PayrollRunDetailsScreen 
