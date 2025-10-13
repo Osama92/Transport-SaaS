@@ -1158,7 +1158,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       case 'Map':
         return <MapScreen items={drivers} />;
       case 'Drivers':
-        return <DriversScreen setActiveModal={(modal) => handleShowModal(modal)} drivers={drivers} onSendFunds={(driver) => handleDriverAction('sendFunds', driver)} onViewDetails={(driver) => handleDriverAction('driverDetails', driver)} onRemove={(driver) => handleDriverAction('confirmRemoval', driver)} onEditPay={(driver) => handleDriverAction('editDriverPay', driver)} onEditDriver={(driver) => handleDriverAction('editDriver', driver)} analyticsData={analyticsData} dateRange={dateRange} selectedDriver1={analyticsDriver1} onDriver1Change={setAnalyticsDriver1} selectedDriver2={analyticsDriver2} onDriver2Change={setAnalyticsDriver2} />;
+        return <DriversScreen setActiveModal={(modal) => handleShowModal(modal)} drivers={drivers} onSendFunds={(driver) => handleDriverAction('sendFunds', driver)} onViewDetails={(driver) => handleDriverAction('driverDetails', driver)} onRemove={(driver) => handleDriverAction('confirmRemoval', driver)} onEditPay={(driver) => handleDriverAction('editDriverPay', driver)} onEditDriver={(driver) => handleDriverAction('editDriver', driver)} dateRange={dateRange} selectedDriver1={analyticsDriver1} onDriver1Change={setAnalyticsDriver1} selectedDriver2={analyticsDriver2} onDriver2Change={setAnalyticsDriver2} />;
       case 'Vehicles':
         return <VehiclesScreen
           vehicles={vehicles}

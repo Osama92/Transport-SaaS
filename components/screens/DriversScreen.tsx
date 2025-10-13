@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import DriversTable from '../DriversTable';
 import { UserPlusIcon, UserGroupIcon, ChartPieIcon } from '../Icons';
-import type { Driver, DriverPerformanceData } from '../../types';
+import type { Driver } from '../../types';
 import DriverAnalytics from '../analytics/DriverAnalytics';
 
 interface DriversScreenProps {
@@ -12,7 +12,6 @@ interface DriversScreenProps {
     onRemove: (driver: Driver) => void;
     onEditPay: (driver: Driver) => void;
     onEditDriver?: (driver: Driver) => void;
-    analyticsData: DriverPerformanceData[];
     dateRange: { start: Date, end: Date };
     selectedDriver1: string;
     onDriver1Change: (id: string) => void;
@@ -23,7 +22,7 @@ interface DriversScreenProps {
 const DriversScreen: React.FC<DriversScreenProps> = (props) => {
     const {
         setActiveModal, drivers, onSendFunds, onViewDetails, onRemove, onEditPay, onEditDriver,
-        analyticsData, dateRange, selectedDriver1, onDriver1Change, selectedDriver2, onDriver2Change
+        dateRange, selectedDriver1, onDriver1Change, selectedDriver2, onDriver2Change
     } = props;
     const [activeTab, setActiveTab] = useState<'all' | 'analytics'>('all');
 
@@ -81,9 +80,8 @@ const DriversScreen: React.FC<DriversScreenProps> = (props) => {
                     />
                 )}
                 {activeTab === 'analytics' && (
-                    <DriverAnalytics 
+                    <DriverAnalytics
                         drivers={drivers}
-                        performanceData={analyticsData}
                         dateRange={dateRange}
                         selectedDriver1={selectedDriver1}
                         onDriver1Change={onDriver1Change}

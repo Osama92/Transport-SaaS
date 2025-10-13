@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react';
-import type { Driver, DriverPerformanceData } from '../../types';
+import React, { useMemo, useEffect, useState } from 'react';
+import type { Driver, DriverPerformanceData, Route } from '../../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ClockIcon, MapPinIcon, CheckCircleIcon, CalendarDaysIcon } from '../Icons';
+import { useAuth } from '../../contexts/AuthContext';
+import { getRoutesByOrganization } from '../../services/firestore/routes';
 
 interface AggregatedDayData {
     completedRoutes: number;
@@ -12,7 +14,6 @@ interface AggregatedDayData {
 
 interface DriverAnalyticsProps {
     drivers: Driver[];
-    performanceData: DriverPerformanceData[];
     dateRange: { start: Date; end: Date };
     selectedDriver1: string;
     onDriver1Change: (id: string) => void;
@@ -59,16 +60,90 @@ const DriverSelect: React.FC<{
 );
 
 
-const DriverAnalytics: React.FC<DriverAnalyticsProps> = ({ 
-    drivers, performanceData, dateRange, selectedDriver1, onDriver1Change, selectedDriver2, onDriver2Change 
+const DriverAnalytics: React.FC<DriverAnalyticsProps> = ({
+    drivers, dateRange, selectedDriver1, onDriver1Change, selectedDriver2, onDriver2Change
 }) => {
-    
+    const [routes, setRoutes] = useState<Route[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { organizationId } = useAuth();
+
+    // Fetch routes from Firestore
+    useEffect(() => {
+        const fetchRoutes = async () => {
+            if (!organizationId) return;
+
+            try {
+                setLoading(true);
+                const fetchedRoutes = await getRoutesByOrganization(organizationId);
+                setRoutes(fetchedRoutes);
+            } catch (error) {
+                console.error('Error fetching routes:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchRoutes();
+    }, [organizationId]);
+
+    // Generate performance data from routes
+    const performanceData = useMemo(() => {
+        const data: DriverPerformanceData[] = [];
+
+        // Group completed routes by driver and date
+        const completedRoutes = routes.filter(r => r.status === 'Completed');
+
+        completedRoutes.forEach(route => {
+            const driverId = route.assignedDriverId || route.driverId;
+            if (!driverId) return;
+
+            // Use actual arrival time or created time for grouping by date
+            const dateStr = route.actualArrivalTime
+                ? new Date(route.actualArrivalTime).toISOString().split('T')[0]
+                : new Date(route.createdAt).toISOString().split('T')[0];
+
+            // Find existing record for this driver/date
+            let record = data.find(d => d.driverId === driverId && d.date === dateStr);
+
+            if (!record) {
+                record = {
+                    driverId: driverId as any, // Cast to match old type (number)
+                    date: dateStr,
+                    completedRoutes: 0,
+                    totalDeliveries: 0,
+                    onTimeDeliveries: 0,
+                    distanceKm: 0
+                };
+                data.push(record);
+            }
+
+            // Increment metrics
+            record.completedRoutes += 1;
+            record.totalDeliveries += 1; // Each route is one delivery
+            record.distanceKm += route.distanceKm || route.distance || 0;
+
+            // Calculate on-time delivery (if arrival was before or at estimated time)
+            if (route.estimatedArrivalTime && route.actualArrivalTime) {
+                const estimated = new Date(route.estimatedArrivalTime);
+                const actual = new Date(route.actualArrivalTime);
+                if (actual <= estimated) {
+                    record.onTimeDeliveries += 1;
+                }
+            } else {
+                // If no time tracking, assume on-time
+                record.onTimeDeliveries += 1;
+            }
+        });
+
+        return data;
+    }, [routes]);
+
     const { routesData, onTimeData, kmData } = useMemo(() => {
         const processData = (driverIdStr: string) => {
-            const driverId = driverIdStr === 'all' ? 'all' : parseInt(driverIdStr, 10);
-            
-            const filtered = performanceData.filter(p => 
-                driverId === 'all' || p.driverId === driverId
+            const driverId = driverIdStr === 'all' ? 'all' : driverIdStr;
+
+            const filtered = performanceData.filter(p =>
+                driverId === 'all' || p.driverId.toString() === driverId
             );
 
             const aggregated: Record<string, AggregatedDayData> = {};
@@ -114,9 +189,9 @@ const DriverAnalytics: React.FC<DriverAnalyticsProps> = ({
         });
 
         const kmTotals = (driverIdStr: string) => {
-            const driverId = driverIdStr === 'all' ? 'all' : parseInt(driverIdStr, 10);
-             const filtered = performanceData.filter(p => driverId === 'all' || p.driverId === driverId);
-             return filtered.reduce((sum, record) => sum + record.distanceKm, 0);
+            const driverId = driverIdStr === 'all' ? 'all' : driverIdStr;
+            const filtered = performanceData.filter(p => driverId === 'all' || p.driverId.toString() === driverId);
+            return filtered.reduce((sum, record) => sum + record.distanceKm, 0);
         }
 
         const barData = drivers.map(d => ({
@@ -132,6 +207,14 @@ const DriverAnalytics: React.FC<DriverAnalyticsProps> = ({
     
     const driver1Name = selectedDriver1 === 'all' ? 'All Drivers' : drivers.find(d => d.id.toString() === selectedDriver1)?.name || '';
     const driver2Name = selectedDriver2 === 'none' ? '' : (selectedDriver2 === 'all' ? 'All Drivers' : drivers.find(d => d.id.toString() === selectedDriver2)?.name || '');
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-6">
