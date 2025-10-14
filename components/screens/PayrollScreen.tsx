@@ -8,6 +8,7 @@ interface PayrollScreenProps {
     payrollRuns: PayrollRun[];
     onViewDetails: (run: PayrollRun) => void;
     onRunNewPayroll: () => void;
+    onDeletePayrollRun: (run: PayrollRun) => void;
     statusFilter: PayrollRun['status'] | 'All';
     onStatusFilterChange: (status: PayrollRun['status'] | 'All') => void;
     dateFilter: { start: Date | null, end: Date | null };
@@ -41,10 +42,11 @@ const FilterButton: React.FC<{
 );
 
 
-const PayrollScreen: React.FC<PayrollScreenProps> = ({ 
-    payrollRuns, 
-    onViewDetails, 
+const PayrollScreen: React.FC<PayrollScreenProps> = ({
+    payrollRuns,
+    onViewDetails,
     onRunNewPayroll,
+    onDeletePayrollRun,
     statusFilter,
     onStatusFilterChange,
     dateFilter,
@@ -142,9 +144,18 @@ const PayrollScreen: React.FC<PayrollScreenProps> = ({
                                     </td>
                                     <td className="py-4 px-4"><StatusBadge status={run.status} /></td>
                                     <td className="py-4 px-4 text-right">
-                                        <button onClick={() => onViewDetails(run)} className="text-sm font-medium text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 dark:text-indigo-400 dark:border-indigo-800/50 dark:hover:bg-indigo-900/20">
-                                            {t('common.details')}
-                                        </button>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button onClick={() => onViewDetails(run)} className="text-sm font-medium text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 dark:text-indigo-400 dark:border-indigo-800/50 dark:hover:bg-indigo-900/20">
+                                                {t('common.details')}
+                                            </button>
+                                            {run.status === 'Draft' && (
+                                                <button
+                                                    onClick={() => onDeletePayrollRun(run)}
+                                                    className="text-sm font-medium text-red-600 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:text-red-400 dark:border-red-800/50 dark:hover:bg-red-900/20">
+                                                    Delete
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

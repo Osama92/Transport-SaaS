@@ -304,8 +304,6 @@ export function usePayrollRuns(organizationId: string | null) {
         let unsubscribe: Unsubscribe;
 
         const fetchPayrollRunsWithPayslips = async (querySnapshot: any) => {
-            console.log('🔄 [usePayrollRuns] Fetching', querySnapshot.docs.length, 'payroll runs...');
-
             const payrollRunsPromises = querySnapshot.docs.map(async (doc: any) => {
                 const rawData = doc.data();
                 const convertedData = convertTimestamps(rawData);
@@ -313,8 +311,6 @@ export function usePayrollRuns(organizationId: string | null) {
                 // Fetch payslips subcollection for this payroll run
                 const payslipsRef = collection(db, 'payrollRuns', doc.id, 'payslips');
                 const payslipsSnapshot = await getDocs(payslipsRef);
-
-                console.log(`  💰 Payroll run ${doc.id}: Found ${payslipsSnapshot.docs.length} payslips`);
 
                 const payslips = payslipsSnapshot.docs.map(payslipDoc => {
                     const payslipData = payslipDoc.data();
@@ -333,7 +329,6 @@ export function usePayrollRuns(organizationId: string | null) {
             });
 
             const payrollRuns = await Promise.all(payrollRunsPromises);
-            console.log('✅ [usePayrollRuns] Fetched all payroll runs with payslips:', payrollRuns.length);
             setData(payrollRuns);
             setLoading(false);
         };

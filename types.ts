@@ -15,6 +15,7 @@ export interface Organization extends FirestoreDocument {
     type: 'partner' | 'business' | 'individual';
     ownerId: string; // User who created the organization
     members?: OrganizationMember[];
+    walletBalance?: number; // Available balance for payroll and expenses
     settings?: {
         currency: string;
         timezone: string;

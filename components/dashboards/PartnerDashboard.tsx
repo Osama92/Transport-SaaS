@@ -23,6 +23,7 @@ import AddExpenseModal from '../modals/AddExpenseModal';
 import PayslipModal from '../modals/PayslipModal';
 import CreatePayrollRunModal from '../modals/CreatePayrollRunModal'; // Import the new modal
 import EditDriverPayModal from '../modals/EditDriverPayModal'; // Import the new pay modal
+import ManageFundsModal from '../modals/ManageFundsModal';
 import DriversTable from '../DriversTable';
 import VehiclesTable from '../VehiclesTable';
 import ClientsTable from '../ClientsTable';
@@ -33,12 +34,15 @@ import type { Route, Driver, Vehicle, Client, DriverPerformanceData, Maintenance
 import { useDrivers, useVehicles, useRoutes, useClients, usePayrollRuns, useNotifications } from '../../hooks/useFirestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../firebase/firebaseConfig';
 // Import Firestore functions
 import { deleteDriver, updateDriver } from '../../services/firestore/drivers';
 import { deleteVehicle, updateVehicle } from '../../services/firestore/vehicles';
 import { deleteRoute, assignRouteResources, startRoute, updateRoute, addRouteExpense, completeRoute, getRouteById } from '../../services/firestore/routes';
 import { createClient, updateClient as updateClientFirestore, deleteClient, updateClientStatus } from '../../services/firestore/clients';
-import { createPayrollRun } from '../../services/firestore/payroll';
+import { createPayrollRun, deletePayrollRun } from '../../services/firestore/payroll';
+import { addFundsToWallet } from '../../services/firestore/wallet';
 // Import notification triggers and handlers
 import { notifyDriverAssigned, notifyRouteCompleted, notifyNewRoute, notifyDriverOnboarded, notifyExpenseAdded, notifyClientAdded, notifyPayrollGenerated } from '../../services/notificationTriggers';
 import { markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } from '../../services/firestore/notifications';
@@ -105,11 +109,11 @@ interface PartnerDashboardProps {
   role: string;
 }
 
-type ModalType = 'addVehicle' | 'addDriver' | 'editDriver' | 'createRoute' | 'addClient' | 'editClient' | 'confirmDeleteClient' | 'confirmToggleClientStatus' | 'assignDriver' | 'viewPOD' | 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'updateVehicleStatus' | 'addMaintenanceLog' | 'uploadDocument' | 'emailInvoice' | 'confirmMarkAsPaid' | 'profileSettings' | 'addExpense' | 'viewPayslip' | 'createPayrollRun' | 'editDriverPay' | null;
+type ModalType = 'addVehicle' | 'addDriver' | 'editDriver' | 'createRoute' | 'addClient' | 'editClient' | 'confirmDeleteClient' | 'confirmToggleClientStatus' | 'assignDriver' | 'viewPOD' | 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'updateVehicleStatus' | 'addMaintenanceLog' | 'uploadDocument' | 'emailInvoice' | 'confirmMarkAsPaid' | 'profileSettings' | 'addExpense' | 'viewPayslip' | 'createPayrollRun' | 'editDriverPay' | 'deletePayrollRun' | 'manageFunds' | null;
 type RouteStatusFilter = 'All' | 'Pending' | 'In Progress' | 'Completed';
 type InvoiceView = 'list' | 'create' | 'edit';
 
-const WalletCard: React.FC<{ routes: Route[] }> = ({ routes }) => {
+const WalletCard: React.FC<{ routes: Route[]; walletBalance?: number; onManageFunds: () => void }> = ({ routes, walletBalance = 0, onManageFunds }) => {
     const { t } = useTranslation();
 
     // Calculate expected earnings from completed routes
@@ -140,8 +144,10 @@ const WalletCard: React.FC<{ routes: Route[] }> = ({ routes }) => {
                 </div>
                 <div className="flex-1">
                     <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('partnerDashboard.availableBalance')}</p>
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 my-0.5">₦1,250,750</h2>
-                    <button className="text-xs sm:text-sm text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 my-0.5">{formatCurrency(walletBalance)}</h2>
+                    <button
+                        onClick={onManageFunds}
+                        className="text-xs sm:text-sm text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium transition-colors">
                         Manage Funds
                     </button>
                 </div>
@@ -180,11 +186,13 @@ interface DashboardViewProps {
   invoicedRouteIds: Set<string>;
   onEditRoute: (route: Route) => void;
   onDeleteRoute: (route: Route) => void;
+  walletBalance: number;
+  onManageFunds: () => void;
 }
 
-const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveModal, routes, drivers, vehicles, clients, onAssignRoute, onViewDetails, onCompleteRoute, onFilterChange, activeFilter, onViewPendingRoutes, invoicedRouteIds, onEditRoute, onDeleteRoute }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveModal, routes, drivers, vehicles, clients, onAssignRoute, onViewDetails, onCompleteRoute, onFilterChange, activeFilter, onViewPendingRoutes, invoicedRouteIds, onEditRoute, onDeleteRoute, walletBalance, onManageFunds }) => {
     const { t } = useTranslation();
-    const { organization, userRole } = useAuth();
+    const { organization, userRole, organizationId } = useAuth();
 
     // Get subscription limits
     const subscriptionPlan = organization?.subscription?.plan || 'basic';
@@ -249,7 +257,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
         <div className="flex flex-col gap-8">
         {/* Stat Cards Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-            <WalletCard routes={routes} />
+            <WalletCard routes={routes} walletBalance={walletBalance} onManageFunds={onManageFunds} />
             <StatCard
                 title={t('partnerDashboard.totalRouteAssigned')}
                 value={totalRoutesAssigned.toString()}
@@ -350,6 +358,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const { data: firestorePayrollRuns, loading: payrollLoading } = usePayrollRuns(isDemoMode ? null : organizationId);
   const { data: firestoreNotifications, loading: notificationsLoading } = useNotifications(isDemoMode ? null : currentUser?.uid || null);
 
+  const [organizationWalletBalance, setOrganizationWalletBalance] = useState<number>(0);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [activeNav, setActiveNav] = useState('Dashboard');
   const [selectedItem, setSelectedItem] = useState<Route | Driver | Vehicle | Invoice | Client | PayrollRun | Payslip | null>(null);
@@ -411,6 +420,30 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const [dateRange, setDateRange] = useState({ start: lastMonth, end: today });
   const [analyticsDriver1, setAnalyticsDriver1] = useState<string>('all');
   const [analyticsDriver2, setAnalyticsDriver2] = useState<string>('none');
+
+  // Listen for organization wallet balance changes
+  useEffect(() => {
+    if (!organizationId || isDemoMode) {
+      setOrganizationWalletBalance(1250750); // Demo mode default
+      return;
+    }
+
+    // Real-time listener for organization wallet balance
+    const unsubscribe = onSnapshot(
+      doc(db, 'organizations', organizationId),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const orgData = docSnap.data();
+          setOrganizationWalletBalance(orgData.walletBalance || 0);
+        }
+      },
+      (error) => {
+        console.error('Error listening to organization:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [organizationId, isDemoMode]);
 
   // Only load data once when demo mode changes
   useEffect(() => {
@@ -1096,6 +1129,40 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     }
   };
 
+  const handleAddFunds = async (amount: number, method: string) => {
+    if (!organizationId) {
+      throw new Error('Organization not found');
+    }
+
+    if (isDemoMode) {
+      // Demo mode: just update the state
+      setOrganizationWalletBalance(prev => prev + amount);
+      return;
+    }
+
+    // Production mode: Add to Firestore
+    await addFundsToWallet(organizationId, amount, method);
+    // Balance will update automatically via the real-time listener
+  };
+
+  const handleDeletePayrollRun = async (payrollRunId: string) => {
+    if (isDemoMode) {
+      // Demo mode: remove from mock array
+      setMockPayrollRuns(prev => prev.filter(run => run.id !== payrollRunId));
+    } else {
+      // Production mode: delete from Firestore
+      try {
+        await deletePayrollRun(payrollRunId);
+        alert('Payroll run deleted successfully!');
+        // Trigger refresh
+        window.dispatchEvent(new Event('refreshPayrollRuns'));
+      } catch (error) {
+        console.error('Error deleting payroll run:', error);
+        alert('Failed to delete payroll run.');
+      }
+    }
+  };
+
   const filteredRoutes = routes.filter(route => {
     if (routeStatusFilter === 'All') return true;
     return route.status === routeStatusFilter;
@@ -1193,6 +1260,27 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
         return <CreatePayrollRunModal onClose={() => setActiveModal(null)} onConfirm={handleCreatePayrollRun} />;
       case 'editDriverPay':
         return <EditDriverPayModal driver={selectedItem as Driver} onClose={() => setActiveModal(null)} onSave={handleUpdateDriverPay} />;
+      case 'deletePayrollRun':
+        return <ConfirmActionModal
+            isOpen={true}
+            onClose={() => setActiveModal(null)}
+            onConfirm={async () => {
+                if (selectedItem) {
+                    await handleDeletePayrollRun((selectedItem as PayrollRun).id);
+                }
+                setActiveModal(null);
+            }}
+            title="Delete Payroll Run?"
+            message={`Are you sure you want to delete this payroll run? This action cannot be undone. Period: ${(selectedItem as PayrollRun)?.periodStart} - ${(selectedItem as PayrollRun)?.periodEnd}`}
+            confirmButtonText="Delete"
+            confirmButtonClass="bg-red-600 hover:bg-red-700"
+        />;
+      case 'manageFunds':
+        return <ManageFundsModal
+            currentBalance={organizationWalletBalance}
+            onClose={() => setActiveModal(null)}
+            onAddFunds={handleAddFunds}
+        />;
       default:
         return null;
     }
@@ -1227,7 +1315,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
                 onAddExpenseClick={() => setActiveModal('addExpense')}
             />
         }
-        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0, 3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} onEditRoute={handleEditRoute} onDeleteRoute={handleDeleteRoute} />;
+        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0, 3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} onEditRoute={handleEditRoute} onDeleteRoute={handleDeleteRoute} walletBalance={organizationWalletBalance} onManageFunds={() => setActiveModal('manageFunds')} />;
       case 'Map':
         return <MapScreen items={drivers} />;
       case 'Drivers':
@@ -1289,6 +1377,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
             payrollRuns={filteredPayrollRuns}
             onViewDetails={(run) => setViewingPayrollRun(run)}
             onRunNewPayroll={() => setActiveModal('createPayrollRun')}
+            onDeletePayrollRun={(run) => handleShowModal('deletePayrollRun', run)}
             statusFilter={payrollStatusFilter}
             onStatusFilterChange={setPayrollStatusFilter}
             dateFilter={payrollDateFilter}
@@ -1308,7 +1397,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       case 'Manage Subscription':
         return <ManageSubscriptionScreen onBack={() => setActiveNav('Settings')} />;
       default:
-        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0,3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} onEditRoute={handleEditRoute} onDeleteRoute={handleDeleteRoute} />;
+        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0,3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} onEditRoute={handleEditRoute} onDeleteRoute={handleDeleteRoute} walletBalance={organizationWalletBalance} onManageFunds={() => setActiveModal('manageFunds')} />;
     }
   };
 

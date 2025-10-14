@@ -78,31 +78,16 @@ const calculatePayslips = (
     periodStart: string,
     periodEnd: string
 ): Payslip[] => {
-    console.log('🧮 [CALCULATE PAYSLIPS] Starting calculation...');
-    console.log('🧮 Drivers to process:', drivers.length);
-
     const payPeriodDate = new Date(periodStart);
     const payPeriod = `${payPeriodDate.toLocaleString('default', { month: 'short' })} ${payPeriodDate.getFullYear()}`;
     const payDate = new Date(new Date(periodEnd).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    console.log('📅 Pay Period:', payPeriod);
-    console.log('📅 Pay Date:', payDate);
-
     return drivers.map((driver, index) => {
-        console.log(`\n👤 Processing driver ${index + 1}/${drivers.length}:`, driver.name);
-        console.log('  🔍 FULL DRIVER OBJECT:', driver);
-        console.log('  🔍 driver.baseSalary:', driver.baseSalary);
-        console.log('  🔍 driver.payrollInfo?.baseSalary:', driver.payrollInfo?.baseSalary);
-
         // Use default values if fields are missing
         // Check nested payrollInfo first, then fall back to flat structure
         const annualGross = driver.payrollInfo?.baseSalary || driver.baseSalary || 0;
         const pensionRate = driver.payrollInfo?.pensionContributionRate || driver.pensionContributionRate || 8;
         const nhfRate = driver.payrollInfo?.nhfContributionRate || driver.nhfContributionRate || 2.5;
-
-        console.log('  💰 Annual Salary:', annualGross);
-        console.log('  📊 Pension Rate:', pensionRate + '%');
-        console.log('  📊 NHF Rate:', nhfRate + '%');
 
         const monthlyBasePay = annualGross / 12;
         const bonuses = Math.random() > 0.5 ? Math.round(Math.random() * (monthlyBasePay * 0.1)) : 0;
@@ -122,18 +107,9 @@ const calculatePayslips = (
 
         const netPay = monthlyGrossPay - monthlyTax - monthlyPension - monthlyNhf;
 
-        console.log('  📊 Calculations:');
-        console.log('    - Monthly Base Pay: ₦', Math.round(monthlyBasePay));
-        console.log('    - Bonuses: ₦', Math.round(bonuses));
-        console.log('    - Gross Pay: ₦', Math.round(monthlyGrossPay));
-        console.log('    - Tax: ₦', Math.round(monthlyTax));
-        console.log('    - Pension: ₦', Math.round(monthlyPension));
-        console.log('    - NHF: ₦', Math.round(monthlyNhf));
-        console.log('    - NET PAY: ₦', Math.round(netPay));
-
         const payslip: Payslip = {
             id: `PS-${driver.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            driverId: typeof driver.id === 'string' ? parseInt(driver.id.replace(/\D/g, '')) || 0 : driver.id,
+            driverId: typeof driver.id === 'string' ? driver.id : driver.id.toString(), // Store actual driver ID string
             driverName: driver.name,
             payPeriod,
             payDate,
@@ -155,8 +131,6 @@ const calculatePayslips = (
                 bankName: driver.bankInfo.bankName,
             };
         }
-
-        console.log('  ✅ Payslip created for', driver.name);
         return payslip;
     });
 };
@@ -263,45 +237,16 @@ export const createPayrollRun = async (
     userId: string
 ): Promise<string> => {
     try {
-        console.log('🔵 [PAYROLL DEBUG] Creating payroll run...');
-        console.log('📊 Organization ID:', organizationId);
-        console.log('📅 Period:', periodStart, 'to', periodEnd);
-        console.log('👥 Number of drivers received:', drivers.length);
-        console.log('👥 Drivers data:', drivers.map(d => ({
-            id: d.id,
-            name: d.name,
-            baseSalary: d.baseSalary,
-            pensionRate: d.pensionContributionRate,
-            nhfRate: d.nhfContributionRate
-        })));
-
         const payrollRunsRef = collection(db, PAYROLL_RUNS_COLLECTION);
 
         // Calculate payslips for all drivers
         const payslipsData = calculatePayslips(drivers, periodStart, periodEnd);
-
-        console.log('💰 Payslips generated:', payslipsData.length);
-        console.log('💰 Payslip details:', payslipsData.map(p => ({
-            driver: p.driverName,
-            basePay: p.basePay,
-            grossPay: p.grossPay,
-            netPay: p.netPay,
-            tax: p.tax,
-            pension: p.pension,
-            nhf: p.nhf
-        })));
 
         // Calculate totals
         const totalGrossPay = payslipsData.reduce((sum, ps) => sum + ps.grossPay, 0);
         const totalNetPay = payslipsData.reduce((sum, ps) => sum + ps.netPay, 0);
         const totalTax = payslipsData.reduce((sum, ps) => sum + ps.tax, 0);
         const totalDeductions = payslipsData.reduce((sum, ps) => sum + (ps.tax + ps.pension + ps.nhf), 0);
-
-        console.log('📈 Totals calculated:');
-        console.log('  - Total Gross Pay: ₦', totalGrossPay);
-        console.log('  - Total Net Pay: ₦', totalNetPay);
-        console.log('  - Total Tax: ₦', totalTax);
-        console.log('  - Total Deductions: ₦', totalDeductions);
 
         const payDate = payslipsData[0]?.payDate || new Date().toISOString().split('T')[0];
 
@@ -320,25 +265,19 @@ export const createPayrollRun = async (
             createdBy: userId,
         };
 
-        console.log('💾 Creating payroll run document...');
         const docRef = await addDoc(payrollRunsRef, newPayrollRun);
-        console.log('✅ Payroll run created with ID:', docRef.id);
 
         // Create payslips in subcollection
-        console.log('💾 Creating payslips in subcollection...');
         for (const payslipData of payslipsData) {
-            const payslipId = await addPayslip(docRef.id, payslipData);
-            console.log('  ✅ Payslip created for', payslipData.driverName, '- ID:', payslipId);
+            await addPayslip(docRef.id, payslipData);
         }
-
-        console.log('🎉 Payroll run creation complete!');
 
         // Trigger refresh event for real-time UI update
         window.dispatchEvent(new Event('refreshPayrollRuns'));
 
         return docRef.id;
     } catch (error) {
-        console.error('❌ Error creating payroll run:', error);
+        console.error('Error creating payroll run:', error);
         throw new Error('Failed to create payroll run');
     }
 };
@@ -400,27 +339,133 @@ export const processPayrollRun = async (payrollRunId: string): Promise<void> => 
 };
 
 /**
- * Mark payroll run as paid (mark all payslips as paid)
+ * Process payroll - Deduct from organization balance
+ * Changes status from Draft → Processed
+ */
+export const processPayroll = async (
+    payrollRunId: string,
+    organizationId: string
+): Promise<void> => {
+    try {
+        // Get payroll run
+        const payrollRunRef = doc(db, PAYROLL_RUNS_COLLECTION, payrollRunId);
+        const payrollRunSnap = await getDoc(payrollRunRef);
+
+        if (!payrollRunSnap.exists()) {
+            throw new Error('Payroll run not found');
+        }
+
+        const payrollRun = payrollRunSnap.data() as PayrollRun;
+
+        if (payrollRun.status !== 'Draft') {
+            throw new Error('Only draft payroll runs can be processed');
+        }
+
+        // Get organization
+        const orgRef = doc(db, 'organizations', organizationId);
+        const orgSnap = await getDoc(orgRef);
+
+        if (!orgSnap.exists()) {
+            throw new Error('Organization not found');
+        }
+
+        const organization = orgSnap.data();
+        const currentBalance = organization.walletBalance || 0;
+        const totalNetPay = payrollRun.totalNetPay || 0;
+
+        // Check if organization has sufficient funds
+        if (currentBalance < totalNetPay) {
+            throw new Error(`Insufficient funds. Available: ₦${currentBalance.toLocaleString()}, Required: ₦${totalNetPay.toLocaleString()}`);
+        }
+
+        // Deduct from organization balance
+        await updateDoc(orgRef, {
+            walletBalance: currentBalance - totalNetPay,
+            updatedAt: serverTimestamp(),
+        });
+
+        // Update payroll run status to Processed
+        await updateDoc(payrollRunRef, {
+            status: 'Processed',
+            processedDate: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+
+        // Trigger refresh
+        window.dispatchEvent(new Event('refreshPayrollRuns'));
+    } catch (error) {
+        console.error('Error processing payroll:', error);
+        throw error;
+    }
+};
+
+/**
+ * Mark payroll run as paid - Credit driver wallets
+ * Changes status from Processed → Paid
  */
 export const markPayrollRunAsPaid = async (payrollRunId: string): Promise<void> => {
     try {
-        // Update all payslips to paid
+        // Get payroll run
+        const payrollRunRef = doc(db, PAYROLL_RUNS_COLLECTION, payrollRunId);
+        const payrollRunSnap = await getDoc(payrollRunRef);
+
+        if (!payrollRunSnap.exists()) {
+            throw new Error('Payroll run not found');
+        }
+
+        const payrollRun = payrollRunSnap.data() as PayrollRun;
+
+        if (payrollRun.status !== 'Processed') {
+            throw new Error('Only processed payroll runs can be marked as paid');
+        }
+
+        // Get all payslips
         const payslips = await getPayslipsByPayrollRun(payrollRunId);
+
+        // Update each driver's wallet balance
         for (const payslip of payslips) {
-            if (payslip.id) {
-                await updatePayslipStatus(payrollRunId, payslip.id, 'Paid');
+            if (payslip.driverId) {
+                // Get driver document directly by ID
+                const driverRef = doc(db, 'drivers', payslip.driverId);
+                const driverSnap = await getDoc(driverRef);
+
+                if (driverSnap.exists()) {
+                    const driver = driverSnap.data();
+                    const currentWalletBalance = driver.walletBalance || 0;
+
+                    console.log(`[PAYROLL] Crediting driver ${payslip.driverName} (${payslip.driverId})`);
+                    console.log(`[PAYROLL] Current balance: ₦${currentWalletBalance.toLocaleString()}`);
+                    console.log(`[PAYROLL] Net pay: ₦${payslip.netPay.toLocaleString()}`);
+                    console.log(`[PAYROLL] New balance: ₦${(currentWalletBalance + payslip.netPay).toLocaleString()}`);
+
+                    // Credit driver wallet
+                    await updateDoc(driverRef, {
+                        walletBalance: currentWalletBalance + payslip.netPay,
+                        updatedAt: serverTimestamp(),
+                    });
+                } else {
+                    console.error(`[PAYROLL] Driver not found: ${payslip.driverId}`);
+                }
+
+                // Mark payslip as paid
+                if (payslip.id) {
+                    await updatePayslipStatus(payrollRunId, payslip.id, 'Paid');
+                }
             }
         }
 
-        // Update payroll run status
-        const payrollRunRef = doc(db, PAYROLL_RUNS_COLLECTION, payrollRunId);
+        // Update payroll run status to Paid
         await updateDoc(payrollRunRef, {
             status: 'Paid',
+            paidDate: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
+
+        // Trigger refresh
+        window.dispatchEvent(new Event('refreshPayrollRuns'));
     } catch (error) {
         console.error('Error marking payroll run as paid:', error);
-        throw new Error('Failed to mark payroll run as paid');
+        throw error;
     }
 };
 
@@ -483,11 +528,8 @@ export const getPayrollRunsByStatus = async (
  */
 export const getPayslipsByPayrollRun = async (payrollRunId: string): Promise<Payslip[]> => {
     try {
-        console.log('🔍 [GET PAYSLIPS] Fetching payslips for payroll run:', payrollRunId);
         const payslipsRef = collection(db, PAYROLL_RUNS_COLLECTION, payrollRunId, 'payslips');
         const querySnapshot = await getDocs(payslipsRef);
-
-        console.log('🔍 [GET PAYSLIPS] Found', querySnapshot.docs.length, 'payslips');
 
         return querySnapshot.docs.map(doc => {
             const data = doc.data();

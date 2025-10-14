@@ -121,6 +121,7 @@ export const createDriver = async (
                 lastUpdated: serverTimestamp(),
             } : null,
             safetyScore: driverData.safetyScore || 0,
+            walletBalance: 0, // Initialize wallet balance to 0
             payrollInfo: {
                 baseSalary: driverData.payrollInfo?.baseSalary || driverData.baseSalary || 0,
                 pensionContributionRate: driverData.payrollInfo?.pensionContributionRate || driverData.pensionContributionRate || 8,
@@ -378,5 +379,45 @@ export const authenticateDriver = async (
     } catch (error) {
         console.error('Error authenticating driver:', error);
         throw new Error('Failed to authenticate driver');
+    }
+};
+
+/**
+ * Migration utility: Add walletBalance field to existing drivers
+ * This should be called once to update existing drivers in the database
+ */
+export const migrateDriversAddWalletBalance = async (organizationId: string): Promise<void> => {
+    try {
+        console.log('[MIGRATION] Starting wallet balance migration for organization:', organizationId);
+
+        const driversRef = collection(db, DRIVERS_COLLECTION);
+        const q = query(driversRef, where('organizationId', '==', organizationId));
+        const querySnapshot = await getDocs(q);
+
+        let migratedCount = 0;
+        let skippedCount = 0;
+
+        for (const driverDoc of querySnapshot.docs) {
+            const driverData = driverDoc.data();
+
+            // Check if walletBalance already exists
+            if (driverData.walletBalance === undefined) {
+                await updateDoc(driverDoc.ref, {
+                    walletBalance: 0,
+                    updatedAt: serverTimestamp(),
+                });
+                migratedCount++;
+                console.log('[MIGRATION] Added walletBalance to driver:', driverDoc.id);
+            } else {
+                skippedCount++;
+            }
+        }
+
+        console.log('[MIGRATION] Migration complete!');
+        console.log('[MIGRATION] Migrated:', migratedCount, 'drivers');
+        console.log('[MIGRATION] Skipped (already had walletBalance):', skippedCount, 'drivers');
+    } catch (error) {
+        console.error('[MIGRATION] Error migrating drivers:', error);
+        throw new Error('Failed to migrate drivers');
     }
 };

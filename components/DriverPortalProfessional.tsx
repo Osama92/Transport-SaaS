@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, doc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { startRoute, completeRoute, updateRouteProgress } from '../services/firestore/routes';
 import { updateDriver } from '../services/firestore/drivers';
 import { updateVehicle } from '../services/firestore/vehicles';
-import type { Driver, Route } from '../types';
+import { getPayslipsByDriver } from '../services/firestore/payroll';
+import type { Driver, Route, Payslip } from '../types';
 
 interface DriverPortalProfessionalProps {
     driver: Driver;
@@ -22,6 +23,8 @@ const DriverPortalProfessional: React.FC<DriverPortalProfessionalProps> = ({ dri
     const [podFile, setPodFile] = useState<File | null>(null);
     const [podPreview, setPodPreview] = useState<string | null>(null);
     const [uploadingPod, setUploadingPod] = useState(false);
+    const [walletBalance, setWalletBalance] = useState(driver.walletBalance || 0);
+    const [payslips, setPayslips] = useState<any[]>([]);
 
     // Listen to driver's active route
     useEffect(() => {
@@ -96,6 +99,79 @@ const DriverPortalProfessional: React.FC<DriverPortalProfessionalProps> = ({ dri
             setProgressSlider(activeRoute.progress || 0);
         }
     }, [activeRoute]);
+
+    // Listen to driver's wallet balance in real-time
+    useEffect(() => {
+        console.log('[DRIVER PORTAL DEBUG] Setting up wallet balance listener');
+        console.log('[DRIVER PORTAL DEBUG] Driver ID:', driver?.id);
+        console.log('[DRIVER PORTAL DEBUG] Driver object:', driver);
+
+        if (!driver?.id) {
+            console.log('[DRIVER PORTAL DEBUG] No driver ID, skipping wallet listener');
+            return;
+        }
+
+        // Listen to the specific driver document by its ID
+        const driverDocRef = doc(db, 'drivers', driver.id);
+        console.log('[DRIVER PORTAL DEBUG] Listening to driver document:', driver.id);
+
+        const unsubscribe = onSnapshot(driverDocRef, (docSnap) => {
+            console.log('[DRIVER PORTAL DEBUG] Wallet listener snapshot received');
+            console.log('[DRIVER PORTAL DEBUG] Document exists:', docSnap.exists());
+
+            if (docSnap.exists()) {
+                const driverData = docSnap.data();
+                console.log('[DRIVER PORTAL DEBUG] Driver data:', driverData);
+                console.log('[DRIVER PORTAL DEBUG] Wallet balance from Firestore:', driverData.walletBalance);
+                setWalletBalance(driverData.walletBalance || 0);
+            } else {
+                console.log('[DRIVER PORTAL DEBUG] Driver document does not exist!');
+            }
+        }, (error) => {
+            console.error('[DRIVER PORTAL DEBUG] Error listening to driver wallet balance:', error);
+        });
+
+        return () => {
+            console.log('[DRIVER PORTAL DEBUG] Cleaning up wallet balance listener');
+            unsubscribe();
+        };
+    }, [driver?.id]);
+
+    // Fetch driver's payslips
+    useEffect(() => {
+        console.log('[DRIVER PORTAL DEBUG] Setting up payslips fetcher');
+        console.log('[DRIVER PORTAL DEBUG] Driver ID for payslips:', driver?.id);
+        console.log('[DRIVER PORTAL DEBUG] Organization ID for payslips:', driver?.organizationId);
+
+        if (!driver?.id) {
+            console.log('[DRIVER PORTAL DEBUG] No driver ID, clearing payslips');
+            setPayslips([]);
+            return;
+        }
+
+        const fetchPayslips = async () => {
+            try {
+                // Get organization ID from driver
+                const organizationId = driver.organizationId;
+                console.log('[DRIVER PORTAL DEBUG] Fetching payslips for org:', organizationId);
+
+                if (!organizationId) {
+                    console.log('[DRIVER PORTAL DEBUG] No organization ID, skipping payslips fetch');
+                    return;
+                }
+
+                const driverPayslips = await getPayslipsByDriver(organizationId, driver.id);
+                console.log('[DRIVER PORTAL DEBUG] Payslips fetched:', driverPayslips);
+                console.log('[DRIVER PORTAL DEBUG] Number of payslips:', driverPayslips.length);
+                setPayslips(driverPayslips);
+            } catch (error) {
+                console.error('[DRIVER PORTAL DEBUG] Error fetching payslips:', error);
+                setPayslips([]);
+            }
+        };
+
+        fetchPayslips();
+    }, [driver?.id, driver?.organizationId]);
 
     const handleUpdateProgress = async () => {
         if (activeRoute && !updatingProgress) {
@@ -446,7 +522,7 @@ const DriverPortalProfessional: React.FC<DriverPortalProfessionalProps> = ({ dri
                         {/* Wallet Balance */}
                         <div className="bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl shadow-lg p-6 text-white">
                             <p className="text-sm font-semibold opacity-90 mb-1">Available Balance</p>
-                            <h2 className="text-4xl font-bold mb-3">₦{(driver.walletBalance || 0).toLocaleString()}</h2>
+                            <h2 className="text-4xl font-bold mb-3">₦{walletBalance.toLocaleString()}</h2>
                             <p className="text-sm opacity-90">Ready for withdrawal</p>
                         </div>
 
@@ -529,15 +605,74 @@ const DriverPortalProfessional: React.FC<DriverPortalProfessionalProps> = ({ dri
                             <h2 className="text-lg font-bold">My Payslips</h2>
                             <p className="text-sm text-indigo-100">View payment history</p>
                         </div>
-                        <div className="p-10 text-center">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
+                        {payslips.length > 0 ? (
+                            <div className="p-4 space-y-3">
+                                {payslips.map((payslip) => {
+                                    // Calculate total deductions
+                                    const totalDeductions = (payslip.tax || 0) + (payslip.pension || 0) + (payslip.nhf || 0);
+
+                                    return (
+                                        <div key={payslip.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div>
+                                                    <h3 className="text-sm font-bold text-gray-900">
+                                                        {payslip.payPeriod}
+                                                    </h3>
+                                                    <p className="text-xs text-gray-500 mt-0.5">Payment Date: {new Date(payslip.payDate).toLocaleDateString('en-NG')}</p>
+                                                </div>
+                                                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                                    payslip.status === 'Paid'
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : 'bg-gray-100 text-gray-700'
+                                                }`}>
+                                                    {payslip.status}
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-3 mb-3">
+                                                <div className="bg-gray-50 rounded-lg p-2.5">
+                                                    <p className="text-xs text-gray-500 mb-0.5">Gross Pay</p>
+                                                    <p className="text-sm font-bold text-gray-900">₦{(payslip.grossPay || 0).toLocaleString()}</p>
+                                                </div>
+                                                <div className="bg-red-50 rounded-lg p-2.5">
+                                                    <p className="text-xs text-red-600 mb-0.5">Deductions</p>
+                                                    <p className="text-sm font-bold text-red-700">-₦{totalDeductions.toLocaleString()}</p>
+                                                </div>
+                                                <div className="bg-green-50 rounded-lg p-2.5">
+                                                    <p className="text-xs text-green-600 mb-0.5">Net Pay</p>
+                                                    <p className="text-sm font-bold text-green-700">₦{(payslip.netPay || 0).toLocaleString()}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="border-t border-gray-200 pt-3 space-y-1.5">
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-gray-600">PAYE Tax</span>
+                                                    <span className="font-semibold text-gray-900">₦{(payslip.tax || 0).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-gray-600">Pension</span>
+                                                    <span className="font-semibold text-gray-900">₦{(payslip.pension || 0).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-gray-600">NHF</span>
+                                                    <span className="font-semibold text-gray-900">₦{(payslip.nhf || 0).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                            <h3 className="text-base font-bold text-gray-900 mb-1">No Payslips Available</h3>
-                            <p className="text-sm text-gray-600">Payslips will appear here once processed</p>
-                        </div>
+                        ) : (
+                            <div className="p-10 text-center">
+                                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-base font-bold text-gray-900 mb-1">No Payslips Available</h3>
+                                <p className="text-sm text-gray-600">Payslips will appear here once processed</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
