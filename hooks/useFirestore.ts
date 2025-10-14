@@ -281,16 +281,108 @@ export function useInvoices(organizationId: string | null) {
 
 /**
  * Hook for fetching payroll runs with real-time updates
+ * Fetches payroll runs AND their payslips subcollections
  */
 export function usePayrollRuns(organizationId: string | null) {
-    const constraints = useMemo(
-        () => organizationId
-            ? [where('organizationId', '==', organizationId), orderBy('createdAt', 'desc')]
-            : [],
+    const [data, setData] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+    const [refreshCounter, setRefreshCounter] = useState(0);
+
+    const constraintsKey = useMemo(
+        () => organizationId ? `payrollRuns-${organizationId}` : 'payrollRuns-null',
         [organizationId]
     );
 
-    return useFirestoreCollection('payrollRuns', constraints);
+    useEffect(() => {
+        if (!organizationId) {
+            setData([]);
+            setLoading(false);
+            return;
+        }
+
+        let unsubscribe: Unsubscribe;
+
+        const fetchPayrollRunsWithPayslips = async (querySnapshot: any) => {
+            console.log('🔄 [usePayrollRuns] Fetching', querySnapshot.docs.length, 'payroll runs...');
+
+            const payrollRunsPromises = querySnapshot.docs.map(async (doc: any) => {
+                const rawData = doc.data();
+                const convertedData = convertTimestamps(rawData);
+
+                // Fetch payslips subcollection for this payroll run
+                const payslipsRef = collection(db, 'payrollRuns', doc.id, 'payslips');
+                const payslipsSnapshot = await getDocs(payslipsRef);
+
+                console.log(`  💰 Payroll run ${doc.id}: Found ${payslipsSnapshot.docs.length} payslips`);
+
+                const payslips = payslipsSnapshot.docs.map(payslipDoc => {
+                    const payslipData = payslipDoc.data();
+                    return {
+                        id: payslipDoc.id,
+                        payrollRunId: doc.id,
+                        ...convertTimestamps(payslipData)
+                    };
+                });
+
+                return {
+                    id: doc.id,
+                    ...convertedData,
+                    payslips,
+                };
+            });
+
+            const payrollRuns = await Promise.all(payrollRunsPromises);
+            console.log('✅ [usePayrollRuns] Fetched all payroll runs with payslips:', payrollRuns.length);
+            setData(payrollRuns);
+            setLoading(false);
+        };
+
+        const setupListener = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+
+                const payrollRunsRef = collection(db, 'payrollRuns');
+                const q = query(
+                    payrollRunsRef,
+                    where('organizationId', '==', organizationId),
+                    orderBy('createdAt', 'desc')
+                );
+
+                unsubscribe = onSnapshot(
+                    q,
+                    fetchPayrollRunsWithPayslips,
+                    (err) => {
+                        console.error('Error listening to payroll runs:', err);
+                        setError(err as Error);
+                        setLoading(false);
+                    }
+                );
+            } catch (err) {
+                console.error('Error setting up payroll runs listener:', err);
+                setError(err as Error);
+                setLoading(false);
+            }
+        };
+
+        setupListener();
+
+        // Listen for custom refresh event (triggered when payslip is added)
+        const handleRefresh = () => {
+            setRefreshCounter(prev => prev + 1);
+        };
+        window.addEventListener('refreshPayrollRuns', handleRefresh);
+
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+            window.removeEventListener('refreshPayrollRuns', handleRefresh);
+        };
+    }, [constraintsKey, refreshCounter]);
+
+    return { data, loading, error };
 }
 
 /**
