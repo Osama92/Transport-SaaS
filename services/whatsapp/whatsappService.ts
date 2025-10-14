@@ -107,7 +107,14 @@ class WhatsAppService {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error?.message || 'Failed to send WhatsApp message');
+                const errorMsg = data.error?.message || 'Failed to send WhatsApp message';
+                console.error('WhatsApp API Error:', {
+                    status: response.status,
+                    error: data.error,
+                    phoneNumberId: this.config.phoneNumberId,
+                    to: formattedPhone
+                });
+                throw new Error(`WhatsApp API Error (${response.status}): ${errorMsg}`);
             }
 
             return {
@@ -354,18 +361,17 @@ export const whatsAppNotifications = {
 
     /**
      * Notify driver about new route assignment
+     * Template: "Hello! Driver {{1}} has been assigned to route {{2}}."
      */
     async notifyDriverRouteAssigned(
         driverPhone: string,
-        routeId: string,
-        origin: string,
-        destination: string,
-        pickupTime: string
+        driverName: string,
+        routeId: string
     ): Promise<WhatsAppResponse> {
         return whatsAppService.sendTemplate(
             driverPhone,
-            'route_assigned',
-            [routeId, origin, destination, pickupTime]
+            'driver_assigned',
+            [driverName, routeId]
         );
     },
 

@@ -8,7 +8,7 @@ import OnboardingPage from './components/OnboardingPage';
 import SubscriptionPage from './components/SubscriptionPage';
 import AuthLayout from './components/AuthLayout';
 import DriverPortalLogin from './components/DriverPortalLogin';
-import DriverPortal from './components/DriverPortal';
+import DriverPortalEnhanced from './components/DriverPortalEnhanced';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import type { Driver } from './types';
 
@@ -83,7 +83,7 @@ const AppContent: React.FC = () => {
 
     if (isDriverPortalRoute) {
         if (driverSession) {
-            return <DriverPortal driver={driverSession} onLogout={handleDriverLogout} />;
+            return <DriverPortalEnhanced driver={driverSession} onLogout={handleDriverLogout} />;
         } else {
             return <DriverPortalLogin onLoginSuccess={handleDriverLogin} />;
         }

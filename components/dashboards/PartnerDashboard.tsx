@@ -690,22 +690,17 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
 
                   // Send WhatsApp notification to driver if phone number exists and notifications enabled
                   if (driver.phone && driver.portalAccess?.whatsappNotifications !== false) {
-                      const route = routes.find(r => r.id === routeId);
-                      if (route) {
-                          try {
-                              const pickupTime = route.estimatedDepartureTime || 'TBD';
-                              await whatsAppNotifications.notifyDriverRouteAssigned(
-                                  driver.phone,
-                                  routeId,
-                                  route.origin,
-                                  route.destination,
-                                  pickupTime
-                              );
-                              console.log('WhatsApp notification sent to driver:', driver.phone);
-                          } catch (whatsappError) {
-                              console.error('Failed to send WhatsApp notification:', whatsappError);
-                              // Don't fail the assignment if WhatsApp fails
-                          }
+                      try {
+                          // Template expects: Driver Name ({{1}}), Route ID ({{2}})
+                          await whatsAppNotifications.notifyDriverRouteAssigned(
+                              driver.phone,
+                              driver.name,
+                              routeId
+                          );
+                          console.log('WhatsApp notification sent to driver:', driver.phone);
+                      } catch (whatsappError) {
+                          console.error('Failed to send WhatsApp notification:', whatsappError);
+                          // Don't fail the assignment if WhatsApp fails
                       }
                   }
 

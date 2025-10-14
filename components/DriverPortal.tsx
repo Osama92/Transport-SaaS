@@ -14,7 +14,7 @@ interface DriverPortalProps {
 const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
     const [activeRoute, setActiveRoute] = useState<Route | null>(null);
     const [completedRoutes, setCompletedRoutes] = useState<Route[]>([]);
-    const [activeView, setActiveView] = useState<'dashboard' | 'history' | 'earnings' | 'profile'>('dashboard');
+    const [activeView, setActiveView] = useState<'dashboard' | 'history' | 'wallet' | 'analytics' | 'payslips' | 'profile'>('dashboard');
     const [loading, setLoading] = useState(true);
     const [progressSlider, setProgressSlider] = useState(0);
     const [updatingProgress, setUpdatingProgress] = useState(false);
@@ -492,75 +492,142 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
                     </div>
                 )}
 
-                {activeView === 'earnings' && (
+                {activeView === 'wallet' && (
                     <div className="space-y-6">
-                        {/* Earnings Summary Card */}
+                        {/* Wallet Balance Card */}
                         <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
                             <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold">Total Earnings</h2>
+                                <h2 className="text-xl font-bold">Wallet Balance</h2>
                                 <svg className="w-8 h-8 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                 </svg>
                             </div>
                             <p className="text-4xl font-bold mb-2">
-                                ₦{completedRoutes.reduce((total, route) => total + (route.distanceKm * 1250 || 0), 0).toLocaleString()}
+                                ₦{(driver.walletBalance || 0).toLocaleString()}
                             </p>
-                            <p className="text-green-100 text-sm">From {completedRoutes.length} completed routes</p>
+                            <p className="text-green-100 text-sm">Available for withdrawal</p>
                         </div>
 
-                        {/* Earnings Breakdown */}
+                        {/* Withdrawal Button */}
+                        <button
+                            onClick={() => alert('Withdrawal feature coming soon! Contact your transporter for payment.')}
+                            className="w-full bg-white hover:bg-gray-50 text-green-600 font-bold py-4 rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Request Withdrawal
+                        </button>
+
+                        {/* Recent Transactions */}
                         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                            <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-4">
-                                <h2 className="text-xl font-bold">Earnings Breakdown</h2>
-                                <p className="text-sm text-orange-100 mt-1">Per route earnings</p>
+                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-4">
+                                <h2 className="text-xl font-bold">Recent Payments</h2>
+                                <p className="text-sm text-blue-100 mt-1">Last 10 payments received</p>
                             </div>
                             <div className="divide-y max-h-96 overflow-y-auto">
-                                {completedRoutes.length === 0 ? (
-                                    <div className="p-8 text-center text-gray-500">
-                                        No earnings yet. Complete routes to start earning!
-                                    </div>
-                                ) : (
-                                    completedRoutes.map((route) => {
-                                        const routeEarnings = route.distanceKm * 1250;
-                                        return (
-                                            <div key={route.id} className="p-4 hover:bg-gray-50">
-                                                <div className="flex justify-between items-start">
-                                                    <div className="flex-1">
-                                                        <p className="font-semibold text-gray-900">{route.origin} → {route.destination}</p>
-                                                        <p className="text-xs text-gray-500 mt-1">{route.id} • {route.distanceKm} km</p>
-                                                        {route.actualArrivalTime && (
-                                                            <p className="text-xs text-gray-400 mt-1">
-                                                                Completed: {new Date(route.actualArrivalTime).toLocaleDateString()}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-right ml-4">
-                                                        <p className="font-bold text-green-600">₦{routeEarnings.toLocaleString()}</p>
-                                                        <p className="text-xs text-gray-500">@₦1,250/km</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
+                                <div className="p-8 text-center text-gray-500">
+                                    No payment history yet
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeView === 'analytics' && (
+                    <div className="space-y-6">
+                        {/* KPI Cards */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white rounded-xl shadow-lg p-4">
+                                <p className="text-xs text-gray-500 uppercase mb-1">Completion Rate</p>
+                                <p className="text-3xl font-bold text-gray-900">
+                                    {completedRoutes.length > 0 ? '100' : '0'}%
+                                </p>
+                                <p className="text-xs text-green-600 mt-1">{completedRoutes.length} completed</p>
+                            </div>
+                            <div className="bg-white rounded-xl shadow-lg p-4">
+                                <p className="text-xs text-gray-500 uppercase mb-1">On-Time Delivery</p>
+                                <p className="text-3xl font-bold text-gray-900">
+                                    {completedRoutes.length > 0
+                                        ? Math.round((completedRoutes.filter(r => {
+                                            if (!r.estimatedArrivalTime || !r.actualArrivalTime) return false;
+                                            return new Date(r.actualArrivalTime) <= new Date(r.estimatedArrivalTime);
+                                        }).length / completedRoutes.length) * 100)
+                                        : 0}%
+                                </p>
+                                <p className="text-xs text-blue-600 mt-1">Delivered on time</p>
                             </div>
                         </div>
 
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white rounded-xl shadow p-4">
-                                <p className="text-xs text-gray-500 uppercase mb-1">Avg per Route</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    ₦{completedRoutes.length > 0 ? Math.round(completedRoutes.reduce((total, route) => total + (route.distanceKm * 1250 || 0), 0) / completedRoutes.length).toLocaleString() : '0'}
-                                </p>
-                                <p className="text-xs text-blue-600 mt-1">Average</p>
+                        {/* Total Distance Card */}
+                        <div className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold">Total Distance</h2>
+                                <svg className="w-8 h-8 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                </svg>
                             </div>
-                            <div className="bg-white rounded-xl shadow p-4">
-                                <p className="text-xs text-gray-500 uppercase mb-1">Total Distance</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {completedRoutes.reduce((total, route) => total + (route.distanceKm || 0), 0).toLocaleString()} km
-                                </p>
-                                <p className="text-xs text-purple-600 mt-1">Driven</p>
+                            <p className="text-4xl font-bold mb-2">
+                                {completedRoutes.reduce((total, route) => total + (route.distanceKm || 0), 0).toLocaleString()} km
+                            </p>
+                            <p className="text-purple-100 text-sm">Across {completedRoutes.length} routes</p>
+                        </div>
+
+                        {/* Performance Stats */}
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                            <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-4">
+                                <h2 className="text-xl font-bold">Performance Metrics</h2>
+                                <p className="text-sm text-orange-100 mt-1">Your delivery statistics</p>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Total Routes Completed</span>
+                                    <span className="font-bold text-gray-900">{completedRoutes.length}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Average Distance per Route</span>
+                                    <span className="font-bold text-gray-900">
+                                        {completedRoutes.length > 0
+                                            ? Math.round(completedRoutes.reduce((total, route) => total + (route.distanceKm || 0), 0) / completedRoutes.length)
+                                            : 0} km
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">On-Time Deliveries</span>
+                                    <span className="font-bold text-green-600">
+                                        {completedRoutes.filter(r => {
+                                            if (!r.estimatedArrivalTime || !r.actualArrivalTime) return false;
+                                            return new Date(r.actualArrivalTime) <= new Date(r.estimatedArrivalTime);
+                                        }).length} / {completedRoutes.length}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Late Deliveries</span>
+                                    <span className="font-bold text-red-600">
+                                        {completedRoutes.filter(r => {
+                                            if (!r.estimatedArrivalTime || !r.actualArrivalTime) return false;
+                                            return new Date(r.actualArrivalTime) > new Date(r.estimatedArrivalTime);
+                                        }).length}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeView === 'payslips' && (
+                    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-4">
+                            <h2 className="text-xl font-bold">My Payslips</h2>
+                            <p className="text-sm text-indigo-100 mt-1">View your payment history</p>
+                        </div>
+                        <div className="divide-y">
+                            <div className="p-8 text-center text-gray-500">
+                                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <p className="text-gray-600 font-medium mb-2">No payslips available</p>
+                                <p className="text-sm text-gray-500">Your payslips will appear here once processed by your transporter</p>
                             </div>
                         </div>
                     </div>
@@ -601,47 +668,58 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, onLogout }) => {
 
             {/* Bottom Navigation */}
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
-                <div className="grid grid-cols-4 max-w-4xl mx-auto">
+                <div className="grid grid-cols-5 max-w-4xl mx-auto">
                     <button
                         onClick={() => setActiveView('dashboard')}
-                        className={`flex flex-col items-center justify-center py-3 ${
+                        className={`flex flex-col items-center justify-center py-2 ${
                             activeView === 'dashboard' ? 'text-blue-600' : 'text-gray-400'
                         }`}
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                         </svg>
                         <span className="text-xs mt-1">Home</span>
                     </button>
                     <button
-                        onClick={() => setActiveView('history')}
-                        className={`flex flex-col items-center justify-center py-3 ${
-                            activeView === 'history' ? 'text-blue-600' : 'text-gray-400'
+                        onClick={() => setActiveView('wallet')}
+                        className={`flex flex-col items-center justify-center py-2 ${
+                            activeView === 'wallet' ? 'text-blue-600' : 'text-gray-400'
                         }`}
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                         </svg>
-                        <span className="text-xs mt-1">History</span>
+                        <span className="text-xs mt-1">Wallet</span>
                     </button>
                     <button
-                        onClick={() => setActiveView('earnings')}
-                        className={`flex flex-col items-center justify-center py-3 ${
-                            activeView === 'earnings' ? 'text-blue-600' : 'text-gray-400'
+                        onClick={() => setActiveView('analytics')}
+                        className={`flex flex-col items-center justify-center py-2 ${
+                            activeView === 'analytics' ? 'text-blue-600' : 'text-gray-400'
                         }`}
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
-                        <span className="text-xs mt-1">Earnings</span>
+                        <span className="text-xs mt-1">Analytics</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveView('payslips')}
+                        className={`flex flex-col items-center justify-center py-2 ${
+                            activeView === 'payslips' ? 'text-blue-600' : 'text-gray-400'
+                        }`}
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span className="text-xs mt-1">Payslips</span>
                     </button>
                     <button
                         onClick={() => setActiveView('profile')}
-                        className={`flex flex-col items-center justify-center py-3 ${
+                        className={`flex flex-col items-center justify-center py-2 ${
                             activeView === 'profile' ? 'text-blue-600' : 'text-gray-400'
                         }`}
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                         <span className="text-xs mt-1">Profile</span>

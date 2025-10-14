@@ -175,6 +175,7 @@ export interface Driver extends FirestoreDocument {
         bankName: string;
         bankCode?: string; // For Nigerian banks (e.g., GTB = 058)
     };
+    walletBalance?: number; // Driver's current wallet balance for withdrawals
     // Deprecated fields (for backward compatibility)
     lat?: number;
     lng?: number;

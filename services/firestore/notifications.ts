@@ -22,7 +22,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { Notification } from '../../types';
-import { whatsAppNotifications } from '../whatsapp/whatsappService';
+import { whatsAppNotifications, whatsAppService } from '../whatsapp/whatsappService';
 
 const NOTIFICATIONS_COLLECTION = 'notifications';
 
@@ -236,7 +236,7 @@ async function sendWhatsAppNotification(data: CreateNotificationData): Promise<v
 
         // For now, send as text message (requires user interaction in last 24 hours)
         // In production, use approved templates
-        await whatsAppNotifications.sendText(data.whatsAppPhone, message);
+        await whatsAppService.sendText(data.whatsAppPhone, message);
     } catch (error) {
         console.error('Failed to send WhatsApp notification:', error);
         // Don't throw - WhatsApp failure shouldn't stop in-app notification
