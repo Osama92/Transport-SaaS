@@ -188,9 +188,52 @@ interface DashboardViewProps {
   onDeleteRoute: (route: Route) => void;
   walletBalance: number;
   onManageFunds: () => void;
+  // Driver actions
+  onDriverSendFunds: (driver: Driver) => void;
+  onDriverViewDetails: (driver: Driver) => void;
+  onDriverRemove: (driver: Driver) => void;
+  onDriverEditPay: (driver: Driver) => void;
+  onDriverEdit: (driver: Driver) => void;
+  // Vehicle actions
+  onVehicleViewDetails: (vehicle: Vehicle) => void;
+  onVehicleUpdateStatus: (vehicle: Vehicle) => void;
+  onVehicleRemove: (vehicle: Vehicle) => void;
+  // Client actions
+  onClientEdit: (client: Client) => void;
+  onClientToggleStatus: (client: Client) => void;
+  onClientDelete: (client: Client) => void;
 }
 
-const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveModal, routes, drivers, vehicles, clients, onAssignRoute, onViewDetails, onCompleteRoute, onFilterChange, activeFilter, onViewPendingRoutes, invoicedRouteIds, onEditRoute, onDeleteRoute, walletBalance, onManageFunds }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({
+    setActiveNav,
+    setActiveModal,
+    routes,
+    drivers,
+    vehicles,
+    clients,
+    onAssignRoute,
+    onViewDetails,
+    onCompleteRoute,
+    onFilterChange,
+    activeFilter,
+    onViewPendingRoutes,
+    invoicedRouteIds,
+    onEditRoute,
+    onDeleteRoute,
+    walletBalance,
+    onManageFunds,
+    onDriverSendFunds,
+    onDriverViewDetails,
+    onDriverRemove,
+    onDriverEditPay,
+    onDriverEdit,
+    onVehicleViewDetails,
+    onVehicleUpdateStatus,
+    onVehicleRemove,
+    onClientEdit,
+    onClientToggleStatus,
+    onClientDelete
+}) => {
     const { t } = useTranslation();
     const { organization, userRole, organizationId } = useAuth();
 
@@ -316,12 +359,26 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
 
         {/* Management Tables Grid */}
         <div className="space-y-8">
-            <DriversTable drivers={drivers.slice(0, 4)} onViewAll={() => setActiveNav('Drivers')} />
-            <VehiclesTable vehicles={vehicles.slice(0,4)} onViewAll={() => setActiveNav('Vehicles')} onViewDetails={() => {}} onUpdateStatus={() => {}} />
+            <DriversTable
+                drivers={drivers.slice(0, 4)}
+                onViewAll={() => setActiveNav('Drivers')}
+                onSendFunds={onDriverSendFunds}
+                onViewDetails={onDriverViewDetails}
+                onRemove={onDriverRemove}
+                onEditPay={onDriverEditPay}
+                onEditDriver={onDriverEdit}
+            />
+            <VehiclesTable
+                vehicles={vehicles.slice(0,4)}
+                onViewAll={() => setActiveNav('Vehicles')}
+                onViewDetails={onVehicleViewDetails}
+                onUpdateStatus={onVehicleUpdateStatus}
+                onRemove={onVehicleRemove}
+            />
         </div>
         <div>
             <RouteAssignmentTable
-                routes={routes}
+                routes={routes.slice(0, 5)}
                 onAssign={onAssignRoute}
                 onViewDetails={onViewDetails}
                 onComplete={onCompleteRoute}
@@ -333,10 +390,17 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveNav, setActiveMo
                 invoicedRouteIds={invoicedRouteIds}
                 onEdit={onEditRoute}
                 onDelete={onDeleteRoute}
+                onViewAll={() => setActiveNav('Routes')}
             />
         </div>
         <div>
-            <ClientsTable clients={clients} onViewAll={() => setActiveNav('Clients')} />
+            <ClientsTable
+                clients={clients.slice(0, 5)}
+                onViewAll={() => setActiveNav('Clients')}
+                onEdit={onClientEdit}
+                onToggleStatus={onClientToggleStatus}
+                onDelete={onClientDelete}
+            />
         </div>
         </div>
     );
@@ -362,6 +426,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [activeNav, setActiveNav] = useState('Dashboard');
   const [selectedItem, setSelectedItem] = useState<Route | Driver | Vehicle | Invoice | Client | PayrollRun | Payslip | null>(null);
+  const [clientToToggle, setClientToToggle] = useState<Client | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
 
   // State for demo mode mock data
   const [mockRoutes, setMockRoutes] = useState<Route[]>([]);
@@ -1315,7 +1381,36 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
                 onAddExpenseClick={() => setActiveModal('addExpense')}
             />
         }
-        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0, 3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} onEditRoute={handleEditRoute} onDeleteRoute={handleDeleteRoute} walletBalance={organizationWalletBalance} onManageFunds={() => setActiveModal('manageFunds')} />;
+        return <DashboardView
+            setActiveNav={setActiveNav}
+            setActiveModal={setActiveModal}
+            routes={filteredRoutes}
+            drivers={drivers}
+            vehicles={vehicles}
+            clients={clients.slice(0, 3)}
+            onAssignRoute={handleOpenAssignModal}
+            onViewDetails={handleViewDetails}
+            onCompleteRoute={handleCompleteRoute}
+            onFilterChange={setRouteStatusFilter}
+            activeFilter={routeStatusFilter}
+            onViewPendingRoutes={handleViewPendingRoutes}
+            invoicedRouteIds={invoicedRouteIds}
+            onEditRoute={handleEditRoute}
+            onDeleteRoute={handleDeleteRoute}
+            walletBalance={organizationWalletBalance}
+            onManageFunds={() => setActiveModal('manageFunds')}
+            onDriverSendFunds={(driver) => { setSelectedItem(driver); setActiveModal('sendFunds'); }}
+            onDriverViewDetails={(driver) => { setSelectedItem(driver); setActiveModal('driverDetails'); }}
+            onDriverRemove={(driver) => { setSelectedItem(driver); setActiveModal('confirmRemoval'); }}
+            onDriverEditPay={(driver) => { setSelectedItem(driver); setActiveModal('editDriverPay'); }}
+            onDriverEdit={(driver) => { setSelectedItem(driver); setActiveModal('editDriver'); }}
+            onVehicleViewDetails={(vehicle) => { setSelectedItem(vehicle); setActiveModal('updateVehicleStatus'); }}
+            onVehicleUpdateStatus={(vehicle) => { setSelectedItem(vehicle); setActiveModal('updateVehicleStatus'); }}
+            onVehicleRemove={(vehicle) => handleRemoveVehicle(vehicle.id)}
+            onClientEdit={(client) => { setSelectedItem(client); setActiveModal('editClient'); }}
+            onClientToggleStatus={(client) => { setClientToToggle(client); setActiveModal('confirmToggleClientStatus'); }}
+            onClientDelete={(client) => { setClientToDelete(client); setActiveModal('confirmDeleteClient'); }}
+        />;
       case 'Map':
         return <MapScreen items={drivers} />;
       case 'Drivers':
@@ -1397,7 +1492,36 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       case 'Manage Subscription':
         return <ManageSubscriptionScreen onBack={() => setActiveNav('Settings')} />;
       default:
-        return <DashboardView setActiveNav={setActiveNav} setActiveModal={setActiveModal} routes={filteredRoutes} drivers={drivers} vehicles={vehicles} clients={clients.slice(0,3)} onAssignRoute={handleOpenAssignModal} onViewDetails={handleViewDetails} onCompleteRoute={handleCompleteRoute} onFilterChange={setRouteStatusFilter} activeFilter={routeStatusFilter} onViewPendingRoutes={handleViewPendingRoutes} invoicedRouteIds={invoicedRouteIds} onEditRoute={handleEditRoute} onDeleteRoute={handleDeleteRoute} walletBalance={organizationWalletBalance} onManageFunds={() => setActiveModal('manageFunds')} />;
+        return <DashboardView
+            setActiveNav={setActiveNav}
+            setActiveModal={setActiveModal}
+            routes={filteredRoutes}
+            drivers={drivers}
+            vehicles={vehicles}
+            clients={clients.slice(0,3)}
+            onAssignRoute={handleOpenAssignModal}
+            onViewDetails={handleViewDetails}
+            onCompleteRoute={handleCompleteRoute}
+            onFilterChange={setRouteStatusFilter}
+            activeFilter={routeStatusFilter}
+            onViewPendingRoutes={handleViewPendingRoutes}
+            invoicedRouteIds={invoicedRouteIds}
+            onEditRoute={handleEditRoute}
+            onDeleteRoute={handleDeleteRoute}
+            walletBalance={organizationWalletBalance}
+            onManageFunds={() => setActiveModal('manageFunds')}
+            onDriverSendFunds={(driver) => { setSelectedItem(driver); setActiveModal('sendFunds'); }}
+            onDriverViewDetails={(driver) => { setSelectedItem(driver); setActiveModal('driverDetails'); }}
+            onDriverRemove={(driver) => { setSelectedItem(driver); setActiveModal('confirmRemoval'); }}
+            onDriverEditPay={(driver) => { setSelectedItem(driver); setActiveModal('editDriverPay'); }}
+            onDriverEdit={(driver) => { setSelectedItem(driver); setActiveModal('editDriver'); }}
+            onVehicleViewDetails={(vehicle) => { setSelectedItem(vehicle); setActiveModal('updateVehicleStatus'); }}
+            onVehicleUpdateStatus={(vehicle) => { setSelectedItem(vehicle); setActiveModal('updateVehicleStatus'); }}
+            onVehicleRemove={(vehicle) => handleRemoveVehicle(vehicle.id)}
+            onClientEdit={(client) => { setSelectedItem(client); setActiveModal('editClient'); }}
+            onClientToggleStatus={(client) => { setClientToToggle(client); setActiveModal('confirmToggleClientStatus'); }}
+            onClientDelete={(client) => { setClientToDelete(client); setActiveModal('confirmDeleteClient'); }}
+        />;
     }
   };
 

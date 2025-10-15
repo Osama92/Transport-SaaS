@@ -31,6 +31,7 @@ interface RouteAssignmentTableProps {
     invoicedRouteIds: Set<string>;
     onEdit?: (route: Route) => void;
     onDelete?: (route: Route) => void;
+    onViewAll?: () => void;
 }
 
 const FilterButton: React.FC<{
@@ -56,7 +57,7 @@ const FilterButton: React.FC<{
 };
 
 
-const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onAssign, onViewDetails, onComplete, onFilterChange, activeFilter, selectedRoutes, onSelectRoute, onSelectAllCompleted, invoicedRouteIds, onEdit, onDelete }) => {
+const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onAssign, onViewDetails, onComplete, onFilterChange, activeFilter, selectedRoutes, onSelectRoute, onSelectAllCompleted, invoicedRouteIds, onEdit, onDelete, onViewAll }) => {
     const { t } = useTranslation();
     const hasSelectableCompletedRoutes = routes.some(r => r.status === 'Completed' && !invoicedRouteIds.has(r.id));
     const allCompletedSelected = hasSelectableCompletedRoutes && routes.filter(r => r.status === 'Completed' && !invoicedRouteIds.has(r.id)).every(r => selectedRoutes.includes(r.id));
@@ -77,15 +78,25 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
     return (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm h-full">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">{t('components.routeAssignmentTable.title')}</h3>
+                <div className="flex items-center justify-between w-full sm:w-auto">
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">{t('components.routeAssignmentTable.title')}</h3>
+                    {onViewAll && (
+                        <button onClick={onViewAll} className="sm:hidden text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300">View All</button>
+                    )}
+                </div>
                 <div className="flex items-center gap-2">
                     <FilterButton label="All" activeFilter={activeFilter} onClick={onFilterChange} />
                     <FilterButton label="In Progress" activeFilter={activeFilter} onClick={onFilterChange} />
                     <FilterButton label="Completed" activeFilter={activeFilter} onClick={onFilterChange} />
                     <FilterButton label="Pending" activeFilter={activeFilter} onClick={onFilterChange} />
-                    <button className="flex items-center gap-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600">
-                        <ArrowDownTrayIcon className="w-5 h-5"/>
-                    </button>
+                    {!onViewAll && (
+                        <button className="flex items-center gap-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600">
+                            <ArrowDownTrayIcon className="w-5 h-5"/>
+                        </button>
+                    )}
+                    {onViewAll && (
+                        <button onClick={onViewAll} className="hidden sm:block text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300">View All</button>
+                    )}
                 </div>
             </div>
             <div className="overflow-x-auto">
@@ -93,8 +104,8 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                     <thead className="border-b text-sm text-gray-500 dark:border-slate-700 dark:text-gray-400">
                         <tr>
                             <th className="py-3 px-2 font-medium">
-                                <input 
-                                    type="checkbox" 
+                                <input
+                                    type="checkbox"
                                     className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-600 disabled:opacity-50"
                                     disabled={!hasSelectableCompletedRoutes}
                                     checked={allCompletedSelected}
@@ -172,64 +183,64 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                                     </td>
                                     <td className="py-4 px-4"><StatusBadge status={route.status} /></td>
                                     <td className="py-4 px-4">
-                                        <div className="flex items-center gap-2">
-                                            {route.status === 'Pending' && (
-                                                <button
-                                                    onClick={() => onAssign(route)}
-                                                    className="flex items-center gap-1.5 text-sm bg-orange-100 text-orange-700 font-semibold px-3 py-1.5 rounded-lg hover:bg-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:hover:bg-orange-900"
-                                                >
-                                                    <UserPlusIcon className="w-4 h-4" />
-                                                    {t('components.routeAssignmentTable.assign')}
-                                                </button>
-                                            )}
-                                            {route.status === 'In Progress' && (
-                                                <>
-                                                    <button onClick={() => onComplete(route)} className="flex items-center gap-1.5 text-sm font-medium text-gray-600 border px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700">
-                                                        <CheckCircleIcon className="w-4 h-4 text-green-600" />
-                                                        {t('components.routeAssignmentTable.complete')}
+                                            <div className="flex items-center gap-2">
+                                                {route.status === 'Pending' && (
+                                                    <button
+                                                        onClick={() => onAssign(route)}
+                                                        className="flex items-center gap-1.5 text-sm bg-orange-100 text-orange-700 font-semibold px-3 py-1.5 rounded-lg hover:bg-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:hover:bg-orange-900"
+                                                    >
+                                                        <UserPlusIcon className="w-4 h-4" />
+                                                        {t('components.routeAssignmentTable.assign')}
                                                     </button>
-                                                    <button onClick={() => onViewDetails(route)} className="text-sm font-medium text-gray-600 border px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700">{t('common.details')}</button>
-                                                </>
-                                            )}
-                                            {route.status === 'Completed' && (
-                                                <button onClick={() => onViewDetails(route)} className="flex items-center gap-1.5 text-sm font-medium text-green-700 bg-green-100 border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900 dark:border-green-800">
-                                                    <ClipboardDocumentCheckIcon className="w-4 h-4" />
-                                                    {t('components.routeAssignmentTable.viewpod')}
-                                                </button>
-                                            )}
-                                            <div className="relative">
-                                                <button
-                                                    onClick={() => setOpenMenuId(openMenuId === route.id ? null : route.id)}
-                                                    className="text-gray-500 hover:text-gray-800 p-1 rounded-full hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-slate-700"
-                                                >
-                                                    <EllipsisHorizontalIcon className="w-5 h-5"/>
-                                                </button>
-                                                {openMenuId === route.id && (
-                                                    <div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl z-10 border dark:border-slate-700">
-                                                        {onEdit && (
-                                                            <button
-                                                                onClick={() => { onEdit(route); setOpenMenuId(null); }}
-                                                                className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
-                                                            >
-                                                                <PencilIcon className="w-4 h-4 text-gray-500"/> {t('common.edit')}
-                                                            </button>
-                                                        )}
-                                                        {onDelete && (
-                                                            <>
-                                                                <div className="border-t my-1 dark:border-slate-700"></div>
-                                                                <button
-                                                                    onClick={() => { onDelete(route); setOpenMenuId(null); }}
-                                                                    className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                                >
-                                                                    <TrashIcon className="w-4 h-4"/> {t('common.delete')}
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                    </div>
                                                 )}
+                                                {route.status === 'In Progress' && (
+                                                    <>
+                                                        <button onClick={() => onComplete(route)} className="flex items-center gap-1.5 text-sm font-medium text-gray-600 border px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700">
+                                                            <CheckCircleIcon className="w-4 h-4 text-green-600" />
+                                                            {t('components.routeAssignmentTable.complete')}
+                                                        </button>
+                                                        <button onClick={() => onViewDetails(route)} className="text-sm font-medium text-gray-600 border px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700">{t('common.details')}</button>
+                                                    </>
+                                                )}
+                                                {route.status === 'Completed' && (
+                                                    <button onClick={() => onViewDetails(route)} className="flex items-center gap-1.5 text-sm font-medium text-green-700 bg-green-100 border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900 dark:border-green-800">
+                                                        <ClipboardDocumentCheckIcon className="w-4 h-4" />
+                                                        {t('components.routeAssignmentTable.viewpod')}
+                                                    </button>
+                                                )}
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={() => setOpenMenuId(openMenuId === route.id ? null : route.id)}
+                                                        className="text-gray-500 hover:text-gray-800 p-1 rounded-full hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-slate-700"
+                                                    >
+                                                        <EllipsisHorizontalIcon className="w-5 h-5"/>
+                                                    </button>
+                                                    {openMenuId === route.id && (
+                                                        <div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl z-10 border dark:border-slate-700">
+                                                            {onEdit && (
+                                                                <button
+                                                                    onClick={() => { onEdit(route); setOpenMenuId(null); }}
+                                                                    className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
+                                                                >
+                                                                    <PencilIcon className="w-4 h-4 text-gray-500"/> {t('common.edit')}
+                                                                </button>
+                                                            )}
+                                                            {onDelete && (
+                                                                <>
+                                                                    <div className="border-t my-1 dark:border-slate-700"></div>
+                                                                    <button
+                                                                        onClick={() => { onDelete(route); setOpenMenuId(null); }}
+                                                                        className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                                    >
+                                                                        <TrashIcon className="w-4 h-4"/> {t('common.delete')}
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
+                                        </td>
                                 </tr>
                             )
                         })}
