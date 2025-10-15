@@ -19,6 +19,17 @@ const AppContent: React.FC = () => {
     const [isOnboarding, setIsOnboarding] = useState(false);
     const [isSubscription, setIsSubscription] = useState(false);
 
+    // Debug logging
+    useEffect(() => {
+        console.log('[APP DEBUG] State changed:', {
+            loading,
+            currentUser: currentUser?.email,
+            userRole,
+            isOnboarding,
+            isSubscription,
+        });
+    }, [loading, currentUser, userRole, isOnboarding, isSubscription]);
+
     // Driver portal state
     const [driverSession, setDriverSession] = useState<Driver | null>(null);
     const [checkingDriverSession, setCheckingDriverSession] = useState(true);
@@ -71,9 +82,13 @@ const AppContent: React.FC = () => {
 
     // Show a loading screen while checking for sessions
     if (loading || checkingDriverSession) {
+        console.log('[APP DEBUG] Showing loading screen');
         return (
-            <div className="flex h-screen items-center justify-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
+            <div className="flex h-screen items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600 mx-auto mb-4"></div>
+                    <p className="text-indigo-600 font-semibold text-lg">Loading...</p>
+                </div>
             </div>
         );
     }
@@ -92,25 +107,31 @@ const AppContent: React.FC = () => {
     // Regular user flow (admin portal)
     // User is logged in
     if (currentUser) {
+        console.log('[APP DEBUG] User is logged in, checking flow...');
+
         // If explicitly in onboarding or subscription flow, show those pages
         if (isOnboarding && !userRole) {
+            console.log('[APP DEBUG] Showing onboarding (explicit)');
             return <OnboardingPage onComplete={handleRoleSelection} />;
         }
 
         if (isSubscription) {
+            console.log('[APP DEBUG] Showing subscription page');
             return <SubscriptionPage roleId={userRole || 'business'} onComplete={handleSubscriptionComplete} onBack={handleBackToOnboarding} />
         }
 
         // Check if user has completed onboarding (must have a role)
         const hasCompletedOnboarding = !!userRole;
 
-        // User hasn't completed onboarding - show onboarding page
-        if (!hasCompletedOnboarding) {
-            return <OnboardingPage onComplete={handleRoleSelection} />;
+        // User is fully authenticated with a role - go to dashboard
+        if (hasCompletedOnboarding) {
+            console.log('[APP DEBUG] User has role, showing dashboard');
+            return <Dashboard role={userRole} />;
         }
 
-        // User is fully authenticated with a role - go to dashboard
-        return <Dashboard role={userRole} />;
+        // User hasn't completed onboarding - show onboarding page
+        console.log('[APP DEBUG] No role found, showing onboarding');
+        return <OnboardingPage onComplete={handleRoleSelection} />;
     }
 
     // User is not logged in, show auth pages

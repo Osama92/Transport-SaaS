@@ -74,19 +74,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Listen to Firebase Auth state changes
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
-                // User is signed in
+                // User is signed in - keep loading true until we have the role
                 const appUser = firebaseUserToAppUser(firebaseUser);
-                setCurrentUser(appUser);
 
                 // Load user profile from Firestore
                 try {
                     const userProfile = await getUserProfile(firebaseUser.uid);
 
                     if (userProfile) {
-                        // Update last login
-                        await updateLastLogin(firebaseUser.uid);
+                        // Update last login (don't await, let it run in background)
+                        updateLastLogin(firebaseUser.uid).catch(err => console.error('Error updating last login:', err));
 
-                        // Set role and organization from user profile
+                        // Set all user data atomically
+                        setCurrentUser(appUser);
                         setUserRole(userProfile.role);
 
                         // Use organizationId from user profile (not email)
@@ -97,9 +97,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             const org = await getOrganizationById(userProfile.organizationId);
                             setOrganizationState(org);
                         }
+                    } else {
+                        // User profile doesn't exist yet (new user), set current user without role
+                        setCurrentUser(appUser);
                     }
                 } catch (error) {
                     console.error('Error loading user profile:', error);
+                    // Still set current user even if profile loading fails
+                    setCurrentUser(appUser);
                 }
             } else {
                 // User is signed out
@@ -343,7 +348,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };
