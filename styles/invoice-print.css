@@ -1,0 +1,50 @@
+/* Invoice Print Styles - A4 Optimized */
+
+@media print {
+    @page {
+        size: A4;
+        margin: 0;
+    }
+
+    body {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    #invoice-preview {
+        width: 210mm !important;
+        min-height: 297mm !important;
+        padding: 20mm !important;
+        page-break-after: avoid;
+        box-shadow: none !important;
+    }
+
+    /* Hide non-printable elements */
+    header,
+    footer,
+    button,
+    nav,
+    .no-print {
+        display: none !important;
+    }
+
+    /* Ensure colors are printed */
+    * {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    /* Prevent page breaks inside elements */
+    table,
+    tr,
+    td,
+    th,
+    div {
+        page-break-inside: avoid;
+    }
+}
+
+/* Screen styles for invoice preview */
+#invoice-preview {
+    box-sizing: border-box;
+}

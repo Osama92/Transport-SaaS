@@ -66,7 +66,7 @@ import VehiclesScreen from '../screens/VehiclesScreen';
 import RoutesScreen from '../screens/RoutesScreen';
 import RouteDetailsScreen from '../screens/RouteDetailsScreen';
 import ClientsScreen from '../screens/ClientsScreen';
-import InvoiceScreen from '../invoice/InvoiceScreen';
+import InvoiceScreen from '../invoice/InvoiceScreenModern';
 import AllInvoicesScreen from '../screens/AllInvoicesScreen';
 import ManageSubscriptionScreen from '../screens/ManageSubscriptionScreen';
 import SettingsScreen from '../screens/SettingsScreen';

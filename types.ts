@@ -323,6 +323,7 @@ export interface PaymentDetails {
     accountName: string;
     accountNumber: string;
     code?: string; // BSB or Sort Code
+    bankName?: string;
 }
 
 export interface Invoice extends FirestoreDocument {
@@ -342,6 +343,9 @@ export interface Invoice extends FirestoreDocument {
     notes: string;
     paymentDetails: PaymentDetails;
     signatureUrl?: string;
+    companyLogoUrl?: string;
+    vatRate?: number; // VAT percentage (e.g., 7.5 for 7.5%)
+    vatInclusive?: boolean; // true = VAT included in price, false = VAT added on top
     status: 'Draft' | 'Sent' | 'Paid';
     paidDate?: string;
 }

@@ -13,7 +13,7 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
-import { generateReadableId } from './utils';
+import { generateReadableId, generateRouteId } from './utils';
 import type { Driver, Vehicle, Route, Client } from '../../types';
 
 /**
@@ -180,7 +180,7 @@ export const createPartnerRoute = async (
     userId: string
 ): Promise<string> => {
     try {
-        const routeId = generateReadableId('RTE');
+        const routeId = generateRouteId(routeData.origin, routeData.destination);
         const routeRef = getPartnerDoc(partnerId, 'routes', routeId);
 
         const newRoute = {

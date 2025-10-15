@@ -17,10 +17,10 @@ const InputField: React.FC<{ label: string, id: string, type?: string, value: st
 );
 
 const EmailInvoiceModal: React.FC<EmailInvoiceModalProps> = ({ onClose, invoice, onSend }) => {
-    const defaultSubject = `Invoice #${invoice.id} from ${invoice.from.name}`;
-    const defaultBody = `Dear ${invoice.to.name},\n\nPlease find attached the invoice for your recent services.\n\nBest regards,\n${invoice.from.name}`;
+    const defaultSubject = invoice ? `Invoice #${invoice.id} from ${invoice.from.name}` : 'Invoice';
+    const defaultBody = invoice ? `Dear ${invoice.to.name},\n\nPlease find attached the invoice for your recent services.\n\nBest regards,\n${invoice.from.name}` : '';
 
-    const [recipient, setRecipient] = useState(invoice.to.email || '');
+    const [recipient, setRecipient] = useState(invoice?.to?.email || '');
     const [subject, setSubject] = useState(defaultSubject);
     const [body, setBody] = useState(defaultBody);
 

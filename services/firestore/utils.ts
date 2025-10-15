@@ -41,11 +41,19 @@ export const generateVehicleId = (): string => {
 };
 
 /**
- * Generate route ID
- * Format: RTE-YYYYMMDD-HHMMSS-random
- * Example: RTE-20251009-143022-abc123
+ * Generate route ID with origin and destination
+ * Format: RTE-Origin-Destination-random
+ * Example: RTE-Lagos-Abuja-abc123
  */
-export const generateRouteId = (): string => {
+export const generateRouteId = (origin?: string, destination?: string): string => {
+    if (origin && destination) {
+        // Clean up the names: remove special characters, trim, and limit length
+        const cleanOrigin = origin.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
+        const cleanDestination = destination.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
+        return `RTE-${cleanOrigin}-${cleanDestination}-${randomSuffix}`.toUpperCase();
+    }
+    // Fallback to timestamp-based ID if origin/destination not provided
     return generateReadableId('RTE');
 };
 

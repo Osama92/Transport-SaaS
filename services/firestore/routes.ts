@@ -115,7 +115,7 @@ export const createRoute = async (
     userId: string
 ): Promise<string> => {
     try {
-        const routeId = generateRouteId();
+        const routeId = generateRouteId(routeData.origin, routeData.destination);
         const routeRef = doc(db, ROUTES_COLLECTION, routeId);
 
         const newRoute = {
