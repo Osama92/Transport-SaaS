@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import type { Invoice, InvoiceLineItem } from '../../types';
+import { uploadInvoiceLogo, uploadInvoiceSignature } from './storage';
 
 const INVOICES_COLLECTION = 'invoices';
 
@@ -137,13 +138,39 @@ export const createInvoice = async (
         const invoicesRef = collection(db, INVOICES_COLLECTION);
         const invoiceNumber = await generateInvoiceNumber(organizationId);
 
-        const newInvoice = {
+        // Helper function to check if a string is a base64 data URL
+        const isBase64DataUrl = (url: string | null | undefined): boolean => {
+            return !!url && url.startsWith('data:');
+        };
+
+        // Upload logo to Firebase Storage if it's a base64 data URL
+        let companyLogoUrl = invoiceData.companyLogoUrl || null;
+        if (companyLogoUrl && isBase64DataUrl(companyLogoUrl)) {
+            try {
+                companyLogoUrl = await uploadInvoiceLogo(companyLogoUrl, organizationId);
+            } catch (error) {
+                console.error('Failed to upload logo, saving without it:', error);
+                companyLogoUrl = null;
+            }
+        }
+
+        // Upload signature to Firebase Storage if it's a base64 data URL
+        let signatureUrl = invoiceData.signatureUrl || null;
+        if (signatureUrl && isBase64DataUrl(signatureUrl)) {
+            try {
+                signatureUrl = await uploadInvoiceSignature(signatureUrl, organizationId);
+            } catch (error) {
+                console.error('Failed to upload signature, saving without it:', error);
+                signatureUrl = null;
+            }
+        }
+
+        const newInvoice: any = {
             organizationId,
             invoiceNumber,
-            clientId: invoiceData.clientId,
-            clientName: invoiceData.clientName,
-            clientEmail: invoiceData.clientEmail || '',
-            clientAddress: invoiceData.clientAddress || '',
+            clientName: invoiceData.clientName || invoiceData.to?.name || '',
+            clientEmail: invoiceData.clientEmail || invoiceData.to?.email || '',
+            clientAddress: invoiceData.clientAddress || invoiceData.to?.address || '',
             status: invoiceData.status || 'Draft',
             invoiceDate: invoiceData.invoiceDate || serverTimestamp(),
             dueDate: invoiceData.dueDate || null,
@@ -159,10 +186,23 @@ export const createInvoice = async (
             paymentTerms: invoiceData.paymentTerms || 'Net 30',
             routeIds: invoiceData.routeIds || [],
             pdfUrl: invoiceData.pdfUrl || null,
+            from: invoiceData.from || {},
+            to: invoiceData.to || {},
+            items: invoiceData.items || [],
+            paymentDetails: invoiceData.paymentDetails || {},
+            vatRate: invoiceData.vatRate || 0,
+            vatInclusive: invoiceData.vatInclusive || false,
+            companyLogoUrl: companyLogoUrl,
+            signatureUrl: signatureUrl,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             createdBy: userId,
         };
+
+        // Only add clientId if it exists
+        if (invoiceData.clientId) {
+            newInvoice.clientId = invoiceData.clientId;
+        }
 
         const docRef = await addDoc(invoicesRef, newInvoice);
         return docRef.id;
@@ -182,10 +222,42 @@ export const updateInvoice = async (
     try {
         const invoiceRef = doc(db, INVOICES_COLLECTION, invoiceId);
 
+        // Helper function to check if a string is a base64 data URL
+        const isBase64DataUrl = (url: string | null | undefined): boolean => {
+            return !!url && url.startsWith('data:');
+        };
+
         const updateData: any = {
             ...updates,
             updatedAt: serverTimestamp(),
         };
+
+        // Get the invoice to access organizationId
+        const invoiceDoc = await getDoc(invoiceRef);
+        if (!invoiceDoc.exists()) {
+            throw new Error('Invoice not found');
+        }
+        const organizationId = invoiceDoc.data().organizationId;
+
+        // Upload logo to Firebase Storage if it's a base64 data URL
+        if (updateData.companyLogoUrl && isBase64DataUrl(updateData.companyLogoUrl)) {
+            try {
+                updateData.companyLogoUrl = await uploadInvoiceLogo(updateData.companyLogoUrl, organizationId);
+            } catch (error) {
+                console.error('Failed to upload logo, keeping existing:', error);
+                delete updateData.companyLogoUrl; // Don't update if upload fails
+            }
+        }
+
+        // Upload signature to Firebase Storage if it's a base64 data URL
+        if (updateData.signatureUrl && isBase64DataUrl(updateData.signatureUrl)) {
+            try {
+                updateData.signatureUrl = await uploadInvoiceSignature(updateData.signatureUrl, organizationId);
+            } catch (error) {
+                console.error('Failed to upload signature, keeping existing:', error);
+                delete updateData.signatureUrl; // Don't update if upload fails
+            }
+        }
 
         await updateDoc(invoiceRef, updateData);
     } catch (error) {

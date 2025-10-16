@@ -92,7 +92,7 @@ const AllInvoicesScreen: React.FC<AllInvoicesScreenProps> = ({ invoices, onCreat
                         <tbody>
                             {invoices.map((invoice) => (
                                 <tr key={invoice.id} className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                                    <td className="py-4 px-4 font-mono dark:text-gray-300">{invoice.id}</td>
+                                    <td className="py-4 px-4 font-mono dark:text-gray-300">#{invoice.invoiceNumber || invoice.id}</td>
                                     <td className="py-4 px-4">
                                         <p className="font-semibold text-gray-800 dark:text-gray-100">{invoice.to.name}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">{invoice.to.email}</p>

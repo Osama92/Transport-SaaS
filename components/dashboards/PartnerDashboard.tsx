@@ -31,7 +31,7 @@ import RouteAssignmentTable from '../RouteAssignmentTable';
 import StatCard from '../StatCard';
 import type { Route, Driver, Vehicle, Client, DriverPerformanceData, MaintenanceLog, VehicleDocument, Invoice, InvoiceItem, Expense, Notification, PayrollRun, Payslip } from '../../types';
 // Import Firestore hooks
-import { useDrivers, useVehicles, useRoutes, useClients, usePayrollRuns, useNotifications } from '../../hooks/useFirestore';
+import { useDrivers, useVehicles, useRoutes, useClients, usePayrollRuns, useNotifications, useInvoices } from '../../hooks/useFirestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -43,6 +43,7 @@ import { deleteRoute, assignRouteResources, startRoute, updateRoute, addRouteExp
 import { createClient, updateClient as updateClientFirestore, deleteClient, updateClientStatus } from '../../services/firestore/clients';
 import { createPayrollRun, deletePayrollRun } from '../../services/firestore/payroll';
 import { addFundsToWallet } from '../../services/firestore/wallet';
+import { createInvoice, updateInvoice, deleteInvoice as deleteInvoiceFirestore, updateInvoiceStatus } from '../../services/firestore/invoices';
 // Import notification triggers and handlers
 import { notifyDriverAssigned, notifyRouteCompleted, notifyNewRoute, notifyDriverOnboarded, notifyExpenseAdded, notifyClientAdded, notifyPayrollGenerated } from '../../services/notificationTriggers';
 import { markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } from '../../services/firestore/notifications';
@@ -75,9 +76,10 @@ import MapScreen from '../screens/MapScreen'; // Import MapScreen
 import PayrollScreen from '../screens/PayrollScreen';
 import PayrollRunDetailsScreen from '../screens/PayrollRunDetailsScreen';
 import PartnerAnalyticsScreen from '../screens/PartnerAnalyticsScreen';
-import InvoicePreview from '../invoice/InvoicePreview';
+import InvoiceTemplate from '../invoice/InvoiceTemplates';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { generateInvoicePdf } from '../../utils/pdfGenerator';
 
 import {
     PlusIcon,
@@ -421,6 +423,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const { data: firestoreClients, loading: clientsLoading } = useClients(isDemoMode ? null : organizationId);
   const { data: firestorePayrollRuns, loading: payrollLoading } = usePayrollRuns(isDemoMode ? null : organizationId);
   const { data: firestoreNotifications, loading: notificationsLoading } = useNotifications(isDemoMode ? null : currentUser?.uid || null);
+  const { data: firestoreInvoices, loading: invoicesLoading } = useInvoices(isDemoMode ? null : organizationId);
 
   const [organizationWalletBalance, setOrganizationWalletBalance] = useState<number>(0);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -443,6 +446,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const drivers = isDemoMode ? mockDrivers : (firestoreDrivers || []);
   const vehicles = isDemoMode ? mockVehicles : (firestoreVehicles || []);
   const clients = isDemoMode ? mockClients : (firestoreClients || []);
+  const invoices = isDemoMode ? mockInvoices : (firestoreInvoices || []);
   const payrollRuns = isDemoMode ? mockPayrollRuns : (firestorePayrollRuns || []);
   const notifications = isDemoMode ? mockNotifications : (firestoreNotifications || []);
 
@@ -463,11 +467,9 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
   const subscriptionPlan = organization?.subscription?.plan || 'basic';
   const subscriptionLimits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
 
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [routeStatusFilter, setRouteStatusFilter] = useState<RouteStatusFilter>('All');
   const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
   const [invoiceView, setInvoiceView] = useState<InvoiceView>('list');
-  const [invoiceForPdf, setInvoiceForPdf] = useState<Invoice | null>(null);
   const [invoicedRouteIds, setInvoicedRouteIds] = useState<Set<string>>(new Set());
   const [viewingRoute, setViewingRoute] = useState<Route | null>(null);
   const [viewingPayrollRun, setViewingPayrollRun] = useState<PayrollRun | null>(null);
@@ -516,18 +518,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     const loadAllData = async () => {
         // Only load mock data if in demo mode
         if (!isDemoMode) {
-            // For production mode, just load invoices (everything else handled by hooks)
-            try {
-                setLoading(true);
-                setError(null);
-                const invoicesData = await getInvoices();
-                setInvoices(invoicesData as Invoice[]);
-            } catch (err) {
-                setError("Failed to load partner data. Please refresh the page.");
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
+            // For production mode, everything handled by hooks
+            setLoading(false);
             return;
         }
 
@@ -559,7 +551,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
             setMockClients(clientsData as Client[]);
             setMockRoutes(routesData as Route[]);
             setMockInvoices(invoicesData as Invoice[]);
-            setInvoices(invoicesData as Invoice[]);
             setMockNotifications(notificationsData as Notification[]);
             setMockPayrollRuns(payrollData as PayrollRun[]);
             rawPerformanceData = generateDriverPerformanceData(typedDriversData);
@@ -603,31 +594,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     });
   }, [dateRange]);
     
-    useEffect(() => {
-        if (invoiceForPdf) {
-            // Delay to allow the off-screen component to render
-            setTimeout(() => {
-                const input = document.getElementById('pdf-invoice-preview');
-                if (input) {
-                    html2canvas(input, { scale: 2 })
-                        .then((canvas) => {
-                            const imgData = canvas.toDataURL('image/png');
-                            const pdf = new jsPDF('p', 'mm', 'a4');
-                            const pdfWidth = pdf.internal.pageSize.getWidth();
-                            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-                            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-                            pdf.save(`Invoice-${invoiceForPdf.id}.pdf`);
-                        })
-                        .finally(() => {
-                            setInvoiceForPdf(null); // Clean up after download
-                        });
-                } else {
-                    console.error("PDF preview element not found.");
-                    setInvoiceForPdf(null);
-                }
-            }, 100);
-        }
-    }, [invoiceForPdf]);
 
     useEffect(() => {
         const routeIdRegex = /(#R-\d+)/g;
@@ -1006,25 +972,51 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     setActiveNav('Invoices');
   };
 
-  const handleSaveInvoice = (invoice: Invoice) => {
-    const existingIndex = invoices.findIndex(inv => inv.id === invoice.id);
-    if (existingIndex > -1) {
-        const updatedInvoices = [...invoices];
-        updatedInvoices[existingIndex] = invoice;
-        setInvoices(updatedInvoices);
+  const handleSaveInvoice = async (invoice: Invoice) => {
+    if (isDemoMode) {
+      const existingIndex = mockInvoices.findIndex(inv => inv.id === invoice.id);
+      if (existingIndex > -1) {
+          const updatedInvoices = [...mockInvoices];
+          updatedInvoices[existingIndex] = invoice;
+          setMockInvoices(updatedInvoices);
+      } else {
+          setMockInvoices(prev => [invoice, ...prev]);
+      }
     } else {
-        setInvoices(prev => [invoice, ...prev]);
+      try {
+        const existingInvoice = invoices.find(inv => inv.id === invoice.id);
+        if (existingInvoice) {
+          // Update existing invoice
+          await updateInvoice(invoice.id, invoice);
+        } else {
+          // Create new invoice
+          await createInvoice(organizationId!, invoice, currentUser!.uid);
+        }
+      } catch (error) {
+        console.error('Error saving invoice:', error);
+        alert('Failed to save invoice. Please try again.');
+        return;
+      }
     }
     setInvoiceView('list');
     setActiveNav('Invoices');
     setSelectedItem(null);
     setSelectedRoutes([]);
   };
-    
-  const handleMarkAsPaid = (invoiceId: string) => {
-    setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'Paid' } : inv));
+
+  const handleMarkAsPaid = async (invoiceId: string) => {
+    if (isDemoMode) {
+      setMockInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'Paid' } : inv));
+    } else {
+      try {
+        await updateInvoiceStatus(invoiceId, 'Paid');
+      } catch (error) {
+        console.error('Error marking invoice as paid:', error);
+        alert('Failed to mark invoice as paid. Please try again.');
+      }
+    }
   };
-  
+
   const handleRequestMarkAsPaid = (invoiceId: string) => {
       const invoiceToUpdate = invoices.find(inv => inv.id === invoiceId);
       if (invoiceToUpdate) {
@@ -1032,15 +1024,29 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
         setActiveModal('confirmMarkAsPaid');
       }
   };
-  
-  const handleDeleteInvoice = (invoiceId: string) => {
+
+  const handleDeleteInvoice = async (invoiceId: string) => {
       if (window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
-        setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+        if (isDemoMode) {
+          setMockInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+        } else {
+          try {
+            await deleteInvoiceFirestore(invoiceId);
+          } catch (error) {
+            console.error('Error deleting invoice:', error);
+            alert('Failed to delete invoice. Please try again.');
+          }
+        }
       }
   };
 
-  const handleDownloadPdf = (invoice: Invoice) => {
-      setInvoiceForPdf(invoice);
+  const handleDownloadPdf = async (invoice: Invoice) => {
+      try {
+          await generateInvoicePdf(invoice, invoice.template || 'pdf');
+      } catch (error) {
+          console.error('Error generating PDF:', error);
+          alert('Failed to generate PDF. Please try again.');
+      }
   };
   
   const handleAddClient = async (newClientData: Omit<Client, 'id' | 'status'>) => {
@@ -1537,14 +1543,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       notifications={notifications}
     >
       {renderModal()}
-      {/* For PDF Generation */}
-      {invoiceForPdf && (
-          <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: '210mm' }}>
-              <div id="pdf-invoice-preview">
-                 <InvoicePreview invoice={invoiceForPdf} />
-              </div>
-          </div>
-      )}
       {/* WhatsApp Test Component - Toggle with button in Settings */}
       {showWhatsAppTest && (
         <div className="relative z-50">

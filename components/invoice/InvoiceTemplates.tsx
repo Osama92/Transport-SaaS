@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Invoice } from '../../types';
 
-export type InvoiceTemplateType = 'classic' | 'modern' | 'minimal' | 'professional';
+export type InvoiceTemplateType = 'classic' | 'modern' | 'minimal' | 'professional' | 'pdf';
 
 interface InvoiceTemplateProps {
     invoice: Invoice;
@@ -9,7 +9,28 @@ interface InvoiceTemplateProps {
 }
 
 const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) => {
-    const totalAmount = invoice.items.reduce((sum, item) => sum + item.units * item.price, 0);
+    // Calculate amounts with VAT
+    const subtotalAmount = invoice.items.reduce((sum, item) => sum + item.units * item.price, 0);
+    const vatRate = invoice.vatRate || 0;
+    const vatInclusive = invoice.vatInclusive || false;
+
+    let subtotal = subtotalAmount;
+    let vatAmount = 0;
+    let totalAmount = subtotalAmount;
+
+    if (vatRate > 0) {
+        if (vatInclusive) {
+            // VAT is included in the price, so we extract it
+            vatAmount = (subtotalAmount * vatRate) / (100 + vatRate);
+            subtotal = subtotalAmount - vatAmount;
+            totalAmount = subtotalAmount;
+        } else {
+            // VAT is added on top
+            vatAmount = (subtotalAmount * vatRate) / 100;
+            subtotal = subtotalAmount;
+            totalAmount = subtotalAmount + vatAmount;
+        }
+    }
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
@@ -30,27 +51,21 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                 <div className="flex justify-between items-start mb-12">
                     <div>
                         <h1 className="text-5xl font-bold text-gray-800">INVOICE</h1>
-                        <p className="text-gray-500 mt-2 text-lg">#{invoice.id}</p>
+                        <p className="text-gray-500 mt-2 text-lg">#{invoice.invoiceNumber}</p>
                     </div>
-                    {invoice.from.logoUrl ? (
-                        <img src={invoice.from.logoUrl} alt="Company Logo" className="max-h-16" />
+                    {invoice.companyLogoUrl ? (
+                        <img src={invoice.companyLogoUrl} alt="Company Logo" className="max-h-16" />
                     ) : (
                         <div className="text-3xl font-bold text-gray-800">{invoice.from.name || 'Your Company'}</div>
                     )}
                 </div>
 
-                {/* Dates and Project */}
-                <div className="grid grid-cols-2 gap-8 mb-8">
-                    <div>
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Project</p>
-                        <p className="font-semibold text-gray-800 text-lg mt-1">{invoice.project || 'Project Name'}</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Issue Date</p>
-                        <p className="font-semibold text-gray-800 mt-1">{invoice.issuedDate}</p>
-                        <p className="text-sm text-gray-500 uppercase tracking-wide mt-3">Due Date</p>
-                        <p className="font-semibold text-gray-800 mt-1">{invoice.dueDate}</p>
-                    </div>
+                {/* Dates */}
+                <div className="mb-8 text-right">
+                    <p className="text-sm text-gray-500 uppercase tracking-wide">Issue Date</p>
+                    <p className="font-semibold text-gray-800 mt-1">{invoice.issuedDate}</p>
+                    <p className="text-sm text-gray-500 uppercase tracking-wide mt-3">Due Date</p>
+                    <p className="font-semibold text-gray-800 mt-1">{invoice.dueDate}</p>
                 </div>
 
                 {/* From/To */}
@@ -93,13 +108,25 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                     </tbody>
                 </table>
 
-                {/* Total */}
+                {/* Total with VAT Breakdown */}
                 <div className="flex justify-end mb-8">
-                    <div className="w-64">
-                        <div className="bg-gray-800 text-white p-6 rounded-lg">
-                            <div className="flex justify-between items-center">
-                                <span className="text-lg font-semibold">TOTAL</span>
-                                <span className="text-2xl font-bold">{formatCurrency(totalAmount)}</span>
+                    <div className="w-80">
+                        <div className="bg-white border-2 border-gray-800 p-6 rounded-lg space-y-3">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-700">Subtotal:</span>
+                                <span className="font-medium text-gray-900">{formatCurrency(subtotal)}</span>
+                            </div>
+                            {vatRate > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-700">VAT ({vatRate}% {vatInclusive ? 'Inclusive' : 'Exclusive'}):</span>
+                                    <span className="font-medium text-gray-900">{formatCurrency(vatAmount)}</span>
+                                </div>
+                            )}
+                            <div className="border-t-2 border-gray-800 pt-3">
+                                <div className="bg-gray-800 text-white px-4 py-3 rounded flex justify-between items-center">
+                                    <span className="text-lg font-semibold">TOTAL</span>
+                                    <span className="text-2xl font-bold">{formatCurrency(totalAmount)}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -135,6 +162,14 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                         </div>
                     </div>
                 </div>
+
+                {/* Signature */}
+                {invoice.signatureUrl && (
+                    <div className="mt-8 pt-6 border-t border-gray-200">
+                        <p className="text-sm font-semibold text-gray-700 mb-3">Authorized Signature:</p>
+                        <img src={invoice.signatureUrl} alt="Signature" className="max-h-16 max-w-xs" />
+                    </div>
+                )}
             </div>
         );
     }
@@ -147,10 +182,10 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                     <div className="flex justify-between items-start">
                         <div>
                             <h1 className="text-5xl font-bold">INVOICE</h1>
-                            <p className="text-indigo-100 mt-2 text-lg">#{invoice.id}</p>
+                            <p className="text-indigo-100 mt-2 text-lg">#{invoice.invoiceNumber}</p>
                         </div>
-                        {invoice.from.logoUrl ? (
-                            <img src={invoice.from.logoUrl} alt="Logo" className="max-h-16 bg-white p-2 rounded" />
+                        {invoice.companyLogoUrl ? (
+                            <img src={invoice.companyLogoUrl} alt="Logo" className="max-h-16 bg-white p-2 rounded" />
                         ) : (
                             <div className="text-3xl font-bold">{invoice.from.name || 'Company'}</div>
                         )}
@@ -191,12 +226,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                     </div>
                 </div>
 
-                {/* Project */}
-                <div className="mb-6 p-4 bg-indigo-50 border-l-4 border-indigo-600 rounded-r">
-                    <p className="text-xs text-indigo-600 font-bold uppercase">Project</p>
-                    <p className="font-semibold text-gray-800 text-lg mt-1">{invoice.project}</p>
-                </div>
-
                 {/* Items Table */}
                 <table className="w-full mb-8">
                     <thead>
@@ -219,12 +248,26 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                     </tbody>
                 </table>
 
-                {/* Total */}
+                {/* Total with VAT Breakdown */}
                 <div className="flex justify-end mb-8">
-                    <div className="w-64 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-lg shadow-lg">
-                        <div className="flex justify-between items-center">
-                            <span className="text-lg font-semibold">TOTAL DUE</span>
-                            <span className="text-2xl font-bold">{formatCurrency(totalAmount)}</span>
+                    <div className="w-80">
+                        <div className="bg-white border-2 border-purple-200 p-6 rounded-lg shadow-lg space-y-3">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-700">Subtotal:</span>
+                                <span className="font-medium text-gray-900">{formatCurrency(subtotal)}</span>
+                            </div>
+                            {vatRate > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-700">VAT ({vatRate}% {vatInclusive ? 'Inclusive' : 'Exclusive'}):</span>
+                                    <span className="font-medium text-gray-900">{formatCurrency(vatAmount)}</span>
+                                </div>
+                            )}
+                            <div className="border-t-2 border-purple-200 pt-3">
+                                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3 rounded-lg flex justify-between items-center">
+                                    <span className="text-lg font-semibold">TOTAL DUE</span>
+                                    <span className="text-2xl font-bold">{formatCurrency(totalAmount)}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -270,6 +313,14 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                         </div>
                     </div>
                 </div>
+
+                {/* Signature */}
+                {invoice.signatureUrl && (
+                    <div className="mt-8 pt-6 border-t-2 border-gradient-to-r from-indigo-200 to-purple-200">
+                        <p className="text-sm font-semibold text-gray-700 mb-3">Authorized Signature:</p>
+                        <img src={invoice.signatureUrl} alt="Signature" className="max-h-16 max-w-xs" />
+                    </div>
+                )}
             </div>
         );
     }
@@ -279,8 +330,8 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
             <div style={a4Style} className="bg-white print:shadow-none" id="invoice-preview">
                 {/* Minimal Header */}
                 <div className="flex justify-between items-start mb-16">
-                    {invoice.from.logoUrl ? (
-                        <img src={invoice.from.logoUrl} alt="Logo" className="max-h-12" />
+                    {invoice.companyLogoUrl ? (
+                        <img src={invoice.companyLogoUrl} alt="Logo" className="max-h-12" />
                     ) : (
                         <div className="text-2xl font-light text-gray-800">{invoice.from.name || 'Company'}</div>
                     )}
@@ -293,7 +344,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                 <div className="grid grid-cols-4 gap-8 mb-16 pb-8 border-b border-gray-200">
                     <div>
                         <p className="text-xs text-gray-400 uppercase mb-1">Invoice</p>
-                        <p className="text-sm font-medium text-gray-800">#{invoice.id}</p>
+                        <p className="text-sm font-medium text-gray-800">#{invoice.invoiceNumber}</p>
                     </div>
                     <div>
                         <p className="text-xs text-gray-400 uppercase mb-1">Issued</p>
@@ -331,12 +382,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                     </div>
                 </div>
 
-                {/* Project */}
-                <div className="mb-12">
-                    <p className="text-xs text-gray-400 uppercase mb-2">Project</p>
-                    <p className="text-lg font-light text-gray-800">{invoice.project}</p>
-                </div>
-
                 {/* Minimal Table */}
                 <table className="w-full mb-16">
                     <thead>
@@ -357,9 +402,15 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                             </tr>
                         ))}
                         <tr>
-                            <td colSpan={3} className="text-right pt-6 pb-3 text-sm text-gray-600">Subtotal</td>
-                            <td className="text-right pt-6 pb-3 text-gray-800 font-medium">{formatCurrency(totalAmount)}</td>
+                            <td colSpan={3} className="text-right pt-6 pb-2 text-sm text-gray-600">Subtotal</td>
+                            <td className="text-right pt-6 pb-2 text-gray-800 font-medium">{formatCurrency(subtotal)}</td>
                         </tr>
+                        {vatRate > 0 && (
+                            <tr>
+                                <td colSpan={3} className="text-right pb-2 text-sm text-gray-600">VAT ({vatRate}% {vatInclusive ? 'Inclusive' : 'Exclusive'})</td>
+                                <td className="text-right pb-2 text-gray-800 font-medium">{formatCurrency(vatAmount)}</td>
+                            </tr>
+                        )}
                         <tr className="border-t-2 border-gray-800">
                             <td colSpan={3} className="text-right pt-3 font-medium text-gray-800">Total</td>
                             <td className="text-right pt-3 text-xl font-semibold text-gray-800">{formatCurrency(totalAmount)}</td>
@@ -385,6 +436,14 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                         <p><span className="text-gray-400">Bank:</span> {invoice.paymentDetails.bankName}</p>
                     </div>
                 </div>
+
+                {/* Signature */}
+                {invoice.signatureUrl && (
+                    <div className="mt-12 pt-8 border-t border-gray-200">
+                        <p className="text-xs text-gray-400 uppercase mb-3">Authorized Signature</p>
+                        <img src={invoice.signatureUrl} alt="Signature" className="max-h-16 max-w-xs" />
+                    </div>
+                )}
             </div>
         );
     }
@@ -396,8 +455,8 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                 <div className="border-b-4 border-blue-600 pb-6 mb-8">
                     <div className="flex justify-between items-start">
                         <div>
-                            {invoice.from.logoUrl ? (
-                                <img src={invoice.from.logoUrl} alt="Logo" className="max-h-14 mb-3" />
+                            {invoice.companyLogoUrl ? (
+                                <img src={invoice.companyLogoUrl} alt="Logo" className="max-h-14 mb-3" />
                             ) : (
                                 <div className="text-2xl font-bold text-blue-900 mb-3">{invoice.from.name}</div>
                             )}
@@ -408,7 +467,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                         </div>
                         <div className="text-right">
                             <h1 className="text-4xl font-bold text-blue-900">INVOICE</h1>
-                            <p className="text-blue-600 font-semibold mt-1">#{invoice.id}</p>
+                            <p className="text-blue-600 font-semibold mt-1">#{invoice.invoiceNumber}</p>
                         </div>
                     </div>
                 </div>
@@ -420,14 +479,14 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                             <tr className="border-b border-gray-200">
                                 <td className="py-2 text-gray-600 font-semibold w-32">Invoice Date:</td>
                                 <td className="py-2 text-gray-800">{invoice.issuedDate}</td>
-                                <td className="py-2 text-gray-600 font-semibold w-32">Project:</td>
-                                <td className="py-2 text-gray-800">{invoice.project}</td>
                             </tr>
                             <tr className="border-b border-gray-200">
                                 <td className="py-2 text-gray-600 font-semibold">Due Date:</td>
                                 <td className="py-2 text-gray-800">{invoice.dueDate}</td>
+                            </tr>
+                            <tr className="border-b border-gray-200">
                                 <td className="py-2 text-gray-600 font-semibold">Amount Due:</td>
-                                <td className="py-2 text-blue-600 font-bold">{formatCurrency(totalAmount)}</td>
+                                <td className="py-2 text-blue-600 font-bold" colSpan={3}>{formatCurrency(totalAmount)}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -464,12 +523,14 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                     <tfoot>
                         <tr className="border-t-2 border-blue-600">
                             <td colSpan={3} className="text-right pt-4 pb-2 font-semibold text-gray-700">Subtotal:</td>
-                            <td className="text-right pt-4 pb-2 text-gray-800 font-semibold">{formatCurrency(totalAmount)}</td>
+                            <td className="text-right pt-4 pb-2 text-gray-800 font-semibold">{formatCurrency(subtotal)}</td>
                         </tr>
-                        <tr>
-                            <td colSpan={3} className="text-right pb-2 font-semibold text-gray-700">Tax (0%):</td>
-                            <td className="text-right pb-2 text-gray-800 font-semibold">₦0.00</td>
-                        </tr>
+                        {vatRate > 0 && (
+                            <tr>
+                                <td colSpan={3} className="text-right pb-2 font-semibold text-gray-700">VAT ({vatRate}% {vatInclusive ? 'Inclusive' : 'Exclusive'}):</td>
+                                <td className="text-right pb-2 text-gray-800 font-semibold">{formatCurrency(vatAmount)}</td>
+                            </tr>
+                        )}
                         <tr className="bg-blue-900 text-white">
                             <td colSpan={3} className="text-right py-3 px-4 font-bold text-lg">TOTAL:</td>
                             <td className="text-right py-3 px-4 font-bold text-xl">{formatCurrency(totalAmount)}</td>
@@ -507,14 +568,148 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ invoice, template }) 
                         </div>
                     </div>
                     <div className="mt-6 p-3 bg-blue-50 rounded text-xs text-blue-900">
-                        <p className="font-semibold">Please include invoice number #{invoice.id} as payment reference</p>
+                        <p className="font-semibold">Please include invoice number #{invoice.invoiceNumber} as payment reference</p>
                     </div>
                 </div>
+
+                {/* Signature */}
+                {invoice.signatureUrl && (
+                    <div className="mt-8 pt-6 border-t-2 border-blue-200">
+                        <p className="text-sm font-semibold text-blue-900 mb-3">Authorized Signature:</p>
+                        <img src={invoice.signatureUrl} alt="Signature" className="max-h-16 max-w-xs" />
+                    </div>
+                )}
 
                 {/* Footer */}
                 <div className="mt-12 pt-6 border-t border-gray-300 text-center text-xs text-gray-500">
                     <p>Thank you for your business!</p>
                     <p className="mt-1">For questions about this invoice, please contact {invoice.from.email}</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (template === 'pdf') {
+
+        return (
+            <div style={a4Style} className="bg-white print:shadow-none" id="invoice-preview">
+                {/* Header with dark background */}
+                <div className="bg-gray-800 text-white -m-[20mm] mb-8 p-[20mm] pb-6">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h1 className="text-4xl font-bold">INVOICE</h1>
+                        </div>
+                        {invoice.companyLogoUrl && (
+                            <img src={invoice.companyLogoUrl} alt="Company Logo" className="max-h-16 bg-white p-2 rounded" />
+                        )}
+                    </div>
+                    <p className="text-gray-300 mt-2">#{invoice.invoiceNumber}</p>
+                </div>
+
+                {/* From/To Section */}
+                <div className="grid grid-cols-2 gap-8 mb-8">
+                    <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">From</p>
+                        <p className="font-bold text-gray-900">{invoice.from.name}</p>
+                        <p className="text-sm text-gray-600">{invoice.from.address}</p>
+                        <p className="text-sm text-gray-600">{invoice.from.email}</p>
+                        <p className="text-sm text-gray-600">{invoice.from.phone}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Bill To</p>
+                        <p className="font-bold text-gray-900">{invoice.to.name}</p>
+                        <p className="text-sm text-gray-600">{invoice.to.address}</p>
+                        <p className="text-sm text-gray-600">{invoice.to.email}</p>
+                        <p className="text-sm text-gray-600">{invoice.to.phone}</p>
+                    </div>
+                </div>
+
+                {/* Dates */}
+                <div className="flex justify-between mb-6 text-sm">
+                    <p><span className="text-gray-500">Issue Date:</span> <span className="font-medium">{invoice.issuedDate}</span></p>
+                    <p><span className="text-gray-500">Due Date:</span> <span className="font-medium">{invoice.dueDate}</span></p>
+                </div>
+
+                {/* Items Table */}
+                <table className="w-full mb-8">
+                    <thead className="bg-gray-100 border-b border-gray-200">
+                        <tr>
+                            <th className="text-left font-bold text-xs uppercase py-3 px-2 text-gray-700">Description</th>
+                            <th className="text-center font-bold text-xs uppercase py-3 px-2 text-gray-700 w-20">Qty</th>
+                            <th className="text-right font-bold text-xs uppercase py-3 px-2 text-gray-700 w-32">Price</th>
+                            <th className="text-right font-bold text-xs uppercase py-3 px-2 text-gray-700 w-32">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {invoice.items.map((item, idx) => (
+                            <tr key={item.id} className="border-b border-gray-100">
+                                <td className="py-3 px-2 text-sm text-gray-800">{item.description}</td>
+                                <td className="text-center py-3 px-2 text-sm text-gray-600">{item.units}</td>
+                                <td className="text-right py-3 px-2 text-sm text-gray-600">{formatCurrency(item.price)}</td>
+                                <td className="text-right py-3 px-2 text-sm font-medium text-gray-800">{formatCurrency(item.units * item.price)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                {/* Totals */}
+                <div className="flex justify-end mb-8">
+                    <div className="w-80">
+                        <div className="border-t border-gray-200 pt-4 space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Subtotal</span>
+                                <span className="font-medium">{formatCurrency(subtotal)}</span>
+                            </div>
+                            {vatRate > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">VAT ({vatRate}% {invoice.vatInclusive ? 'Inclusive' : 'Exclusive'})</span>
+                                    <span className="font-medium">{formatCurrency(vatAmount)}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between text-lg font-bold pt-2 border-t-2 border-gray-800">
+                                <span>TOTAL</span>
+                                <span>{formatCurrency(totalAmount)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Payment Details */}
+                {invoice.paymentDetails && (
+                    <div className="mb-8">
+                        <p className="text-xs font-bold text-gray-700 uppercase mb-3">Payment Details</p>
+                        <div className="text-sm text-gray-600 space-y-1">
+                            <p><span className="text-gray-500">Method:</span> {invoice.paymentDetails.method}</p>
+                            {invoice.paymentDetails.method === 'Bank Transfer' && (
+                                <>
+                                    {invoice.paymentDetails.bankName && <p><span className="text-gray-500">Bank:</span> {invoice.paymentDetails.bankName}</p>}
+                                    {invoice.paymentDetails.accountName && <p><span className="text-gray-500">Account Name:</span> {invoice.paymentDetails.accountName}</p>}
+                                    {invoice.paymentDetails.accountNumber && <p><span className="text-gray-500">Account Number:</span> {invoice.paymentDetails.accountNumber}</p>}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Notes */}
+                {invoice.notes && (
+                    <div className="mb-8">
+                        <p className="text-xs font-bold text-gray-700 uppercase mb-2">Notes</p>
+                        <p className="text-sm text-gray-600">{invoice.notes}</p>
+                    </div>
+                )}
+
+                {/* Signature */}
+                {invoice.signatureUrl && (
+                    <div className="mt-8 pt-6 border-t border-gray-200">
+                        <p className="text-xs font-bold text-gray-700 uppercase mb-3">Authorized Signature</p>
+                        <img src={invoice.signatureUrl} alt="Signature" className="max-h-16 max-w-xs" />
+                    </div>
+                )}
+
+                {/* Footer */}
+                <div className="mt-12 pt-6 border-t border-gray-200 text-center">
+                    <p className="text-xs text-gray-500">Thank you for your business!</p>
                 </div>
             </div>
         );

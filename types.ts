@@ -348,6 +348,11 @@ export interface Invoice extends FirestoreDocument {
     vatInclusive?: boolean; // true = VAT included in price, false = VAT added on top
     status: 'Draft' | 'Sent' | 'Paid';
     paidDate?: string;
+    template?: 'classic' | 'modern' | 'minimal' | 'professional' | 'pdf'; // Selected invoice template
+    invoiceNumber?: string; // Formatted invoice number (e.g., INV-202501-001)
+    clientName?: string; // Client name for easy filtering
+    clientEmail?: string; // Client email
+    clientAddress?: string; // Client address
 }
 
 export type NotificationType = 'Order' | 'Driver' | 'Vehicle' | 'System';

@@ -202,3 +202,99 @@ export const uploadProofOfDelivery = async (
         throw new Error('Failed to upload proof of delivery');
     }
 };
+
+/**
+ * Convert base64 data URL to Blob
+ */
+const dataURLtoBlob = (dataURL: string): Blob => {
+    const arr = dataURL.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+};
+
+/**
+ * Upload invoice company logo from base64 data URL
+ * @param dataURL - Base64 data URL of the logo
+ * @param organizationId - The organization's ID
+ * @returns The download URL of the uploaded logo
+ */
+export const uploadInvoiceLogo = async (
+    dataURL: string,
+    organizationId: string
+): Promise<string> => {
+    try {
+        // Convert data URL to Blob
+        const blob = dataURLtoBlob(dataURL);
+
+        const timestamp = Date.now();
+        const fileName = `logo_${timestamp}.png`;
+
+        // Create storage reference
+        const storageRef = ref(storage, `organizations/${organizationId}/invoices/logos/${fileName}`);
+
+        // Upload blob
+        const snapshot = await uploadBytes(storageRef, blob, {
+            contentType: 'image/png',
+            customMetadata: {
+                organizationId: organizationId,
+                documentType: 'invoice-logo',
+                uploadedAt: new Date().toISOString(),
+            }
+        });
+
+        // Get download URL
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        return downloadURL;
+    } catch (error) {
+        console.error('Error uploading invoice logo:', error);
+        throw new Error('Failed to upload invoice logo');
+    }
+};
+
+/**
+ * Upload invoice signature from base64 data URL
+ * @param dataURL - Base64 data URL of the signature
+ * @param organizationId - The organization's ID
+ * @returns The download URL of the uploaded signature
+ */
+export const uploadInvoiceSignature = async (
+    dataURL: string,
+    organizationId: string
+): Promise<string> => {
+    try {
+        // Convert data URL to Blob
+        const blob = dataURLtoBlob(dataURL);
+
+        const timestamp = Date.now();
+        const fileName = `signature_${timestamp}.png`;
+
+        // Create storage reference
+        const storageRef = ref(storage, `organizations/${organizationId}/invoices/signatures/${fileName}`);
+
+        // Upload blob
+        const snapshot = await uploadBytes(storageRef, blob, {
+            contentType: 'image/png',
+            customMetadata: {
+                organizationId: organizationId,
+                documentType: 'invoice-signature',
+                uploadedAt: new Date().toISOString(),
+            }
+        });
+
+        // Get download URL
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        return downloadURL;
+    } catch (error) {
+        console.error('Error uploading invoice signature:', error);
+        throw new Error('Failed to upload invoice signature');
+    }
+};
