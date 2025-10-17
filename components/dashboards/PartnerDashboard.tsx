@@ -192,6 +192,7 @@ interface DashboardViewProps {
   onManageFunds: () => void;
   // Driver actions
   onDriverSendFunds: (driver: Driver) => void;
+  onDriverManageWallet: (driver: Driver) => void;
   onDriverViewDetails: (driver: Driver) => void;
   onDriverRemove: (driver: Driver) => void;
   onDriverEditPay: (driver: Driver) => void;
@@ -225,6 +226,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
     walletBalance,
     onManageFunds,
     onDriverSendFunds,
+    onDriverManageWallet,
     onDriverViewDetails,
     onDriverRemove,
     onDriverEditPay,
@@ -365,6 +367,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
                 drivers={drivers.slice(0, 4)}
                 onViewAll={() => setActiveNav('Drivers')}
                 onSendFunds={onDriverSendFunds}
+                onManageWallet={onDriverManageWallet}
                 onViewDetails={onDriverViewDetails}
                 onRemove={onDriverRemove}
                 onEditPay={onDriverEditPay}
@@ -845,9 +848,14 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
     setRouteStatusFilter('Pending');
   };
 
-  const handleDriverAction = (action: 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'editDriverPay' | 'editDriver', driver: Driver) => {
+  const handleDriverAction = (action: 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'editDriverPay' | 'editDriver' | 'manageDriverWallet', driver: Driver) => {
     setSelectedItem(driver);
-    setActiveModal(action);
+    if (action === 'manageDriverWallet' || action === 'sendFunds') {
+      // Both "Send Funds" and "Manage Wallet" use the same modal
+      setActiveModal('manageFunds');
+    } else {
+      setActiveModal(action);
+    }
   };
 
   const handleRemoveDriver = async (driverId: string | number) => {
@@ -1295,8 +1303,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
         return <AssignDriverModal onClose={() => setActiveModal(null)} route={selectedItem as Route} drivers={drivers.filter(d => d.status === 'Idle' || d.status === 'Available')} vehicles={vehicles.filter(v => v.status === 'Active' || v.status === 'Parked')} onAssign={handleAssignDriver} />;
       case 'viewPOD':
         return <ProofOfDeliveryModal onClose={() => setActiveModal(null)} route={selectedItem as Route} />;
-      case 'sendFunds':
-        return <SendFundsModal onClose={() => setActiveModal(null)} driver={selectedItem as Driver} />;
       case 'driverDetails':
         return <DriverDetailsModal onClose={() => setActiveModal(null)} driver={selectedItem as Driver} />;
       case 'confirmRemoval':
@@ -1348,8 +1354,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
             confirmButtonClass="bg-red-600 hover:bg-red-700"
         />;
       case 'manageFunds':
+        const driverForWallet = selectedItem as Driver | null;
         return <ManageFundsModal
-            currentBalance={organizationWalletBalance}
+            currentBalance={driverForWallet ? (driverForWallet.walletBalance || 0) : organizationWalletBalance}
+            driverId={driverForWallet?.id}
+            driverName={driverForWallet?.name}
+            driverEmail={driverForWallet?.email}
+            organizationId={organizationId}
             onClose={() => setActiveModal(null)}
             onAddFunds={handleAddFunds}
         />;
@@ -1406,6 +1417,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
             walletBalance={organizationWalletBalance}
             onManageFunds={() => setActiveModal('manageFunds')}
             onDriverSendFunds={(driver) => { setSelectedItem(driver); setActiveModal('sendFunds'); }}
+            onDriverManageWallet={(driver) => handleDriverAction('manageDriverWallet', driver)}
             onDriverViewDetails={(driver) => { setSelectedItem(driver); setActiveModal('driverDetails'); }}
             onDriverRemove={(driver) => { setSelectedItem(driver); setActiveModal('confirmRemoval'); }}
             onDriverEditPay={(driver) => { setSelectedItem(driver); setActiveModal('editDriverPay'); }}
@@ -1420,7 +1432,21 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
       case 'Map':
         return <MapScreen items={drivers} />;
       case 'Drivers':
-        return <DriversScreen setActiveModal={(modal) => handleShowModal(modal)} drivers={drivers} onSendFunds={(driver) => handleDriverAction('sendFunds', driver)} onViewDetails={(driver) => handleDriverAction('driverDetails', driver)} onRemove={(driver) => handleDriverAction('confirmRemoval', driver)} onEditPay={(driver) => handleDriverAction('editDriverPay', driver)} onEditDriver={(driver) => handleDriverAction('editDriver', driver)} dateRange={dateRange} selectedDriver1={analyticsDriver1} onDriver1Change={setAnalyticsDriver1} selectedDriver2={analyticsDriver2} onDriver2Change={setAnalyticsDriver2} />;
+        return <DriversScreen
+          setActiveModal={(modal) => handleShowModal(modal)}
+          drivers={drivers}
+          onSendFunds={(driver) => handleDriverAction('sendFunds', driver)}
+          onManageWallet={(driver) => handleDriverAction('manageDriverWallet', driver)}
+          onViewDetails={(driver) => handleDriverAction('driverDetails', driver)}
+          onRemove={(driver) => handleDriverAction('confirmRemoval', driver)}
+          onEditPay={(driver) => handleDriverAction('editDriverPay', driver)}
+          onEditDriver={(driver) => handleDriverAction('editDriver', driver)}
+          dateRange={dateRange}
+          selectedDriver1={analyticsDriver1}
+          onDriver1Change={setAnalyticsDriver1}
+          selectedDriver2={analyticsDriver2}
+          onDriver2Change={setAnalyticsDriver2}
+        />;
       case 'Vehicles':
         return <VehiclesScreen
           vehicles={vehicles}
@@ -1517,6 +1543,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role }) =
             walletBalance={organizationWalletBalance}
             onManageFunds={() => setActiveModal('manageFunds')}
             onDriverSendFunds={(driver) => { setSelectedItem(driver); setActiveModal('sendFunds'); }}
+            onDriverManageWallet={(driver) => handleDriverAction('manageDriverWallet', driver)}
             onDriverViewDetails={(driver) => { setSelectedItem(driver); setActiveModal('driverDetails'); }}
             onDriverRemove={(driver) => { setSelectedItem(driver); setActiveModal('confirmRemoval'); }}
             onDriverEditPay={(driver) => { setSelectedItem(driver); setActiveModal('editDriverPay'); }}

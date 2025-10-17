@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Driver } from '../types';
-import { EllipsisHorizontalIcon, CurrencyDollarIcon, EyeIcon, TrashIcon, PencilIcon } from './Icons';
+import { EllipsisHorizontalIcon, CurrencyDollarIcon, EyeIcon, TrashIcon, PencilIcon, WalletIcon } from './Icons';
 
 const StatusBadge: React.FC<{ status: Driver['status'] }> = ({ status }) => {
     const { t } = useTranslation();
@@ -30,6 +30,7 @@ interface DriversTableProps {
     showViewAllButton?: boolean;
     onViewAll?: () => void;
     onSendFunds?: (driver: Driver) => void;
+    onManageWallet?: (driver: Driver) => void;
     onViewDetails?: (driver: Driver) => void;
     onRemove?: (driver: Driver) => void;
     onEditPay?: (driver: Driver) => void;
@@ -41,6 +42,7 @@ const DriversTable: React.FC<DriversTableProps> = ({
     showViewAllButton = true,
     onViewAll,
     onSendFunds,
+    onManageWallet,
     onViewDetails,
     onRemove,
     onEditPay,
@@ -140,6 +142,9 @@ const DriversTable: React.FC<DriversTableProps> = ({
                                         </button>
                                         {openMenuId === driver.id && (
                                             <div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl z-10 border dark:border-slate-700">
+                                                <button onClick={() => { onManageWallet?.(driver); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800">
+                                                    <WalletIcon className="w-5 h-5 text-green-500"/> Manage Wallet
+                                                </button>
                                                 <button onClick={() => { onSendFunds?.(driver); setOpenMenuId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800">
                                                     <CurrencyDollarIcon className="w-5 h-5 text-gray-500"/> {t('components.driversTable.sendFunds')}
                                                 </button>

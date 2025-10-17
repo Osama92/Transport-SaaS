@@ -1,19 +1,35 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ModalBase from './ModalBase';
+import PaystackWalletFunding from '../PaystackWalletFunding';
 
 interface ManageFundsModalProps {
     currentBalance: number;
+    driverId?: string;
+    driverName?: string;
+    driverEmail?: string;
+    organizationId?: string;
     onClose: () => void;
     onAddFunds: (amount: number, method: string) => Promise<void>;
+    onSuccess?: () => void;
 }
 
-const ManageFundsModal: React.FC<ManageFundsModalProps> = ({ currentBalance, onClose, onAddFunds }) => {
+const ManageFundsModal: React.FC<ManageFundsModalProps> = ({
+    currentBalance,
+    driverId,
+    driverName,
+    driverEmail,
+    organizationId,
+    onClose,
+    onAddFunds,
+    onSuccess
+}) => {
     const { t } = useTranslation();
     const [amount, setAmount] = useState<string>('');
-    const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'card' | 'manual'>('manual');
+    const [paymentMethod, setPaymentMethod] = useState<'paystack' | 'bank_transfer' | 'card' | 'manual'>('paystack');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showPaystackModal, setShowPaystackModal] = useState(false);
 
     const quickAmounts = [10000, 50000, 100000, 500000, 1000000];
 
@@ -36,11 +52,18 @@ const ManageFundsModal: React.FC<ManageFundsModalProps> = ({ currentBalance, onC
             return;
         }
 
-        if (numericAmount < 1000) {
-            setError('Minimum top-up amount is ₦1,000');
+        if (numericAmount < 100) {
+            setError('Minimum top-up amount is ₦100');
             return;
         }
 
+        // If Paystack payment method is selected and we have driver info, show Paystack modal
+        if (paymentMethod === 'paystack' && driverId && driverName && organizationId) {
+            setShowPaystackModal(true);
+            return;
+        }
+
+        // Otherwise, use the manual method
         setIsSubmitting(true);
         try {
             await onAddFunds(numericAmount, paymentMethod);
@@ -57,6 +80,7 @@ const ManageFundsModal: React.FC<ManageFundsModalProps> = ({ currentBalance, onC
     };
 
     return (
+        <>
         <ModalBase isOpen={true} onClose={onClose} title="Manage Wallet Funds">
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Current Balance Display */}
@@ -121,7 +145,36 @@ const ManageFundsModal: React.FC<ManageFundsModalProps> = ({ currentBalance, onC
                         Payment Method
                     </label>
                     <div className="space-y-2">
-                        {/* Manual Top-Up (For Now) */}
+                        {/* Paystack Payment (Active) */}
+                        <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                            paymentMethod === 'paystack'
+                                ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                : 'border-gray-200 dark:border-slate-600 hover:border-gray-300'
+                        }`}>
+                            <input
+                                type="radio"
+                                name="paymentMethod"
+                                value="paystack"
+                                checked={paymentMethod === 'paystack'}
+                                onChange={(e) => setPaymentMethod(e.target.value as 'paystack')}
+                                className="w-4 h-4 text-green-600"
+                            />
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                        Paystack (Recommended)
+                                    </p>
+                                    <span className="px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded">
+                                        Active
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Pay with card, bank transfer, or USSD
+                                </p>
+                            </div>
+                        </label>
+
+                        {/* Manual Top-Up (For Testing) */}
                         <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
                             paymentMethod === 'manual'
                                 ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
@@ -228,6 +281,23 @@ const ManageFundsModal: React.FC<ManageFundsModalProps> = ({ currentBalance, onC
                 </div>
             </form>
         </ModalBase>
+
+        {/* Paystack Payment Modal */}
+        {showPaystackModal && driverId && driverName && organizationId && (
+            <PaystackWalletFunding
+                driverId={driverId}
+                driverName={driverName}
+                driverEmail={driverEmail || ''}
+                organizationId={organizationId}
+                onSuccess={() => {
+                    setShowPaystackModal(false);
+                    if (onSuccess) onSuccess();
+                    onClose();
+                }}
+                onClose={() => setShowPaystackModal(false)}
+            />
+        )}
+        </>
     );
 };
 

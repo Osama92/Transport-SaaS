@@ -54,9 +54,13 @@ service cloud.firestore {
 
     // Drivers collection - organization-scoped
     match /drivers/{driverId} {
-      allow read: if belongsToUserOrg();
+      // Allow reading driver by username for authentication (anyone can query)
+      allow read: if belongsToUserOrg() ||
+                    isAuthenticated();
       allow create: if requestBelongsToUserOrg();
-      allow update: if belongsToUserOrg();
+      // Allow drivers to update their own last login time
+      allow update: if belongsToUserOrg() ||
+                     (isAuthenticated() && resource.data.firebaseAuthUid == request.auth.uid);
       allow delete: if belongsToUserOrg();
 
       // Driver performance history subcollection

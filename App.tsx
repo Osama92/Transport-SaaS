@@ -9,6 +9,8 @@ import SubscriptionPage from './components/SubscriptionPage';
 import AuthLayout from './components/AuthLayout';
 import DriverPortalLogin from './components/DriverPortalLogin';
 import DriverPortalProfessional from './components/DriverPortalProfessional';
+import DriverPhoneLogin from './components/driver-portal/DriverPhoneLogin';
+import DriverDashboardWallet from './components/driver-portal/DriverDashboardWallet';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import type { Driver } from './types';
 
@@ -93,14 +95,25 @@ const AppContent: React.FC = () => {
         );
     }
 
-    // Driver Portal Route
+    // Driver Portal Route (Old version with username/password)
     const isDriverPortalRoute = window.location.pathname === '/driver-portal' || window.location.pathname.startsWith('/driver-portal');
+
+    // New Wallet Driver Portal Route (Phone-based with wallet)
+    const isWalletPortalRoute = window.location.pathname === '/driver-wallet' || window.location.pathname.startsWith('/driver-wallet');
 
     if (isDriverPortalRoute) {
         if (driverSession) {
             return <DriverPortalProfessional driver={driverSession} onLogout={handleDriverLogout} />;
         } else {
             return <DriverPortalLogin onLoginSuccess={handleDriverLogin} />;
+        }
+    }
+
+    if (isWalletPortalRoute) {
+        if (driverSession) {
+            return <DriverDashboardWallet driver={driverSession} onLogout={handleDriverLogout} />;
+        } else {
+            return <DriverPhoneLogin onLoginSuccess={handleDriverLogin} />;
         }
     }
 

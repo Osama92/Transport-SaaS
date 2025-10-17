@@ -32,7 +32,10 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
 
     const handleSetCredentials = async (driverId: string, username: string, password: string) => {
         await setDriverCredentials(driverId, username, password);
-        alert(`Credentials set successfully!\n\nUsername: ${username}\nPassword: ${password}\n\nShare these with the driver. They can login at /driver-portal`);
+        alert(`Driver account created successfully!\n\nUsername: ${username}\nPassword: ${password}\n\nShare these with the driver. They can login at /driver-portal\n\nIMPORTANT: This page will now refresh.`);
+
+        // Refresh page after creating driver account
+        window.location.reload();
     };
 
     const handleResetDriverStatus = async (driver: Driver) => {

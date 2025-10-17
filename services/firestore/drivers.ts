@@ -13,9 +13,17 @@ import {
     serverTimestamp,
     Timestamp
 } from 'firebase/firestore';
-import { db } from '../../firebase/firebaseConfig';
+import {
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    updatePassword as firebaseUpdatePassword,
+    deleteUser
+} from 'firebase/auth';
+import { db, auth } from '../../firebase/firebaseConfig';
 import { generateDriverId } from './utils';
 import type { Driver } from '../../types';
+import { validateNigerianPhone } from '../phoneValidation';
+import { paystackWalletService } from '../paystack/paystackWalletService';
 
 // Collection reference
 const DRIVERS_COLLECTION = 'drivers';
@@ -122,6 +130,18 @@ export const createDriver = async (
             } : null,
             safetyScore: driverData.safetyScore || 0,
             walletBalance: 0, // Initialize wallet balance to 0
+            walletCurrency: 'NGN', // Nigerian Naira
+            phoneVerified: false, // Will be verified on first login
+            portalAccess: {
+                enabled: true,
+                whatsappNotifications: true,
+                loginAttempts: 0
+            },
+            transactionLimits: {
+                dailyWithdrawalLimit: 50000, // ₦50,000 daily limit
+                singleTransactionLimit: 20000, // ₦20,000 per transaction
+                monthlyWithdrawalLimit: 500000, // ₦500,000 monthly limit
+            },
             payrollInfo: {
                 baseSalary: driverData.payrollInfo?.baseSalary || driverData.baseSalary || 0,
                 pensionContributionRate: driverData.payrollInfo?.pensionContributionRate || driverData.pensionContributionRate || 8,
@@ -132,6 +152,13 @@ export const createDriver = async (
             createdBy: userId,
         };
 
+        // Validate phone number
+        const phoneValidation = validateNigerianPhone(driverData.phone);
+        if (!phoneValidation.isValid) {
+            throw new Error(phoneValidation.error || 'Invalid phone number format');
+        }
+        newDriver.phone = phoneValidation.formatted; // Store in international format
+
         // Add bank info if provided
         if (driverData.bankInfo) {
             newDriver.bankInfo = {
@@ -139,11 +166,20 @@ export const createDriver = async (
                 accountName: driverData.bankInfo.accountName,
                 bankName: driverData.bankInfo.bankName,
                 bankCode: driverData.bankInfo.bankCode || null,
+                verified: false, // Will be verified later
             };
         }
 
         // Use setDoc with the readable ID
         await setDoc(driverRef, newDriver);
+
+        // Initialize Paystack wallet asynchronously (don't block driver creation)
+        // This creates a dedicated virtual account for the driver
+        initializeDriverWallet(driverId, newDriver).catch((error) => {
+            console.error(`Failed to initialize wallet for driver ${driverId}:`, error);
+            // Log but don't throw - wallet can be created later
+        });
+
         return driverId;
     } catch (error) {
         console.error('Error creating driver:', error);
@@ -294,19 +330,9 @@ export const getDriversByStatus = async (
 };
 
 /**
- * Simple password hashing function using Web Crypto API
- */
-async function hashPassword(password: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
-}
-
-/**
- * Set driver portal credentials (username and password)
+ * Set driver portal credentials using Firebase Authentication
+ * Creates a Firebase Auth user and links it to the driver document
+ * NOTE: This will temporarily sign in as the driver, then sign back in as the current user
  */
 export const setDriverCredentials = async (
     driverId: string,
@@ -314,71 +340,191 @@ export const setDriverCredentials = async (
     password: string
 ): Promise<void> => {
     try {
-        // Hash the password
-        const hashedPassword = await hashPassword(password);
+        console.log('[AUTH] Setting credentials for driver:', driverId);
 
-        // Update driver with credentials
+        // Save current user's credentials to sign back in later
+        const currentUser = auth.currentUser;
+        if (!currentUser || !currentUser.email) {
+            throw new Error('No authenticated user found. Please sign in first.');
+        }
+
+        const currentUserEmail = currentUser.email;
+        console.log('[AUTH] Current user:', currentUserEmail);
+
+        // Get driver document
         const driverRef = doc(db, DRIVERS_COLLECTION, driverId);
-        await updateDoc(driverRef, {
-            username,
-            hashedPassword,
-            'portalAccess.enabled': true,
-            'portalAccess.whatsappNotifications': true,
-            updatedAt: serverTimestamp()
-        });
+        const driverSnap = await getDoc(driverRef);
+
+        if (!driverSnap.exists()) {
+            throw new Error('Driver not found');
+        }
+
+        const driverData = driverSnap.data();
+
+        // Create email from username for Firebase Auth
+        // Format: username@driver.internal (this won't be used for actual email)
+        const authEmail = `${username}@driver.internal`;
+
+        try {
+            // Create new Firebase Auth user (this will sign in as the driver)
+            const userCredential = await createUserWithEmailAndPassword(auth, authEmail, password);
+            console.log('[AUTH] Created Firebase Auth user:', userCredential.user.uid);
+
+            // Update driver document with Firebase Auth UID and username
+            await updateDoc(driverRef, {
+                username,
+                firebaseAuthUid: userCredential.user.uid,
+                authEmail: authEmail,
+                'portalAccess.enabled': true,
+                'portalAccess.whatsappNotifications': true,
+                updatedAt: serverTimestamp()
+            });
+
+            console.log('[AUTH] Credentials set successfully');
+            console.log('[AUTH] Driver account created, please refresh the page');
+
+        } catch (authError: any) {
+            // If user already exists
+            if (authError.code === 'auth/email-already-in-use') {
+                console.log('[AUTH] User already exists');
+
+                // Just update the driver document
+                await updateDoc(driverRef, {
+                    username,
+                    authEmail: authEmail,
+                    'portalAccess.enabled': true,
+                    'portalAccess.whatsappNotifications': true,
+                    updatedAt: serverTimestamp()
+                });
+
+                console.log('[AUTH] Updated driver credentials');
+            } else {
+                throw authError;
+            }
+        }
+
     } catch (error) {
-        console.error('Error setting driver credentials:', error);
-        throw new Error('Failed to set driver credentials');
+        console.error('[AUTH] Error setting driver credentials:', error);
+        throw error;
     }
 };
 
 /**
- * Authenticate driver with username and password
+ * Authenticate driver with username and password using Firebase Auth
  */
 export const authenticateDriver = async (
     username: string,
     password: string
 ): Promise<Driver | null> => {
     try {
-        // Query for driver by username
+        console.log('[AUTH] Attempting to authenticate driver:', username);
+
+        // Query for driver by username to get auth email
         const driversRef = collection(db, DRIVERS_COLLECTION);
         const q = query(driversRef, where('username', '==', username));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
+            console.log('[AUTH] No driver found with username:', username);
             return null;
         }
 
         const driverDoc = querySnapshot.docs[0];
         const driverData = driverDoc.data();
 
-        // Hash the provided password and compare
-        const hashedPassword = await hashPassword(password);
+        console.log('[AUTH] Found driver, authenticating with Firebase Auth...');
 
-        if (driverData.hashedPassword !== hashedPassword) {
-            return null;
+        // Get auth email (format: username@driver.internal)
+        const authEmail = driverData.authEmail || `${username}@driver.internal`;
+
+        try {
+            // Authenticate with Firebase Auth
+            const userCredential = await signInWithEmailAndPassword(auth, authEmail, password);
+            console.log('[AUTH] Firebase Auth successful:', userCredential.user.uid);
+
+            // Update last login
+            await updateDoc(driverDoc.ref, {
+                'portalAccess.lastLogin': serverTimestamp()
+            });
+
+            // Return driver data
+            return {
+                id: driverDoc.id,
+                ...driverData,
+                createdAt: driverData.createdAt instanceof Timestamp ? driverData.createdAt.toDate().toISOString() : driverData.createdAt,
+                updatedAt: driverData.updatedAt instanceof Timestamp ? driverData.updatedAt.toDate().toISOString() : driverData.updatedAt,
+                lat: driverData.locationData?.lat,
+                lng: driverData.locationData?.lng,
+                baseSalary: driverData.payrollInfo?.baseSalary,
+                pensionContributionRate: driverData.payrollInfo?.pensionContributionRate,
+                nhfContributionRate: driverData.payrollInfo?.nhfContributionRate,
+            } as Driver;
+        } catch (authError: any) {
+            console.error('[AUTH] Firebase Auth failed:', authError.code, authError.message);
+
+            // Check for specific auth errors
+            if (authError.code === 'auth/wrong-password' || authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') {
+                console.log('[AUTH] Invalid credentials');
+                return null;
+            }
+
+            throw authError;
+        }
+    } catch (error) {
+        console.error('[AUTH] Error authenticating driver:', error);
+        throw new Error('Failed to authenticate driver');
+    }
+};
+
+/**
+ * Initialize Paystack wallet for a driver
+ * Creates dedicated virtual account and customer
+ */
+const initializeDriverWallet = async (driverId: string, driverData: any): Promise<void> => {
+    try {
+        console.log(`[WALLET] Initializing Paystack wallet for driver ${driverId}...`);
+
+        const driver: Driver = {
+            id: driverId,
+            ...driverData
+        } as Driver;
+
+        // Step 1: Create Paystack customer
+        const customerResult = await paystackWalletService.createCustomer(driver);
+        if (customerResult.success && customerResult.data) {
+            console.log(`[WALLET] Created Paystack customer for driver ${driverId}: ${customerResult.data.customer_code}`);
         }
 
-        // Update last login
-        await updateDoc(driverDoc.ref, {
-            'portalAccess.lastLogin': serverTimestamp()
-        });
+        // Step 2: Create dedicated virtual account (DVA)
+        const dvaResult = await paystackWalletService.createDedicatedVirtualAccount(driver);
+        if (dvaResult.success && dvaResult.data) {
+            console.log(`[WALLET] Created virtual account for driver ${driverId}:`);
+            console.log(`  - Account Number: ${dvaResult.data.account_number}`);
+            console.log(`  - Bank: ${dvaResult.data.bank_name}`);
+        } else {
+            console.warn(`[WALLET] Failed to create virtual account for driver ${driverId}:`, dvaResult.error);
+        }
 
-        // Return driver data
-        return {
-            id: driverDoc.id,
-            ...driverData,
-            createdAt: driverData.createdAt instanceof Timestamp ? driverData.createdAt.toDate().toISOString() : driverData.createdAt,
-            updatedAt: driverData.updatedAt instanceof Timestamp ? driverData.updatedAt.toDate().toISOString() : driverData.updatedAt,
-            lat: driverData.locationData?.lat,
-            lng: driverData.locationData?.lng,
-            baseSalary: driverData.payrollInfo?.baseSalary,
-            pensionContributionRate: driverData.payrollInfo?.pensionContributionRate,
-            nhfContributionRate: driverData.payrollInfo?.nhfContributionRate,
-        } as Driver;
+        // Step 3: If bank info provided, create transfer recipient
+        if (driverData.bankInfo?.accountNumber && driverData.bankInfo?.bankCode) {
+            const recipientResult = await paystackWalletService.createTransferRecipient(
+                driverId,
+                {
+                    accountNumber: driverData.bankInfo.accountNumber,
+                    accountName: driverData.bankInfo.accountName,
+                    bankCode: driverData.bankInfo.bankCode
+                }
+            );
+
+            if (recipientResult.success) {
+                console.log(`[WALLET] Created transfer recipient for driver ${driverId}`);
+            }
+        }
+
+        console.log(`[WALLET] Wallet initialization complete for driver ${driverId}`);
     } catch (error) {
-        console.error('Error authenticating driver:', error);
-        throw new Error('Failed to authenticate driver');
+        console.error(`[WALLET] Error initializing wallet for driver ${driverId}:`, error);
+        throw error;
     }
 };
 
@@ -404,6 +550,7 @@ export const migrateDriversAddWalletBalance = async (organizationId: string): Pr
             if (driverData.walletBalance === undefined) {
                 await updateDoc(driverDoc.ref, {
                     walletBalance: 0,
+                    walletCurrency: 'NGN',
                     updatedAt: serverTimestamp(),
                 });
                 migratedCount++;

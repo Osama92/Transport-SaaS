@@ -146,7 +146,8 @@ export interface Driver extends FirestoreDocument {
     avatar: string;
     photo?: string; // Alias for avatar
     licenseNumber: string;
-    phone: string;
+    phone: string; // Required: Primary phone number for authentication
+    phoneVerified?: boolean; // Whether phone number has been verified
     nin?: string;
     licensePhotoUrl?: string;
     currentRouteId?: string; // Currently assigned route
@@ -157,32 +158,98 @@ export interface Driver extends FirestoreDocument {
         lastUpdated: Timestamp | string;
     };
     safetyScore?: number;
-    // Driver Portal Access
-    username?: string; // For driver portal login
-    hashedPassword?: string; // Hashed password for security
+    // Driver Portal Access (Updated for phone-based auth)
+    username?: string; // DEPRECATED: For driver portal login (use phone instead)
+    hashedPassword?: string; // DEPRECATED: Hashed password for security (use OTP instead)
     portalAccess?: {
         enabled: boolean;
         lastLogin?: string;
+        lastLoginIP?: string;
+        loginAttempts?: number; // For rate limiting
+        lastOTPRequest?: string; // Track OTP request frequency
         whatsappNotifications: boolean;
     };
+    // Paystack Wallet Integration
+    paystack?: {
+        subaccountCode?: string; // Paystack subaccount code
+        virtualAccountNumber?: string; // Dedicated virtual account number
+        virtualAccountBank?: string; // Bank name for virtual account
+        customerCode?: string; // Paystack customer code
+        recipientCode?: string; // Transfer recipient code (for withdrawals)
+    };
+    walletBalance: number; // Driver's current wallet balance (default: 0)
+    walletCurrency: string; // Wallet currency (default: NGN)
+    // Transaction Limits
+    transactionLimits?: {
+        dailyWithdrawalLimit: number; // Max daily withdrawal
+        singleTransactionLimit: number; // Max single transaction
+        monthlyWithdrawalLimit: number; // Max monthly withdrawal
+    };
+    // Payroll Information
     payrollInfo: {
         baseSalary: number; // Annual base salary
         pensionContributionRate: number; // Employee's contribution percentage, e.g., 8 for 8%
         nhfContributionRate: number; // National Housing Fund contribution, e.g., 2.5 for 2.5%
     };
+    // Bank Information (for withdrawals)
     bankInfo?: {
         accountNumber: string;
         accountName: string;
         bankName: string;
         bankCode?: string; // For Nigerian banks (e.g., GTB = 058)
+        verified?: boolean; // Whether bank account has been verified
     };
-    walletBalance?: number; // Driver's current wallet balance for withdrawals
+    // KYC Information
+    kyc?: {
+        status: 'pending' | 'verified' | 'rejected';
+        bvn?: string; // Bank Verification Number
+        governmentIdUrl?: string; // URL to government ID
+        selfieUrl?: string; // URL to selfie photo
+        verifiedAt?: string;
+    };
     // Deprecated fields (for backward compatibility)
     lat?: number;
     lng?: number;
     baseSalary?: number;
     pensionContributionRate?: number;
     nhfContributionRate?: number;
+}
+
+// Wallet Transaction Types
+export interface WalletTransaction extends FirestoreDocument {
+    id: string;
+    driverId: string;
+    organizationId: string;
+    type: 'credit' | 'debit'; // Money in or out
+    amount: number;
+    currency: string;
+    balanceBefore: number; // Balance before transaction
+    balanceAfter: number; // Balance after transaction
+    status: 'pending' | 'success' | 'failed' | 'reversed';
+    reference: string; // Unique transaction reference
+    description: string;
+    // Payment Method Details
+    paymentMethod: 'paystack' | 'bank_transfer' | 'cash' | 'manual';
+    paystackReference?: string; // Paystack transaction reference
+    transferCode?: string; // Paystack transfer code (for withdrawals)
+    // Recipient Details (for debit transactions)
+    recipient?: {
+        accountNumber?: string;
+        accountName?: string;
+        bankName?: string;
+        bankCode?: string;
+    };
+    // Metadata
+    metadata?: {
+        source?: string; // Where the transaction originated (e.g., 'wallet_funding', 'route_payment', 'withdrawal')
+        notes?: string;
+        adminId?: string; // If manual transaction
+        ipAddress?: string;
+    };
+    // Timestamps
+    initiatedAt?: Timestamp | string;
+    completedAt?: Timestamp | string;
+    failedAt?: Timestamp | string;
 }
 
 export interface Expense {

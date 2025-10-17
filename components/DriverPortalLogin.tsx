@@ -18,17 +18,27 @@ const DriverPortalLogin: React.FC<DriverPortalLoginProps> = ({ onLoginSuccess })
         setError('');
         setLoading(true);
 
+        console.log('[LOGIN] Starting login attempt');
+        console.log('[LOGIN] Username:', username);
+        console.log('[LOGIN] Password length:', password.length);
+        console.log('[LOGIN] Is secure context:', window.isSecureContext);
+        console.log('[LOGIN] Protocol:', window.location.protocol);
+        console.log('[LOGIN] Crypto.subtle available:', !!(crypto && crypto.subtle));
+
         try {
             const driver = await authenticateDriver(username, password);
 
             if (driver) {
+                console.log('[LOGIN] Authentication successful!');
                 // Store full driver object in localStorage for session persistence
                 localStorage.setItem('driverSession', JSON.stringify(driver));
                 onLoginSuccess(driver);
             } else {
+                console.log('[LOGIN] Authentication failed - null driver returned');
                 setError('Invalid username or password');
             }
         } catch (err: any) {
+            console.error('[LOGIN] Authentication error:', err);
             setError(err.message || 'Login failed. Please try again.');
         } finally {
             setLoading(false);

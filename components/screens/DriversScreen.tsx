@@ -8,6 +8,7 @@ interface DriversScreenProps {
     setActiveModal: (modal: 'addDriver') => void;
     drivers: Driver[];
     onSendFunds: (driver: Driver) => void;
+    onManageWallet?: (driver: Driver) => void;
     onViewDetails: (driver: Driver) => void;
     onRemove: (driver: Driver) => void;
     onEditPay: (driver: Driver) => void;
@@ -21,7 +22,7 @@ interface DriversScreenProps {
 
 const DriversScreen: React.FC<DriversScreenProps> = (props) => {
     const {
-        setActiveModal, drivers, onSendFunds, onViewDetails, onRemove, onEditPay, onEditDriver,
+        setActiveModal, drivers, onSendFunds, onManageWallet, onViewDetails, onRemove, onEditPay, onEditDriver,
         dateRange, selectedDriver1, onDriver1Change, selectedDriver2, onDriver2Change
     } = props;
     const [activeTab, setActiveTab] = useState<'all' | 'analytics'>('all');
@@ -73,6 +74,7 @@ const DriversScreen: React.FC<DriversScreenProps> = (props) => {
                         drivers={drivers}
                         showViewAllButton={false}
                         onSendFunds={onSendFunds}
+                        onManageWallet={onManageWallet}
                         onViewDetails={onViewDetails}
                         onRemove={onRemove}
                         onEditPay={onEditPay}
