@@ -6,8 +6,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import axios from 'axios';
-import * as cors from 'cors';
-import * as express from 'express';
+import cors from 'cors';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -46,8 +45,12 @@ export const createDriverVirtualAccount = functions.https.onCall(async (data, co
 
     const driver = driverDoc.data();
 
+    if (!driver) {
+      throw new functions.https.HttpsError('not-found', 'Driver data not found');
+    }
+
     // Check if virtual account already exists
-    if (driver?.wallet?.virtualAccountNumber) {
+    if (driver.wallet?.virtualAccountNumber) {
       return {
         success: true,
         message: 'Virtual account already exists',
@@ -128,8 +131,9 @@ export const paystackWebhook = functions.https.onRequest((req, res) => {
   corsHandler(req, res, async () => {
     try {
       // Verify webhook signature
-      const hash = req.headers['x-paystack-signature'];
       // TODO: Implement signature verification in production
+      // const hash = req.headers['x-paystack-signature'];
+      // Uncomment above and add verification logic before going to production
 
       const event = req.body;
 
@@ -283,14 +287,12 @@ export const processWithdrawal = functions.https.onCall(async (data, context) =>
       throw new functions.https.HttpsError('invalid-argument', 'Not a withdrawal transaction');
     }
 
-    // Get driver
+    // Get driver (to verify existence)
     const driverDoc = await db.collection('drivers').doc(transaction.driverId).get();
 
     if (!driverDoc.exists) {
       throw new functions.https.HttpsError('not-found', 'Driver not found');
     }
-
-    const driver = driverDoc.data();
 
     // Verify recipient bank account
     const verifyResponse = await axios.get(

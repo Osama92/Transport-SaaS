@@ -16,7 +16,10 @@
       "Bash(firebase --version)",
       "Bash(cat:*)",
       "Bash(git push:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(node --version:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm:*)"
     ],
     "deny": [],
     "ask": []
