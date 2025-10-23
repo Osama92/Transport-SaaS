@@ -1,0 +1,915 @@
+
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "details": "Details",
+    "actions": "Actions",
+    "status": "Status",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "address": "Address",
+    "all": "All",
+    "analytics": "Analytics",
+    "date": "Date",
+    "description": "Description",
+    "viewAll": "View All",
+    "remove": "Remove",
+    "edit": "Edit",
+    "delete": "Delete",
+    "view": "View",
+    "saveChanges": "Save Changes",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "error": "Error",
+    "success": "Success",
+    "loading": "Loading...",
+    "submit": "Submit",
+    "optional": "Optional",
+    "chooseFile": "Choose File",
+    "noFileChosen": "No file chosen",
+    "license": "License"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "map": "Map",
+    "analytics": "Analytics",
+    "materials": "Materials",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "drivers": "Drivers",
+    "vehicles": "Vehicles",
+    "routes": "Routes",
+    "fleet tracking": "Fleet Tracking",
+    "clients": "Clients",
+    "invoices": "Invoices",
+    "wallet": "Wallet",
+    "transporters": "Transporters",
+    "contacts": "Contacts",
+    "payroll": "Payroll",
+    "logout": "Logout"
+  },
+  "header": {
+    "greeting": {
+      "morning": "Good Morning",
+      "afternoon": "Good Afternoon",
+      "evening": "Good Evening"
+    },
+    "summary": "Here's your summary for today.",
+    "searchPlaceholder": "Search Shipment ID...",
+    "profileSettings": "Profile Settings",
+    "manageSubscription": "Manage Subscription"
+  },
+  "languages": {
+    "en": "English",
+    "ig": "Igbo",
+    "yo": "Yoruba",
+    "ha": "Hausa"
+  },
+  "auth": {
+    "welcomeTitle": "Welcome Back!",
+    "welcomeSubtitle": "Please enter your details to sign in.",
+    "createTitle": "Create an Account",
+    "createSubtitle": "Join us and start managing your shipments efficiently.",
+    "emailLabel": "Email Address",
+    "passwordLabel": "Password",
+    "forgotPassword": "Forgot Password?",
+    "loginButton": "Login",
+    "loggingIn": "Logging in...",
+    "dontHaveAccount": "Don't have an account?",
+    "signUp": "Sign Up",
+    "fullNameLabel": "Full Name",
+    "phoneLabel": "Phone Number",
+    "confirmPasswordLabel": "Confirm Password",
+    "createAccountButton": "Create Account",
+    "creatingAccount": "Creating Account...",
+    "alreadyHaveAccount": "Already have an account?",
+    "login": "Login",
+    "heroTitle": "Streamline Your Shipments",
+    "heroSubtitle": "Your all-in-one solution for transport management, analytics, and real-time tracking."
+  },
+  "onboarding": {
+    "roleTitle": "What's Your Role?",
+    "roleSubtitle": "Choose your role to get a personalized experience.",
+    "individualTitle": "Individual User",
+    "individualDesc": "For personal use, tracking individual shipments and managing deliveries.",
+    "businessTitle": "Business Owner",
+    "businessDesc": "Manage your business logistics, track multiple shipments, and analyze data.",
+    "partnerTitle": "Shipping Partner",
+    "partnerDesc": "For courier services and logistics partners to manage fleets and deliveries.",
+    "continue": "Continue"
+  },
+  "subscription": {
+    "choosePlanTitle": "Choose Your Plan",
+    "choosePlanSubtitle": "Select the best plan that fits your needs as a {{roleId}}.",
+    "back": "Back",
+    "skipForNow": "Skip for now",
+    "choosePlanButton": "Choose Plan",
+    "limits": {
+      "vehicles": "Vehicles",
+      "drivers": "Drivers",
+      "routes": "Routes",
+      "clients": "Clients"
+    },
+    "limitReached": {
+      "title": "Subscription Limit Reached",
+      "message": "You've reached the maximum number of {{resource}} allowed on your {{plan}} plan.",
+      "upgradePrompt": "Upgrade your subscription to add more resources and unlock additional features.",
+      "upgradeButton": "Upgrade Plan"
+    }
+  },
+  "partnerDashboard": {
+    "hubTitle": "Partner Operations Hub",
+    "hubSubtitle": "Manage your drivers, vehicles, routes, and clients.",
+    "availableBalance": "Available Balance",
+    "totalRouteAssigned": "Total Route Assigned",
+    "totalCompletedRoute": "Total Completed Route",
+    "pendingRoute": "Pending Route",
+    "thisMonth": "This month",
+    "awaitingStart": "Awaiting start",
+    "createRoute": "Create Route",
+    "addDriver": "Add Driver",
+    "addVehicle": "Add Vehicle",
+    "addClient": "Add Client"
+  },
+  "clients": {
+    "title": "All Clients",
+    "subtitle": "Your complete client directory.",
+    "addNew": "Add New Client",
+    "tableTitle": "Manage Clients",
+    "headerCompany": "Company Name",
+    "headerContact": "Contact Person",
+    "headerEmail": "Email",
+    "headerActions": "Actions",
+    "edit": "Edit Client",
+    "delete": "Delete Client",
+    "markActive": "Mark as Active",
+    "markInactive": "Mark as Inactive"
+  },
+  "invoices": {
+    "title": "Invoices",
+    "subtitle": "Manage all your client invoices.",
+    "createNew": "Create New Invoice",
+    "back": "Back to Invoices",
+    "createTitle": "Create New Invoice",
+    "editTitle": "Edit Invoice",
+    "viewTitle": "View Invoice",
+    "formSubtitle": "Fill in invoice details",
+    "formWarning": "You can save unfinished invoice as draft and complete later.",
+    "preview": "Preview",
+    "pdf": "PDF",
+    "email": "Email",
+    "onlinePayment": "Online Payment",
+    "saveInvoice": "Save Invoice",
+    "saveAsDraft": "Save as Draft",
+    "saveAndSend": "Save and Send",
+    "myDetails": "My Details",
+    "clientDetails": "Client Details",
+    "invoiceDetails": "Invoice Details",
+    "paymentDetails": "Payment Details",
+    "addSignature": "Add Signature",
+    "addNotes": "Add Notes",
+    "description": "Description",
+    "units": "Units",
+    "price": "Price",
+    "addItem": "Add Item",
+    "id": "Invoice ID",
+    "client": "Client",
+    "dueDate": "Due Date",
+    "total": "Total",
+    "status": "Status",
+    "actions": "Actions",
+    "noInvoicesTitle": "No invoices yet",
+    "noInvoicesSubtitle": "Click \"Create New Invoice\" to get started.",
+    "viewEdit": "View / Edit",
+    "view": "View",
+    "downloadPdf": "Download PDF",
+    "markAsPaid": "Mark as Paid",
+    "delete": "Delete"
+  },
+  "dashboard": {
+    "createShipmentButton": "Create Shipment",
+    "stat_total_shipments_title": "Total shipments",
+    "stat_total_shipments_desc": "Total shipments",
+    "stat_in_transit_title": "In Transit",
+    "stat_in_transit_desc": "Currently on the move",
+    "stat_delivered_title": "Delivered",
+    "stat_delivered_desc": "Successfully Delivered",
+    "stat_pending_pickup_title": "Pending Pickup",
+    "stat_pending_pickup_desc": "Last Month Dispatch",
+    "individual_stat_total_shipments_title": "Total shipments",
+    "individual_stat_total_shipments_desc": "This month",
+    "individual_stat_in_transit_title": "In Transit",
+    "individual_stat_in_transit_desc": "Currently active",
+    "individual_stat_delivered_title": "Delivered",
+    "individual_stat_delivered_desc": "This month",
+    "latest_visits_title": "Latest Visits",
+    "analytic_view_title": "Analytic View",
+    "analytic_view_subtitle": "Total shipment revenue overview",
+    "analytic_view_filters": "More filters",
+    "analytic_view_legend_last_month": "Last Month",
+    "analytic_view_legend_delivered": "Delivered",
+    "analytic_view_legend_pending": "Pending Pickup",
+    "analytic_view_legend_in_transit": "In Transit",
+    "analytic_view_total_shipments": "Total shipments",
+    "delivery_progress_title": "Delivery In Progress",
+    "delivery_progress_view_all": "View All Status",
+    "delivery_progress_step1_title": "Package Processed",
+    "delivery_progress_step1_subtitle": "Seller's Warehouse",
+    "delivery_progress_step2_title": "Sent to Regional Hub",
+    "delivery_progress_step2_subtitle": "Received by Seller's",
+    "delivery_progress_step3_title": "In Transit",
+    "delivery_progress_step3_subtitle": "Logistic Hub / transit place",
+    "delivery_progress_step4_title": "Arrived at Destinations",
+    "delivery_progress_step4_subtitle": "Destinations of Local Office",
+    "delivery_progress_step5_title": "Out For Delivery",
+    "delivery_progress_step5_subtitle": "With Local Courier Vehicle",
+    "products_table_title": "Products Delivery List",
+    "products_table_all_status": "All Status",
+    "products_table_filters": "More filters",
+    "products_table_export": "Export",
+    "products_table_header_product": "Product Name",
+    "products_table_header_id": "ID & Create Date",
+    "products_table_header_price": "Price",
+    "products_table_header_stock": "Stock",
+    "products_table_header_status": "Status",
+    "products_table_header_actions": "Actions",
+    "products_table_details_button": "Details",
+    "shipment_history_title": "My Shipments",
+    "shipment_history_search": "Search by ID...",
+    "shipment_history_filters": "Filters",
+    "shipment_history_header_id": "Tracking ID",
+    "shipment_history_header_route": "Item & Route",
+    "shipment_history_header_date": "Date",
+    "shipment_history_header_status": "Status",
+    "shipment_history_header_actions": "Actions",
+    "shipment_history_track_action": "Track Shipment",
+    "shipment_history_view_action": "View Details",
+    "shipment_history_assign_action": "Assign Transporter",
+    "shipment_history_delete_action": "Delete Shipment"
+  },
+  "routeDetails": {
+    "title": "Route Details",
+    "subtitle": "View complete route information and manage expenses",
+    "financials": "Financials",
+    "routeRate": "Route Rate",
+    "totalExpenses": "Total Expenses",
+    "balance": "Balance",
+    "pod": "Proof of Delivery",
+    "expenses": "Expenses",
+    "addExpense": "Add Expense",
+    "noExpenses": "No expenses recorded for this route",
+    "mapPlaceholder": "Live Map Placeholder",
+    "stops": "Stops",
+    "progress": "Progress",
+    "complete": "Complete"
+  },
+  "addExpense": {
+    "title": "Add Route Expense",
+    "type": "Expense Type",
+    "description": "Description",
+    "amount": "Amount (₦)",
+    "date": "Date",
+    "saveButton": "Add Expense",
+    "types": {
+      "fuel": "Fuel",
+      "tolls": "Tolls",
+      "maintenance": "Maintenance",
+      "other": "Other"
+    }
+  },
+  "modals": {
+    "addVehicle": {
+      "title": "Add New Vehicle",
+      "make": "Make",
+      "model": "Model",
+      "year": "Year",
+      "plate": "License Plate",
+      "vin": "VIN (Vehicle Identification Number)",
+      "odometer": "Initial Odometer (km)",
+      "documents": "Vehicle Documents",
+      "documentsHelp": "Upload registration, insurance, etc. (PDF, JPG)",
+      "saveButton": "Save Vehicle"
+    },
+    "addDriver": {
+      "title": "Add New Driver",
+      "fullName": "Full Name",
+      "phone": "Phone Number",
+      "license": "Driver's License Number",
+      "photo": "Driver Photo",
+      "saveButton": "Save Driver",
+      "nin": "National Identification Number (NIN)",
+      "licensePhoto": "Driver's License Photo"
+    },
+    "addClient": {
+      "title": "Add New Client",
+      "companyName": "Company Name",
+      "contactPerson": "Contact Person",
+      "email": "Email Address",
+      "phone": "Phone Number",
+      "address": "Address",
+      "tin": "Tax ID Number (TIN)",
+      "cac": "CAC Number",
+      "saveButton": "Save Client"
+    },
+    "editClient": {
+      "title": "Edit Client",
+      "saveButton": "Save Changes"
+    },
+    "deleteClientTitle": "Delete Client?",
+    "deleteClientMessage": "Are you sure you want to delete <strong>{{name}}</strong>? This action is permanent.",
+    "toggleClientStatusTitle": "Mark as {{status}}?",
+    "toggleClientStatusMessage": "Are you sure you want to mark <strong>{{name}}</strong> as {{status}}?",
+    "toggleClientStatusButton": "Mark as {{status}}",
+    "createRoute": {
+      "title": "Create New Route",
+      "origin": "Origin",
+      "destination": "Destination",
+      "distance": "Route Distance (km)",
+      "assignDriver": "Assign Driver",
+      "assignVehicle": "Assign Vehicle",
+      "stops": "Additional Stops (optional)",
+      "stopsHelp": "Add addresses, one per line...",
+      "saveButton": "Create Route"
+    },
+    "assignDriver": {
+      "title": "Assign Driver to Route {{routeId}}",
+      "subtitle": "Select an available driver and vehicle to start this route.",
+      "selectDriver": "Select a driver...",
+      "selectVehicle": "Select a vehicle...",
+      "saveButton": "Assign and Start Route"
+    },
+    "pod": {
+      "title": "Proof of Delivery: {{routeId}}",
+      "driver": "Driver",
+      "vehicle": "Vehicle",
+      "podImage": "POD Image",
+      "noPod": "No POD image available."
+    },
+    "addExpense": {
+      "title": "Add Route Expense",
+      "type": "Expense Type",
+      "description": "Description",
+      "amount": "Amount (₦)",
+      "date": "Date",
+      "saveButton": "Add Expense"
+    },
+    "routeDetails": {
+      "title": "Route Details",
+      "subtitle": "View complete route information and manage expenses",
+      "financials": "Financials",
+      "routeRate": "Route Rate",
+      "totalExpenses": "Total Expenses",
+      "balance": "Balance",
+      "pod": "Proof of Delivery",
+      "expenses": "Expenses",
+      "addExpense": "Add Expense",
+      "noExpenses": "No expenses recorded for this route",
+      "mapPlaceholder": "Live Map Placeholder",
+      "stops": "Stops",
+      "progress": "Progress",
+      "complete": "Complete"
+    },
+    "sendFunds": {
+      "title": "Send Funds to {{driverName}}",
+      "amount": "Amount (USD)",
+      "saveButton": "Send Funds"
+    },
+    "driverDetails": {
+      "title": "Driver Details",
+      "phone": "Phone Number",
+      "license": "License Number",
+      "licensePhoto": "Driver's License",
+      "noLicensePhoto": "No license photo available."
+    },
+    "confirmRemoval": {
+      "title": "Confirm Removal",
+      "message": "Are you sure you want to remove <strong>{{driverName}}</strong>?",
+      "messageDetail": "This action cannot be undone."
+    },
+    "updateVehicleStatus": {
+      "title": "Update Status for {{plateNumber}}",
+      "label": "Vehicle Status",
+      "active": "Active",
+      "inShop": "In-Shop",
+      "inactive": "Inactive"
+    },
+    "addMaintenanceLog": {
+      "title": "Add Log for {{plateNumber}}",
+      "type": "Log Type",
+      "types": {
+        "service": "Service",
+        "repair": "Repair",
+        "tires": "Tires",
+        "fuel": "Fuel",
+        "other": "Other"
+      },
+      "odometer": "Odometer (km)",
+      "cost": "Cost ($)",
+      "description": "Description / Notes",
+      "saveButton": "Save Log"
+    },
+    "uploadDocument": {
+      "title": "Upload Document for {{plateNumber}}",
+      "name": "Document Name",
+      "type": "Document Type",
+      "types": {
+        "registration": "Registration",
+        "insurance": "Insurance",
+        "licenseRenewal": "License Renewal"
+      },
+      "expiryDate": "Expiry Date",
+      "file": "File",
+      "saveButton": "Upload and Save"
+    },
+    "emailInvoice": {
+      "title": "Email Invoice",
+      "subtitle": "This will open your default email client. Remember to download and attach the PDF before sending.",
+      "recipient": "Recipient Email",
+      "subject": "Subject",
+      "body": "Body",
+      "saveButton": "Prepare Email"
+    },
+    "profileSettings": {
+      "title": "Profile Settings",
+      "passwordTitle": "Change Password",
+      "passwordHelp": "Leave blank to keep your current password.",
+      "newPassword": "New Password",
+      "confirmNewPassword": "Confirm New Password",
+      "errorMatch": "Passwords do not match.",
+      "errorUpdate": "Failed to update profile.",
+      "successUpdate": "Profile updated successfully!"
+    },
+    "shipmentDetails": {
+      "title": "Shipment Details: {{id}}",
+      "origin": "Origin",
+      "dateCreated": "Date Created",
+      "status": "Status",
+      "transporter": "Transporter",
+      "notAssigned": "Not Assigned",
+      "assignedTo": "Assigned to {{id}}",
+      "stopsTitle": "Delivery Stops ({{count}})"
+    },
+    "assignTransporter": {
+      "title": "Assign Transporter for {{id}}",
+      "subtitle": "Select an available transporter to handle this shipment.",
+      "label": "Available Transporters",
+      "placeholder": "Select a transporter...",
+      "rating": "Rating: {{rating}}",
+      "assignButton": "Assign Transporter"
+    },
+    "deleteShipment": {
+      "title": "Delete Shipment?",
+      "message": "Are you sure you want to delete shipment <strong>{{id}}</strong>? This cannot be undone.",
+      "deleteButton": "Delete Shipment"
+    },
+    "addTransporter": {
+      "title": "Add New Transporter",
+      "saveButton": "Save Transporter"
+    },
+    "editTransporter": {
+      "title": "Edit Transporter"
+    },
+    "deleteTransporter": {
+      "title": "Delete Transporter?",
+      "message": "Are you sure you want to delete <strong>{{name}}</strong>? This action is permanent."
+    },
+    "toggleTransporterStatus": {
+      "title": "Mark as {{status}}?",
+      "message": "Are you sure you want to mark <strong>{{name}}</strong> as {{status}}?",
+      "button": "Mark as {{status}}"
+    },
+    "createPayrollRun": {
+      "title": "Create New Payroll Run",
+      "subtitle": "Select the pay period for this payroll run.",
+      "periodStart": "Period Start Date",
+      "periodEnd": "Period End Date",
+      "createButton": "Create Payroll Run"
+    }
+  },
+  "screens": {
+    "drivers": {
+      "title": "Drivers",
+      "subtitle": "Manage, analyze, and view details for all registered drivers.",
+      "addNew": "Add New Driver",
+      "allDrivers": "All Drivers"
+    },
+    "vehicles": {
+      "title": "Fleet Management",
+      "subtitle": "Manage, analyze, and view details for all vehicles in your fleet.",
+      "addNew": "Add New Vehicle",
+      "allVehicles": "All Vehicles"
+    },
+    "routes": {
+      "title": "All Routes",
+      "subtitle": "View and manage all active, pending, and completed routes.",
+      "createInvoice": "Create Invoice from Selection ({{count}})",
+      "createNew": "Create New Route"
+    },
+    "vehicleDetails": {
+      "change": "Change",
+      "addLog": "Add Maintenance Log",
+      "uploadDoc": "Upload Document",
+      "odometer": "Odometer",
+      "vin": "VIN",
+      "lastService": "Last Service",
+      "nextService": "Next Service Due",
+      "maintenanceHistory": "Maintenance History",
+      "cost": "Cost",
+      "noLogs": "No maintenance logs found.",
+      "documents": "Documents",
+      "expires": "Expires",
+      "noDocs": "No documents uploaded."
+    },
+    "notifications": {
+      "title": "All Notifications",
+      "subtitle": "View and manage all your notifications.",
+      "markAllRead": "Mark all as read",
+      "all": "All",
+      "unread": "Unread",
+      "orders": "Orders",
+      "drivers": "Drivers",
+      "vehicles": "Vehicles",
+      "system": "System",
+      "markAsRead": "Mark as read",
+      "markAsUnread": "Mark as unread",
+      "delete": "Delete",
+      "noNotificationsTitle": "All Caught Up!",
+      "noNotificationsSubtitle": "There are no notifications in this category."
+    },
+    "transporters": {
+      "title": "Transporters",
+      "subtitle": "Manage your transport and logistics partners.",
+      "addNew": "Add New Transporter"
+    },
+    "materials": {
+      "title": "Manage Materials",
+      "subtitle": "Add, edit, or remove materials used in shipments.",
+      "addNew": "Add New Material",
+      "formTitle": "Create a New Material",
+      "nameLabel": "Material Name",
+      "namePlaceholder": "e.g., Industrial Machine Parts",
+      "descLabel": "Description",
+      "descPlaceholder": "e.g., Heavy duty parts for manufacturing",
+      "uomLabel": "Default Unit of Measure (UoM)",
+      "uomPlaceholder": "e.g., crates, pcs, kg",
+      "addButton": "Add Material",
+      "tableHeaderName": "Name",
+      "tableHeaderDesc": "Description",
+      "tableHeaderUom": "Default UoM"
+    },
+    "contacts": {
+      "title": "Delivery Contacts",
+      "subtitle": "Manage your saved delivery recipients and addresses.",
+      "addNew": "Add New Contact",
+      "formTitle": "Create a New Contact",
+      "nicknameLabel": "Nickname / Name",
+      "nicknamePlaceholder": "e.g., Home Office",
+      "recipientNameLabel": "Recipient's Full Name",
+      "recipientNamePlaceholder": "e.g., Alice Johnson",
+      "addressLabel": "Delivery Address",
+      "addressPlaceholder": "Enter the full delivery address",
+      "phoneLabel": "Contact Phone Number",
+      "phonePlaceholder": "(555) 123-4567",
+      "addButton": "Add Contact",
+      "tableHeaderName": "Name",
+      "tableHeaderRecipient": "Recipient",
+      "tableHeaderAddress": "Address"
+    },
+    "createShipment": {
+      "title": "Create New Shipment",
+      "subtitle": "Create a single shipment with multiple delivery stops.",
+      "backToDashboard": "Back to Dashboard",
+      "itemNameLabel": "Item / Product Name",
+      "itemNamePlaceholder": "e.g., Industrial Machine Parts",
+      "quantityLabel": "Quantity",
+      "uomLabel": "Unit of Measure (UoM)",
+      "uomPlaceholder": "e.g., boxes, pcs, kg",
+      "deliveryLocationLabel": "Delivery Location",
+      "deliveryLocationPlaceholder": "Enter the full destination address",
+      "contactPhoneLabel": "Recipient's Contact Number",
+      "contactPhonePlaceholder": "(555) 123-4567",
+      "addItemToListButton": "Add Stop to Shipment",
+      "submitBatchButton": "Create Shipment ({{count}} stops)",
+      "dispatchListTitle": "Delivery Stops",
+      "removeItem": "Remove Stop",
+      "recipientNameLabel": "Recipient's Name",
+      "recipientNamePlaceholder": "e.g., Jane Doe",
+      "savedContactLabel": "Saved Delivery Contact",
+      "savedContactPlaceholder": "Select a contact to auto-fill...",
+      "savedMaterialPlaceholder": "Select a material...",
+      "addItemToDispatchTitle": "Add Delivery Stop"
+    },
+    "payroll": {
+      "title": "Payroll Management",
+      "subtitle": "View and manage payroll runs for your drivers.",
+      "runNew": "Run New Payroll",
+      "period": "Period",
+      "payDate": "Pay Date",
+      "payslips": "Payslips",
+      "totalAmount": "Total Amount",
+      "runDetailsTitle": "Payroll Run Details",
+      "runDetailsSubtitle": "View and manage individual payslips for this payroll run.",
+      "processPayroll": "Process Payroll",
+      "markAsPaid": "Mark as Paid",
+      "downloadAll": "Download All Payslips",
+      "generating": "Generating...",
+      "driverName": "Name",
+      "basePay": "Base Pay",
+      "bonuses": "Bonuses",
+      "totalDeductions": "Total Deductions",
+      "netPay": "Net Pay",
+      "payslipTitle": "Payslip for",
+      "earnings": "Earnings",
+      "grossPay": "Gross Pay",
+      "deductions": "Deductions",
+      "tax": "Tax (PAYE)",
+      "pension": "Pension",
+      "nhf": "NHF",
+      "print": "Print Payslip",
+      "editPayTitle": "Edit Pay for {{name}}",
+      "editPay": "Edit Pay",
+      "annualSalary": "Annual Salary (₦)",
+      "pensionRate": "Pension Contribution Rate (%)",
+      "nhfRate": "NHF Contribution Rate (%)"
+    }
+  },
+  "components": {
+    "routeAssignmentTable": {
+      "title": "Route Assignments",
+      "all": "All",
+      "inprogress": "In Progress",
+      "completed": "Completed",
+      "pending": "Pending",
+      "headerId": "Route ID",
+      "headerDriver": "Driver",
+      "headerVehicle": "Vehicle",
+      "headerStops": "Stops",
+      "headerProgress": "Progress",
+      "assign": "Assign",
+      "complete": "Complete",
+      "viewpod": "View POD",
+      "invoicedTooltip": "Already Invoiced"
+    },
+    "driversTable": {
+      "title": "Manage Drivers",
+      "contact": "Contact",
+      "sendFunds": "Send Funds",
+      "viewDetails": "View Details",
+      "removeDriver": "Remove Driver"
+    },
+    "vehiclesTable": {
+      "title": "Manage Vehicles",
+      "headerVehicle": "Vehicle",
+      "headerPlate": "Plate No.",
+      "headerOdometer": "Odometer",
+      "updateStatus": "Update Status"
+    },
+    "transportersTable": {
+      "title": "Manage Transporters",
+      "name": "Transporter Name",
+      "contact": "Contact",
+      "rating": "Rating",
+      "markActive": "Mark as Active",
+      "markInactive": "Mark as Inactive"
+    }
+  },
+  "analytics": {
+    "title": "Shipment Analytics",
+    "subtitle": "Analyze your shipping costs, performance, and trends.",
+    "totalCost": "Total Shipping Costs",
+    "totalCostDesc": "Sum of all shipments",
+    "totalShipments": "Total Shipments",
+    "totalShipmentsDesc": "Total shipments created",
+    "avgDeliveryTime": "Average Delivery Time",
+    "avgDeliveryTimeDesc": "For completed shipments",
+    "monthlyCosts": "Monthly Shipping Costs",
+    "spendingByTransporter": "Spending by Transporter",
+    "statusBreakdown": "Shipment Status Breakdown",
+    "noData": "Not enough data to display analytics.",
+    "cost": "Cost",
+    "shipments": "Shipments",
+    "drivers": {
+      "selectDriver": "Select Driver",
+      "compareWith": "Compare With",
+      "none": "None",
+      "allDrivers": "All Drivers",
+      "dateRange": "Date Range",
+      "completedRoutes": "Completed Routes",
+      "onTimeRate": "On-Time Delivery Rate",
+      "kmCovered": "Kilometers Covered"
+    },
+    "vehicles": {
+      "analyze": "Analyze:",
+      "allVehicles": "All Vehicles",
+      "showingData": "Showing data from {{start}} to {{end}}",
+      "totalFleetSpending": "Total Fleet Spending",
+      "totalVehicleSpending": "Total Vehicle Spending",
+      "totalFuel": "Total Fuel Costs",
+      "totalMaintenance": "Total Maintenance Costs",
+      "spendingBreakdown": "Spending Breakdown",
+      "costPerVehicle": "Total Cost Per Vehicle"
+    }
+  },
+  "subscriptions": {
+    "plans": {
+      "individual": {
+        "basic": {
+          "name": "Basic",
+          "description": "Perfect for tracking your personal shipments.",
+          "features": [
+            "Up to 50 shipments/month",
+            "Basic tracking",
+            "Email support"
+          ]
+        },
+        "plus": {
+          "name": "Plus",
+          "description": "For frequent users who need more features.",
+          "features": [
+            "Up to 200 shipments/month",
+            "Real-time tracking notifications",
+            "Priority email support",
+            "Basic analytics"
+          ]
+        },
+        "premium": {
+          "name": "Premium",
+          "description": "The ultimate plan for individual power users.",
+          "features": [
+            "Unlimited shipments",
+            "Real-time tracking notifications",
+            "24/7 chat support",
+            "Advanced analytics"
+          ]
+        }
+      },
+      "business": {
+        "starter": {
+          "name": "Starter",
+          "description": "For small businesses managing their logistics.",
+          "features": [
+            "Up to 500 shipments/month",
+            "Real-time tracking",
+            "Email & chat support",
+            "Analytics dashboard"
+          ]
+        },
+        "growth": {
+          "name": "Growth",
+          "description": "For growing businesses that need more power.",
+          "features": [
+            "Up to 2,000 shipments/month",
+            "Advanced tracking",
+            "Priority support",
+            "API Access",
+            "2 team members"
+          ]
+        },
+        "scale": {
+          "name": "Scale",
+          "description": "For large businesses with high volume needs.",
+          "features": [
+            "Unlimited shipments",
+            "Dedicated account manager",
+            "Custom integrations",
+            "10 team members"
+          ]
+        }
+      },
+      "partner": {
+        "basic": {
+          "name": "Basic",
+          "description": "Perfect for small operations getting started.",
+          "features": [
+            "Up to 3 vehicles",
+            "Up to 3 drivers",
+            "10 routes per month",
+            "Up to 5 clients",
+            "Basic tracking & reporting"
+          ]
+        },
+        "pro": {
+          "name": "Pro",
+          "description": "For growing logistics companies managing a small fleet.",
+          "features": [
+            "Up to 15 vehicles",
+            "Up to 15 drivers",
+            "50 routes per month",
+            "Up to 25 clients",
+            "Advanced analytics",
+            "Priority support"
+          ]
+        },
+        "max": {
+          "name": "Max",
+          "description": "Unlimited solution for large logistics operations.",
+          "features": [
+            "Unlimited vehicles",
+            "Unlimited drivers",
+            "Unlimited routes",
+            "Unlimited clients",
+            "Advanced reporting",
+            "Dedicated support",
+            "Custom integrations"
+          ]
+        }
+      }
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "save": "Save",
+    "saving": "Saving...",
+    "tabs": {
+      "general": "General",
+      "password": "Password",
+      "orgGeneral": "General",
+      "billing": "Plan & Billing",
+      "team": "Team"
+    },
+    "myAccount": "My account",
+    "organization": "Organization",
+    "profile": {
+      "title": "Profile Settings",
+      "profilePicture": "Profile Picture",
+      "changePhoto": "Change photo",
+      "photoHelp": "JPG, PNG or GIF. Max size 5MB.",
+      "fullName": "Full Name",
+      "emailAddress": "Email Address",
+      "emailCannotChange": "Email cannot be changed",
+      "phoneNumber": "Phone Number",
+      "whatsappIntegration": "WhatsApp Integration",
+      "whatsappOptIn": "Subscribe to WhatsApp notifications for customer updates, delivery alerts, and support messages",
+      "whatsappNumberPlaceholder": "+234 800 000 0000",
+      "whatsappEnabledHelp": "Enter your WhatsApp number to receive notifications",
+      "whatsappDisabledHelp": "Enable WhatsApp integration to receive real-time updates",
+      "role": "Role",
+      "organization": "Organization"
+    },
+    "password": {
+      "title": "Change Password",
+      "subtitle": "Update your password to keep your account secure.",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "newPasswordHelp": "Must be at least 6 characters",
+      "confirmPassword": "Confirm New Password",
+      "updateButton": "Update Password",
+      "errorMatch": "New passwords do not match",
+      "errorLength": "Password must be at least 6 characters",
+      "errorEmail": "User email not found",
+      "errorWrongPassword": "Current password is incorrect",
+      "errorGeneral": "Failed to update password",
+      "successMessage": "Password updated successfully!"
+    },
+    "billing": {
+      "title": "Plan & Billing",
+      "subtitle": "Manage your plan and payments.",
+      "cancelSubscription": "Cancel subscription",
+      "managePayments": "Manage payments",
+      "currentPlan": "Current plan",
+      "monthlyPlan": "Monthly plan",
+      "active": "Active",
+      "renewAt": "Renew at",
+      "changePlan": "Change plan",
+      "usage": "Usage",
+      "usageSubtitle": "Your usage is renewed every month.",
+      "vehicles": "Vehicles",
+      "drivers": "Drivers",
+      "routes": "Routes",
+      "clients": "Clients"
+    },
+    "underDevelopment": "This section is under development."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "viewAll": "View All Notifications",
+    "allCaughtUp": "You're all caught up!",
+    "noCaughtUpDesc": "No new notifications at the moment."
+  },
+  "calendar": {
+    "months": {
+      "january": "January",
+      "february": "February",
+      "march": "March",
+      "april": "April",
+      "may": "May",
+      "june": "June",
+      "july": "July",
+      "august": "August",
+      "september": "September",
+      "october": "October",
+      "november": "November",
+      "december": "December"
+    },
+    "clear": "Clear",
+    "apply": "Apply"
+  },
+  "theme": {
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode"
+  }
+}

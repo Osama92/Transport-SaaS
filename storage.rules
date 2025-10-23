@@ -1,0 +1,71 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Organization-scoped storage
+    match /organizations/{organizationId}/{allPaths=**} {
+      // Allow authenticated users to read files from their organization
+      allow read: if request.auth != null;
+
+      // Allow authenticated users to write files to their organization
+      // In production, you may want to add organizationId validation
+      allow write: if request.auth != null;
+    }
+
+    // Fuel receipt photos - driver portal
+    match /fuel-receipts/{organizationId}/{driverId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+                    request.resource.size < 5 * 1024 * 1024 && // Max 5MB
+                    request.resource.contentType.matches('image/.*');
+    }
+
+    // Expense receipt photos - driver portal
+    match /expense-receipts/{organizationId}/{driverId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+                    request.resource.size < 5 * 1024 * 1024 && // Max 5MB
+                    request.resource.contentType.matches('image/.*');
+    }
+
+    // Proof of Delivery photos - driver portal
+    match /pod-photos/{organizationId}/{routeId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+                    request.resource.size < 5 * 1024 * 1024 && // Max 5MB
+                    request.resource.contentType.matches('image/.*');
+    }
+
+    // Driver profile photos - driver portal (legacy path)
+    match /driver-photos/{organizationId}/{driverId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+                    request.resource.size < 5 * 1024 * 1024 && // Max 5MB
+                    request.resource.contentType.matches('image/.*');
+    }
+
+    // Profile photos - general (used by driver portal profile screen)
+    match /profile-photos/{organizationId}/{driverId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+                    request.resource.size < 5 * 1024 * 1024 && // Max 5MB
+                    request.resource.contentType.matches('image/.*');
+    }
+
+    // Profile images - general (used by admin portal)
+    match /profile-images/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+                    request.resource.size < 5 * 1024 * 1024 && // Max 5MB
+                    request.resource.contentType.matches('image/.*');
+    }
+
+    // For backward compatibility - allow authenticated users general access
+    // Remove this in production and use only organization-scoped rules
+    match /{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}

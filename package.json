@@ -1,0 +1,49 @@
+{
+  "name": "transport-saas-dashboard",
+  "version": "1.0.0",
+  "description": "A comprehensive and visually appealing dashboard for a transport and logistics SaaS application",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mobile": "vite --host",
+    "build": "tsc && vite build",
+    "build:prod": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "dependencies": {
+    "@react-google-maps/api": "^2.20.7",
+    "axios": "^1.12.2",
+    "firebase": "^10.12.2",
+    "html2canvas": "^1.4.1",
+    "i18next": "^23.11.5",
+    "i18next-browser-languagedetector": "^8.2.0",
+    "jspdf": "^2.5.1",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.379.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^14.1.2",
+    "react-leaflet": "^4.2.1",
+    "react-paystack": "^6.0.0",
+    "react-select": "^5.10.2",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.12",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.13.1",
+    "@typescript-eslint/parser": "^7.13.1",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "firebase-tools": "^14.21.0",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.2.2",
+    "vite": "^5.3.1"
+  }
+}

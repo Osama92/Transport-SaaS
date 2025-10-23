@@ -1,0 +1,114 @@
+/* React Select Custom Styles */
+
+.react-select-container {
+    width: 100%;
+}
+
+.react-select__control {
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    min-height: 42px;
+    font-size: 0.875rem;
+    box-shadow: none;
+}
+
+.react-select__control:hover {
+    border-color: #9ca3af;
+}
+
+.react-select__control--is-focused {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.react-select__menu {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+}
+
+.react-select__option {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.react-select__option--is-focused {
+    background-color: #f3f4f6;
+}
+
+.react-select__option--is-selected {
+    background-color: #6366f1;
+    color: white;
+}
+
+.react-select__placeholder {
+    color: #9ca3af;
+}
+
+.react-select__input-container {
+    color: #111827;
+}
+
+.react-select__single-value {
+    color: #111827;
+}
+
+/* Dark mode styles */
+.dark .react-select__control {
+    background-color: #334155;
+    border-color: #475569;
+}
+
+.dark .react-select__control:hover {
+    border-color: #64748b;
+}
+
+.dark .react-select__control--is-focused {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.1);
+}
+
+.dark .react-select__menu {
+    background-color: #334155;
+    border-color: #475569;
+}
+
+.dark .react-select__option {
+    color: #e5e7eb;
+}
+
+.dark .react-select__option--is-focused {
+    background-color: #475569;
+}
+
+.dark .react-select__option--is-selected {
+    background-color: #6366f1;
+    color: white;
+}
+
+.dark .react-select__placeholder {
+    color: #9ca3af;
+}
+
+.dark .react-select__input-container {
+    color: #e5e7eb;
+}
+
+.dark .react-select__single-value {
+    color: #e5e7eb;
+}
+
+.dark .react-select__indicator-separator {
+    background-color: #475569;
+}
+
+.dark .react-select__dropdown-indicator {
+    color: #9ca3af;
+}
+
+.dark .react-select__clear-indicator {
+    color: #9ca3af;
+}

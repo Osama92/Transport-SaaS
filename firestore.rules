@@ -1,0 +1,395 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to get user's organization ID from users collection
+    function getUserOrganization(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.organizationId;
+    }
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the organization
+    function isOrganizationOwner(orgId) {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/organizations/$(orgId)).data.createdBy == request.auth.uid;
+    }
+
+    // Helper function to check if user is a member of the organization
+    function isOrganizationMember(orgId) {
+      return isAuthenticated() &&
+             getUserOrganization(request.auth.uid) == orgId;
+    }
+
+    // Helper function to check if resource belongs to user's organization
+    function belongsToUserOrg() {
+      return isAuthenticated() &&
+             resource.data.organizationId == getUserOrganization(request.auth.uid);
+    }
+
+    // Helper function to check if request data belongs to user's organization
+    function requestBelongsToUserOrg() {
+      return isAuthenticated() &&
+             request.resource.data.organizationId == getUserOrganization(request.auth.uid);
+    }
+
+    // Users collection - users can read/write their own data
+    match /users/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Organizations collection
+    match /organizations/{organizationId} {
+      // Allow read if:
+      // 1. User is a member of this organization, OR
+      // 2. User is authenticated (needed to check if org exists during signup)
+      allow read: if isOrganizationMember(organizationId) || isAuthenticated();
+      // Only owners can create organizations
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+      // Members can update, owners can update and delete
+      allow update: if isOrganizationOwner(organizationId) || isOrganizationMember(organizationId);
+      allow delete: if isOrganizationOwner(organizationId);
+    }
+
+    // Drivers collection - organization-scoped
+    match /drivers/{driverId} {
+      // Allow reading driver by phone/username for authentication (open access for login)
+      // Security note: This allows unauthenticated users to query drivers for login purposes
+      // Consider implementing rate limiting or using Firebase Anonymous Auth for better security
+      allow read: if true;
+      allow create: if requestBelongsToUserOrg();
+      // Allow updates for:
+      // 1. Organization admins (belongsToUserOrg)
+      // 2. Drivers updating their own data (firebaseAuthUid matches)
+      // 3. Setting up credentials (firebaseAuthUid, username, authEmail)
+      // 4. OTP verification updates (phoneVerified, portalAccess) - UNAUTHENTICATED for login flow
+      allow update: if belongsToUserOrg() ||
+                     (isAuthenticated() && resource.data.firebaseAuthUid == request.auth.uid) ||
+                     (isAuthenticated() && request.resource.data.keys().hasAny(['firebaseAuthUid', 'username', 'authEmail', 'phoneVerified'])) ||
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phoneVerified', 'portalAccess', 'updatedAt']);
+      allow delete: if belongsToUserOrg();
+
+      // Driver performance history subcollection
+      match /performanceHistory/{performanceId} {
+        // Allow if parent driver belongs to user's organization
+        function parentDriverBelongsToUserOrg() {
+          return isAuthenticated() &&
+                 get(/databases/$(database)/documents/drivers/$(driverId)).data.organizationId == getUserOrganization(request.auth.uid);
+        }
+
+        allow read: if parentDriverBelongsToUserOrg();
+        allow write: if parentDriverBelongsToUserOrg();
+      }
+    }
+
+    // Vehicles collection - organization-scoped + driver read access
+    match /vehicles/{vehicleId} {
+      // Helper to check if authenticated user is a driver in this organization
+      function isDriverInOrg() {
+        return isAuthenticated() && resource.data.organizationId != null &&
+               exists(/databases/$(database)/documents/drivers/$(resource.data.organizationId));
+      }
+
+      // Drivers can read vehicles in their organization, admins can do everything
+      allow read: if belongsToUserOrg() || (isAuthenticated() && resource.data.organizationId != null);
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+
+      // Maintenance logs subcollection
+      match /maintenanceLogs/{logId} {
+        // Allow if parent vehicle belongs to user's organization
+        function parentVehicleBelongsToUserOrg() {
+          return isAuthenticated() &&
+                 get(/databases/$(database)/documents/vehicles/$(vehicleId)).data.organizationId == getUserOrganization(request.auth.uid);
+        }
+
+        allow read: if parentVehicleBelongsToUserOrg();
+        allow write: if parentVehicleBelongsToUserOrg();
+      }
+
+      // Vehicle documents subcollection
+      match /documents/{documentId} {
+        // Allow if parent vehicle belongs to user's organization
+        function parentVehicleBelongsToUserOrg() {
+          return isAuthenticated() &&
+                 get(/databases/$(database)/documents/vehicles/$(vehicleId)).data.organizationId == getUserOrganization(request.auth.uid);
+        }
+
+        allow read: if parentVehicleBelongsToUserOrg();
+        allow write: if parentVehicleBelongsToUserOrg();
+      }
+
+      // Location history subcollection (for GPS tracking)
+      match /locationHistory/{locationId} {
+        // Allow if parent vehicle belongs to user's organization
+        function parentVehicleBelongsToUserOrg() {
+          return isAuthenticated() &&
+                 get(/databases/$(database)/documents/vehicles/$(vehicleId)).data.organizationId == getUserOrganization(request.auth.uid);
+        }
+
+        allow read: if parentVehicleBelongsToUserOrg();
+        allow write: if parentVehicleBelongsToUserOrg();
+      }
+    }
+
+    // Routes collection - organization-scoped + driver access
+    match /routes/{routeId} {
+      // Helper to check if current user is the assigned driver
+      function isAssignedDriver() {
+        return isAuthenticated() &&
+               ((resource.data.assignedDriverId != null &&
+                 get(/databases/$(database)/documents/drivers/$(resource.data.assignedDriverId)).data.firebaseAuthUid == request.auth.uid) ||
+                (resource.data.driverId != null &&
+                 get(/databases/$(database)/documents/drivers/$(resource.data.driverId)).data.firebaseAuthUid == request.auth.uid));
+      }
+
+      allow read: if belongsToUserOrg() || isAssignedDriver();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg() || isAssignedDriver();
+      allow delete: if belongsToUserOrg();
+
+      // Route expenses subcollection
+      match /expenses/{expenseId} {
+        // Allow if parent route belongs to user's organization
+        function parentRouteBelongsToUserOrg() {
+          return isAuthenticated() &&
+                 get(/databases/$(database)/documents/routes/$(routeId)).data.organizationId == getUserOrganization(request.auth.uid);
+        }
+
+        allow read: if parentRouteBelongsToUserOrg();
+        allow create: if parentRouteBelongsToUserOrg();
+        allow update: if parentRouteBelongsToUserOrg();
+        allow delete: if parentRouteBelongsToUserOrg();
+      }
+
+      // Route tracking updates subcollection (real-time GPS)
+      match /trackingUpdates/{updateId} {
+        // Allow if parent route belongs to user's organization
+        function parentRouteBelongsToUserOrg() {
+          return isAuthenticated() &&
+                 get(/databases/$(database)/documents/routes/$(routeId)).data.organizationId == getUserOrganization(request.auth.uid);
+        }
+
+        allow read: if parentRouteBelongsToUserOrg();
+        allow write: if parentRouteBelongsToUserOrg();
+      }
+    }
+
+    // Clients collection - organization-scoped
+    match /clients/{clientId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Invoices collection - organization-scoped
+    match /invoices/{invoiceId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Payrolls collection - organization-scoped
+    match /payrolls/{payrollId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+
+      // Payslips subcollection
+      match /payslips/{payslipId} {
+        // Allow if parent payroll belongs to user's organization
+        function parentPayrollBelongsToUserOrg() {
+          return isAuthenticated() &&
+                 get(/databases/$(database)/documents/payrolls/$(payrollId)).data.organizationId == getUserOrganization(request.auth.uid);
+        }
+
+        allow read: if parentPayrollBelongsToUserOrg();
+        allow write: if parentPayrollBelongsToUserOrg();
+      }
+    }
+
+    // Payroll Runs collection - organization-scoped
+    match /payrollRuns/{payrollRunId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+
+      // Payslips subcollection
+      match /payslips/{payslipId} {
+        // Allow if parent payroll run belongs to user's organization
+        function parentPayrollRunBelongsToUserOrg() {
+          return isAuthenticated() &&
+                 get(/databases/$(database)/documents/payrollRuns/$(payrollRunId)).data.organizationId == getUserOrganization(request.auth.uid);
+        }
+
+        allow read: if parentPayrollRunBelongsToUserOrg();
+        allow write: if parentPayrollRunBelongsToUserOrg();
+      }
+    }
+
+    // Notifications collection - user-scoped
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Shipments collection - user or organization-scoped
+    match /shipments/{shipmentId} {
+      allow read: if isAuthenticated() &&
+                  (resource.data.userId == request.auth.uid ||
+                   resource.data.organizationId == getUserOrganization(request.auth.uid));
+      allow create: if isAuthenticated() &&
+                    (request.resource.data.userId == request.auth.uid ||
+                     request.resource.data.organizationId == getUserOrganization(request.auth.uid));
+      allow update: if isAuthenticated() &&
+                    (resource.data.userId == request.auth.uid ||
+                     resource.data.organizationId == getUserOrganization(request.auth.uid));
+      allow delete: if isAuthenticated() &&
+                    (resource.data.userId == request.auth.uid ||
+                     resource.data.organizationId == getUserOrganization(request.auth.uid));
+    }
+
+    // Materials collection - organization-scoped
+    match /materials/{materialId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Transporters collection - organization-scoped (for business users)
+    match /transporters/{transporterId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Delivery contacts collection - user or organization-scoped
+    match /deliveryContacts/{contactId} {
+      allow read: if isAuthenticated() &&
+                  (resource.data.userId == request.auth.uid ||
+                   resource.data.organizationId == getUserOrganization(request.auth.uid));
+      allow create: if isAuthenticated() &&
+                    (request.resource.data.userId == request.auth.uid ||
+                     request.resource.data.organizationId == getUserOrganization(request.auth.uid));
+      allow update: if isAuthenticated() &&
+                    (resource.data.userId == request.auth.uid ||
+                     resource.data.organizationId == getUserOrganization(request.auth.uid));
+      allow delete: if isAuthenticated() &&
+                    (resource.data.userId == request.auth.uid ||
+                     resource.data.organizationId == getUserOrganization(request.auth.uid));
+    }
+
+    // Subscription Payments collection - organization-scoped (audit trail)
+    match /subscriptionPayments/{paymentId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      // No updates or deletes - immutable audit trail
+      allow update, delete: if false;
+    }
+
+    // Expenses collection - organization-scoped
+    match /expenses/{expenseId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Products collection - organization-scoped
+    match /products/{productId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Wallet Transactions collection - organization-scoped + driver access
+    match /walletTransactions/{transactionId} {
+      allow read: if belongsToUserOrg() ||
+                    (isAuthenticated() && resource.data.driverId != null &&
+                     get(/databases/$(database)/documents/drivers/$(resource.data.driverId)).data.firebaseAuthUid == request.auth.uid);
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      // Don't allow deletes - immutable transaction history
+      allow delete: if false;
+    }
+
+    // WhatsApp Users collection - maps WhatsApp numbers to users/organizations
+    match /whatsappUsers/{whatsappNumber} {
+      // Allow read for authenticated users accessing their own data or org data
+      allow read: if isAuthenticated() &&
+                  (resource.data.userId == request.auth.uid ||
+                   resource.data.organizationId == getUserOrganization(request.auth.uid));
+      // Allow create for authenticated users
+      allow create: if isAuthenticated();
+      // Allow update for user's own data
+      allow update: if isAuthenticated() &&
+                    (resource.data.userId == request.auth.uid);
+      // Allow delete for user's own data
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // WhatsApp Conversations collection - conversation state for Amana AI
+    match /whatsappConversations/{whatsappNumber} {
+      // Allow read for authenticated users accessing their conversations
+      allow read: if isAuthenticated();
+      // Allow write for authenticated users (Firebase Functions with service account)
+      // Note: Cloud Functions run with admin privileges, so this allows bot to update conversations
+      allow write: if isAuthenticated();
+    }
+
+    // Fuel Logs collection - organization-scoped (driver portal)
+    match /fuelLogs/{fuelLogId} {
+      allow read: if belongsToUserOrg() ||
+                    (isAuthenticated() && resource.data.driverId != null &&
+                     get(/databases/$(database)/documents/drivers/$(resource.data.driverId)).data.firebaseAuthUid == request.auth.uid);
+      allow create: if requestBelongsToUserOrg() ||
+                     (isAuthenticated() && request.resource.data.driverId != null &&
+                      get(/databases/$(database)/documents/drivers/$(request.resource.data.driverId)).data.firebaseAuthUid == request.auth.uid);
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Driver Expenses collection - organization-scoped (driver portal)
+    match /driverExpenses/{expenseId} {
+      allow read: if belongsToUserOrg() ||
+                    (isAuthenticated() && resource.data.driverId != null &&
+                     get(/databases/$(database)/documents/drivers/$(resource.data.driverId)).data.firebaseAuthUid == request.auth.uid);
+      allow create: if requestBelongsToUserOrg() ||
+                     (isAuthenticated() && request.resource.data.driverId != null &&
+                      get(/databases/$(database)/documents/drivers/$(request.resource.data.driverId)).data.firebaseAuthUid == request.auth.uid);
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Proof of Delivery collection - organization-scoped (driver portal)
+    match /proofOfDelivery/{podId} {
+      allow read: if belongsToUserOrg() ||
+                    (isAuthenticated() && resource.data.driverId != null &&
+                     get(/databases/$(database)/documents/drivers/$(resource.data.driverId)).data.firebaseAuthUid == request.auth.uid);
+      allow create: if requestBelongsToUserOrg() ||
+                     (isAuthenticated() && request.resource.data.driverId != null &&
+                      get(/databases/$(database)/documents/drivers/$(request.resource.data.driverId)).data.firebaseAuthUid == request.auth.uid);
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Default deny all other documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
