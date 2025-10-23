@@ -56,7 +56,15 @@ const Header: React.FC<HeaderProps> = ({ role, dateRange, onDateRangeChange, onN
     }, []);
 
     const toggleNotifications = () => {
-        setIsNotificationOpen(prev => !prev);
+        // On mobile (screen width < 768px), navigate directly to notifications page
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+            onNavChange('Notifications');
+            setIsNotificationOpen(false);
+        } else {
+            // On desktop, show popup
+            setIsNotificationOpen(prev => !prev);
+        }
         setIsCalendarOpen(false);
         setIsProfileMenuOpen(false);
         setIsLanguageMenuOpen(false);
