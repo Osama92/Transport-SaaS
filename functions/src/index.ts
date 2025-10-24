@@ -17,6 +17,58 @@ export { whatsappWebhook } from './whatsapp/webhook';
 // Driver Authentication
 export { createDriverAuth } from './createDriverAuth';
 
+// Proactive Notifications Engine
+import { NotificationEngine } from './whatsapp/notificationEngine';
+
+/**
+ * Scheduled function to send proactive notifications
+ * Runs every 6 hours to check for important business insights
+ */
+export const sendProactiveNotifications = functions.pubsub
+  .schedule('every 6 hours')
+  .onRun(async (context) => {
+    try {
+      const notificationEngine = new NotificationEngine(db);
+      await notificationEngine.sendProactiveNotifications();
+      functions.logger.info('Proactive notifications sent successfully');
+      return null;
+    } catch (error: any) {
+      functions.logger.error('Error in scheduled notifications:', error);
+      return null;
+    }
+  });
+
+/**
+ * Scheduled function to send daily business summary
+ * Runs every day at 6 PM (18:00) West Africa Time
+ */
+export const sendDailySummaries = functions.pubsub
+  .schedule('0 18 * * *')
+  .timeZone('Africa/Lagos')
+  .onRun(async (context) => {
+    try {
+      const notificationEngine = new NotificationEngine(db);
+
+      // Get all active WhatsApp users
+      const usersSnapshot = await db.collection('whatsapp_users')
+        .where('active', '==', true)
+        .get();
+
+      for (const userDoc of usersSnapshot.docs) {
+        const userData = userDoc.data();
+        if (userData.phoneNumber) {
+          await notificationEngine.sendDailySummary(userData.phoneNumber);
+        }
+      }
+
+      functions.logger.info('Daily summaries sent successfully');
+      return null;
+    } catch (error: any) {
+      functions.logger.error('Error in daily summaries:', error);
+      return null;
+    }
+  });
+
 // Paystack Configuration
 // Using defineSecret for secure environment variables (Firebase Functions v2 style)
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY ||

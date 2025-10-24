@@ -43,7 +43,7 @@ export interface WhatsAppMessage {
   from: string; // Phone number
   id: string; // Message ID
   timestamp: string;
-  type: 'text' | 'audio' | 'image' | 'video' | 'document' | 'button' | 'interactive';
+  type: 'text' | 'audio' | 'image' | 'video' | 'document' | 'button' | 'interactive' | 'location';
   text?: {
     body: string;
   };
@@ -72,6 +72,12 @@ export interface WhatsAppMessage {
       title: string;
       description: string;
     };
+  };
+  location?: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
   };
   context?: {
     from: string;

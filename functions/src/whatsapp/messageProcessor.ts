@@ -743,65 +743,59 @@ async function downloadWhatsAppMedia(
  * Send help/menu message
  */
 export async function sendHelpMessage(to: string, phoneNumberId: string): Promise<void> {
-  const helpMessage = `🚚 *Amana - Your Transport Business Assistant*
+  const helpMessage = `*Glyde Systems - Supply Chain Assistant*
 
-I be Amana (meaning "trust" 🤝), your AI helper for transport & logistics!
+I'm your AI-powered supply chain expert, specializing in transport and logistics optimization.
 
-*✅ Wetin I Fit Do:*
+*What I Can Help You With:*
 
-📄 *Invoices*
-• "Create invoice for [Client], [Items] at [Price]"
-• "Create invoice modern template" (classic, modern, minimal, professional)
-• "Create invoice with VAT inclusive" (or "VAT exclusive")
-• "Preview invoice INV-202510-0001"
-• "Send invoice INV-202510-0001"
-• "List invoices"
-• Example: "Create invoice professional template for ABC Ltd, 50 cement at 5000"
+*Invoicing & Billing*
+• Create and send professional invoices
+• Track payments and overdue accounts
+• Generate financial reports
+• Manage VAT and tax calculations
 
-👤 *Clients*
-• "Add client [Name], email [Email], phone [Phone]"
-• "List clients"
-• Example: "Add client John Doe, email john@example.com"
+*Client Management*
+• Register new clients
+• Manage client profiles
+• Track client history
+• Analyze client performance
 
-💰 *Wallet*
-• "What's my balance?"
-• "Show transactions"
-• "View my wallet"
+*Fleet & Operations*
+• Track vehicles and drivers
+• Optimize route planning
+• Monitor fuel consumption
+• Schedule maintenance
 
-🚚 *Routes & Fleet*
-• "List routes"
-• "List drivers"
-• "List vehicles"
+*Financial Management*
+• Check wallet balance
+• Review transaction history
+• Generate expense reports
+• Analyze profitability
 
-*🎨 Invoice Templates:*
-• Classic - Traditional layout
-• Modern - Contemporary design
-• Minimal - Clean & simple
-• Professional - Corporate style
+*Supply Chain Intelligence*
+• Route optimization suggestions
+• Cost reduction opportunities
+• Performance analytics
+• Predictive maintenance alerts
 
-*💵 VAT Options:*
-• VAT Inclusive - Price includes tax
-• VAT Exclusive - Tax added on top (default)
-• Custom VAT rate: "invoice with 5% VAT"
-
-*💬 Natural Language:*
-Just yarn me wetin you need - I go understand! I fit even give you smart suggestions based on your business patterns 😊
-
-*🎤 Voice Notes:*
-Send voice messages in:
+*How to Use:*
+Simply describe what you need in plain language. I understand:
 • English
-• Hausa
-• Igbo
-• Yoruba
 • Nigerian Pidgin
+• Hausa, Igbo, Yoruba
+• Voice notes
 
-*💡 Amana Intelligence:*
-I dey learn your business patterns and go give you proactive insights like overdue invoices, low balance alerts, and smart suggestions!
+*Examples:*
+• "Register a new client called ABC Logistics"
+• "Create invoice for XYZ Company"
+• "Show me today's deliveries"
+• "Track vehicle BJ-234"
+• "Optimize routes for tomorrow"
 
-*Need Help?*
 Type "HELP" anytime to see this menu again.
 
-How I fit help you today? 🚀`;
+How can I assist with your operations today?`;
 
   await sendWhatsAppMessage(to, phoneNumberId, {
     type: 'text',

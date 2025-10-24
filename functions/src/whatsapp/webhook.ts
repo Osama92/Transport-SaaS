@@ -6,7 +6,10 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import type { WhatsAppWebhookEvent, WhatsAppMessage } from './types';
-import { processMessage } from './messageProcessor';
+import { SupplyChainExpert } from './SupplyChainExpert';
+
+// Initialize the supply chain expert
+const supplyChainExpert = new SupplyChainExpert();
 
 // Lazy initialization - only access Firestore when functions are called
 const getDb = () => admin.firestore();
@@ -185,8 +188,31 @@ async function processIncomingMessage(
       return;
     }
 
-    // Process the message based on type
-    await processMessage(message, whatsappUser, phoneNumberId);
+    // Process the message using the Supply Chain Expert AI
+    if (message.type === 'text' && message.text) {
+      const messageText = message.text.body;
+
+      // Get user's name from profile
+      const userName = whatsappUser.displayName || whatsappUser.email?.split('@')[0] || 'there';
+
+      // Process with SupplyChainExpert for natural conversation
+      const response = await supplyChainExpert.processMessage(from, messageText, userName);
+
+      // Send the response
+      await sendWhatsAppMessage(from, phoneNumberId, { type: 'text', text: response });
+    } else if (message.type === 'location') {
+      // Handle location messages
+      await handleLocationMessage(message, whatsappUser, phoneNumberId);
+    } else if (message.type === 'image' || message.type === 'document') {
+      // Handle media messages
+      await handleMediaMessage(message, whatsappUser, phoneNumberId);
+    } else {
+      // Unsupported message type
+      await sendWhatsAppMessage(from, phoneNumberId, {
+        type: 'text',
+        text: 'I can help you better with text messages. Please describe what you need assistance with.'
+      });
+    }
 
     // Log performance metrics
     const duration = Date.now() - startTime;
@@ -259,20 +285,66 @@ async function getWhatsAppUser(whatsappNumber: string) {
  * Send onboarding message to new user
  */
 async function sendOnboardingMessage(to: string, phoneNumberId: string): Promise<void> {
-  const message = `Welcome to Glyde Systems! 🚚✨
+  const message = `Welcome to Glyde Systems!
 
-I'm your AI assistant for transport & logistics management.
+I'm your AI-powered supply chain assistant, here to help optimize your transport and logistics operations.
 
-*🎯 Quick Start:*
-Type "HELP" to see everything I can do for you!
+Quick Start:
+• Type "HELP" to see what I can do
+• Share your email to link this WhatsApp number to your account
 
-*📝 Already have an account?*
-Send your email address to link this WhatsApp number.
-Example: "my.email@example.com"
+Already have an account? Just send your email address.
+Example: "john.doe@company.com"
 
-Let's get started! 🚀`;
+How can I assist you today?`;
 
   await sendWhatsAppMessage(to, phoneNumberId, { type: 'text', text: message });
+}
+
+/**
+ * Handle location messages
+ */
+async function handleLocationMessage(
+  message: WhatsAppMessage,
+  whatsappUser: any,
+  phoneNumberId: string
+): Promise<void> {
+  const from = message.from;
+
+  if (message.location) {
+    const { latitude, longitude } = message.location;
+
+    // Store location or use for route tracking
+    functions.logger.info('Location received', { from, latitude, longitude });
+
+    await sendWhatsAppMessage(from, phoneNumberId, {
+      type: 'text',
+      text: `I've received your location (${latitude}, ${longitude}). This can be used for:\n\n• Setting pickup/delivery points\n• Tracking current position\n• Finding nearest drivers\n\nHow would you like to use this location?`
+    });
+  }
+}
+
+/**
+ * Handle media messages (images, documents)
+ */
+async function handleMediaMessage(
+  message: WhatsAppMessage,
+  whatsappUser: any,
+  phoneNumberId: string
+): Promise<void> {
+  const from = message.from;
+
+  if (message.type === 'image') {
+    await sendWhatsAppMessage(from, phoneNumberId, {
+      type: 'text',
+      text: 'I received your image. This could be used for:\n\n• Proof of Delivery (POD)\n• Damage documentation\n• Vehicle condition reports\n\nPlease describe what this image is regarding.'
+    });
+  } else if (message.type === 'document') {
+    await sendWhatsAppMessage(from, phoneNumberId, {
+      type: 'text',
+      text: 'Document received. I can help process:\n\n• Invoices and receipts\n• Shipping documents\n• Compliance certificates\n\nWhat type of document is this?'
+    });
+  }
 }
 
 /**
