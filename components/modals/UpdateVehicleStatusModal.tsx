@@ -9,7 +9,7 @@ interface UpdateVehicleStatusModalProps {
 }
 
 const UpdateVehicleStatusModal: React.FC<UpdateVehicleStatusModalProps> = ({ onClose, vehicle, onSave }) => {
-    const [status, setStatus] = useState<Vehicle['status']>(vehicle?.status || 'Active');
+    const [status, setStatus] = useState<Vehicle['status']>(vehicle?.status || 'Parked');
 
     if (!vehicle) return null;
 
@@ -23,14 +23,16 @@ const UpdateVehicleStatusModal: React.FC<UpdateVehicleStatusModalProps> = ({ onC
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Vehicle Status</label>
-                    <select 
-                        id="status" 
+                    <select
+                        id="status"
                         name="status"
                         value={status}
                         onChange={(e) => setStatus(e.target.value as Vehicle['status'])}
                         className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200"
                     >
-                        <option value="Active">Active</option>
+                        <option value="On the Move">On the Move</option>
+                        <option value="Parked">Parked</option>
+                        <option value="Idle">Idle</option>
                         <option value="In-Shop">In-Shop</option>
                         <option value="Inactive">Inactive</option>
                     </select>

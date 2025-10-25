@@ -16,6 +16,13 @@ node_modules
 .env.development.local
 .env.test.local
 .env.production.local
+functions/.env
+functions/.env.*
+
+# Firebase
+.firebase
+firebase-debug.log*
+.firebaserc
 
 # Logs
 npm-debug.log*
@@ -23,7 +30,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-firebase-debug.log*
 
 # Editor directories and files
 .vscode/*
@@ -35,3 +41,12 @@ firebase-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Sensitive documentation
+**/DEPLOY_*.md
+**/DEPLOYMENT_*.md
+**/*_TOKEN_*.md
+**/*_SECRETS_*.md
+
+# Claude settings
+.claude/settings.local.json

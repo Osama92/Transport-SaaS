@@ -23,41 +23,56 @@ export class FirebaseQueries {
         endDate?: string;
     }): Promise<any[]> {
         try {
-            let query = this.db.collection('routes')
+            console.log('[FIRESTORE QUERY] Getting routes for org:', params.organizationId);
+            console.log('[FIRESTORE QUERY] Filters:', { status: params.status, limit: params.limit });
+
+            let query: any = this.db.collection('routes')
                 .where('organizationId', '==', params.organizationId);
 
             if (params.status) {
                 query = query.where('status', '==', params.status);
             }
 
-            if (params.startDate) {
-                query = query.where('date', '>=', params.startDate);
-            }
-
-            if (params.endDate) {
-                query = query.where('date', '<=', params.endDate);
-            }
-
-            query = query.orderBy('date', 'desc').limit(params.limit || 50);
+            // Note: Can't do range queries on createdAt with other where clauses without composite index
+            // So we'll fetch all and filter in memory if needed
+            query = query.limit(params.limit || 50);
 
             const snapshot = await query.get();
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log('[FIRESTORE QUERY] Found', snapshot.docs.length, 'routes');
+
+            let routes = snapshot.docs.map((doc: any) => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // Sort by createdAt in memory (descending - newest first)
+            routes.sort((a: any, b: any) => {
+                const dateA = a.createdAt?.toDate?.() || new Date(0);
+                const dateB = b.createdAt?.toDate?.() || new Date(0);
+                return dateB.getTime() - dateA.getTime();
+            });
+
+            return routes;
         } catch (error) {
-            console.error('Error getting routes:', error);
+            console.error('[FIRESTORE QUERY] ❌ Error getting routes:', error);
             return [];
         }
     }
 
     /**
      * Get drivers with optional filters
+     * Status: 'On-route' | 'Idle' | 'Offline' | 'Active' | 'Inactive'
      */
     async getDrivers(params: {
         organizationId: string;
-        status?: 'Active' | 'Inactive' | 'On Leave';
+        status?: 'On-route' | 'Idle' | 'Offline' | 'Active' | 'Inactive';
         limit?: number;
     }): Promise<any[]> {
         try {
-            let query = this.db.collection('drivers')
+            console.log('[FIRESTORE QUERY] Getting drivers for org:', params.organizationId);
+            console.log('[FIRESTORE QUERY] Filters:', { status: params.status, limit: params.limit });
+
+            let query: any = this.db.collection('drivers')
                 .where('organizationId', '==', params.organizationId);
 
             if (params.status) {
@@ -67,23 +82,29 @@ export class FirebaseQueries {
             query = query.limit(params.limit || 50);
 
             const snapshot = await query.get();
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log('[FIRESTORE QUERY] Found', snapshot.docs.length, 'drivers');
+
+            return snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
         } catch (error) {
-            console.error('Error getting drivers:', error);
+            console.error('[FIRESTORE QUERY] ❌ Error getting drivers:', error);
             return [];
         }
     }
 
     /**
      * Get vehicles with optional filters
+     * Status: 'On the Move' | 'Parked' | 'Idle' | 'Inactive' | 'In-Shop'
      */
     async getVehicles(params: {
         organizationId: string;
-        status?: 'Active' | 'Maintenance' | 'Out of Service';
+        status?: 'On the Move' | 'Parked' | 'Idle' | 'Inactive' | 'In-Shop';
         limit?: number;
     }): Promise<any[]> {
         try {
-            let query = this.db.collection('vehicles')
+            console.log('[FIRESTORE QUERY] Getting vehicles for org:', params.organizationId);
+            console.log('[FIRESTORE QUERY] Filters:', { status: params.status, limit: params.limit });
+
+            let query: any = this.db.collection('vehicles')
                 .where('organizationId', '==', params.organizationId);
 
             if (params.status) {
@@ -93,9 +114,11 @@ export class FirebaseQueries {
             query = query.limit(params.limit || 50);
 
             const snapshot = await query.get();
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log('[FIRESTORE QUERY] Found', snapshot.docs.length, 'vehicles');
+
+            return snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
         } catch (error) {
-            console.error('Error getting vehicles:', error);
+            console.error('[FIRESTORE QUERY] ❌ Error getting vehicles:', error);
             return [];
         }
     }

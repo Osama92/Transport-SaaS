@@ -70,28 +70,25 @@ export class SupplyChainExpert {
             // Learn from user patterns
             await this.learnUserPatterns(phoneNumber, message, ctx);
 
-            // Check if we should use OpenAI for this message
-            const shouldUseAI = this.openai.shouldUseAI(message, ctx.currentFlow);
-
+            // ALWAYS use OpenAI for natural, intelligent conversation
+            // Only fallback to basic intent matching if OpenAI fails
             let response: string;
 
-            if (shouldUseAI) {
-                // Use OpenAI for intelligent, data-driven responses
-                console.log('Using OpenAI for message:', message);
-                try {
-                    response = await this.openai.processWithAI(
-                        phoneNumber,
-                        message,
-                        ctx.conversationHistory
-                    );
-                } catch (aiError) {
-                    console.error('OpenAI processing failed, falling back to basic logic:', aiError);
-                    // Fallback to basic logic if OpenAI fails
-                    const intent = await this.analyzeIntent(message, ctx);
-                    response = await this.generateResponse(intent, message, ctx, userName);
-                }
-            } else {
-                // Use basic intent-based flow for structured tasks
+            try {
+                console.log('🤖 Using OpenAI for intelligent processing:', message);
+
+                // Process with OpenAI for natural conversation
+                response = await this.openai.processWithAI(
+                    phoneNumber,
+                    message,
+                    ctx.conversationHistory
+                );
+
+                console.log('✅ OpenAI response generated successfully');
+            } catch (aiError: any) {
+                console.error('❌ OpenAI processing failed, using fallback:', aiError.message);
+
+                // Fallback to basic logic if OpenAI fails
                 const intent = await this.analyzeIntent(message, ctx);
                 response = await this.generateResponse(intent, message, ctx, userName);
             }
@@ -111,7 +108,7 @@ export class SupplyChainExpert {
             await this.saveContext(phoneNumber, ctx);
 
             return response;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error processing message:', error);
             return `I encountered an error processing your request. Please try again. If this continues, type "help" for assistance.`;
         }
@@ -345,7 +342,7 @@ export class SupplyChainExpert {
         }
     }
 
-    private continueClientOnboarding(message: string, ctx: ConversationContext): string {
+    private async continueClientOnboarding(message: string, ctx: ConversationContext): Promise<string> {
         const step = ctx.flowData.step || 1;
         const isPidgin = ctx.language === 'pidgin';
 
@@ -394,12 +391,21 @@ export class SupplyChainExpert {
 
             case 7: // Address
                 ctx.flowData.clientData.address = message;
+
+                // Get organizationId and userId before saving
+                const organizationId = await this.getOrganizationIdFromPhone(ctx.phoneNumber);
+                const userId = await this.getUserIdFromPhone(ctx.phoneNumber);
+
+                ctx.flowData.clientData.organizationId = organizationId;
+                ctx.flowData.clientData.userId = userId;
+
                 // Save to database
                 this.saveClient(ctx.flowData.clientData);
+
+                const company = ctx.flowData.clientData.companyName;
                 ctx.currentFlow = null;
                 ctx.flowData = {};
 
-                const company = ctx.flowData.clientData.companyName;
                 return isPidgin ?
                     `Everything don set! ${company} don enter system. Anything else wey you wan do?` :
                     `Perfect! ${company} has been successfully registered in your system. The profile is complete and ready for business. What would you like to do next?`;
@@ -646,11 +652,46 @@ export class SupplyChainExpert {
 
     private async saveClient(clientData: any): Promise<void> {
         try {
-            await this.db.collection('clients').add({
-                ...clientData,
+            // Generate client ID in format: CLT-YYYYMMDD-HHMMSS-random
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const random = Math.random().toString(36).substring(2, 8);
+
+            const clientId = `CLT-${year}${month}${day}-${hours}${minutes}${seconds}-${random}`;
+
+            // Prepare full client data with all required fields
+            const fullClientData = {
+                organizationId: clientData.organizationId || 'default-org',
+                name: clientData.companyName || clientData.name,
+                company: clientData.companyName || clientData.name,
+                contactPerson: clientData.contactPerson || '',
+                phone: clientData.phone || '',
+                email: clientData.email || '',
+                address: clientData.address || '',
+                status: 'Active',
+                creditLimit: 0,
+                outstandingBalance: 0,
+                totalRevenue: 0,
+                totalRoutes: 0,
+                paymentTerms: 'Net 30',
+                taxId: clientData.tin || '',
+                tin: clientData.tin || '',
+                cacNumber: clientData.cacNumber || '',
+                notes: '',
+                createdBy: clientData.userId || 'system',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                status: 'active'
-            });
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            };
+
+            // Use set() with custom ID instead of add()
+            await this.db.collection('clients').doc(clientId).set(fullClientData);
+
+            console.log(`✅ Client ${clientId} created successfully in fallback mode`);
         } catch (error) {
             console.error('Error saving client:', error);
         }
@@ -1540,4 +1581,96 @@ export class SupplyChainExpert {
             return null;
         }
     } */
+
+    /**
+     * Normalize phone number to international format (+234...)
+     * Handles formats: 070..., 234..., +234...
+     */
+    private normalizePhoneNumber(phoneNumber: string): string {
+        // Remove all non-digit characters except leading +
+        let cleaned = phoneNumber.replace(/[^\d+]/g, '');
+
+        // If starts with 0 (Nigerian local format), replace with +234
+        if (cleaned.startsWith('0')) {
+            return '+234' + cleaned.substring(1);
+        }
+
+        // If starts with 234 but no +, add it
+        if (cleaned.startsWith('234') && !cleaned.startsWith('+')) {
+            return '+' + cleaned;
+        }
+
+        // If already starts with +, return as is
+        if (cleaned.startsWith('+')) {
+            return cleaned;
+        }
+
+        // Fallback: assume it's a local number, add +234
+        return '+234' + cleaned;
+    }
+
+    /**
+     * Get organization ID from phone number
+     * SECURITY CRITICAL: Must always return correct organizationId to prevent data leakage
+     */
+    private async getOrganizationIdFromPhone(phoneNumber: string): Promise<string> {
+        try {
+            // Normalize phone number to international format
+            const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
+
+            console.log(`🔍 [SECURITY FALLBACK] Fetching organizationId for phone: ${phoneNumber} (normalized: ${normalizedPhone})`);
+
+            // Query users collection by whatsappNumber field
+            const userSnapshot = await this.db.collection('users')
+                .where('whatsappNumber', '==', normalizedPhone)
+                .limit(1)
+                .get();
+
+            if (!userSnapshot.empty) {
+                const userData = userSnapshot.docs[0].data();
+                const orgId = userData.organizationId;
+
+                if (!orgId || orgId === 'default-org') {
+                    console.error(`⚠️ [SECURITY WARNING] User ${normalizedPhone} has invalid organizationId: ${orgId}`);
+                    console.error(`⚠️ [SECURITY WARNING] User data:`, JSON.stringify(userData));
+                }
+
+                console.log(`✅ [SECURITY FALLBACK] Found organizationId: ${orgId} for phone: ${normalizedPhone}`);
+                return orgId || 'default-org';
+            }
+
+            console.error(`❌ [SECURITY ERROR] No user record found for whatsappNumber: ${normalizedPhone}`);
+            return 'default-org';
+        } catch (error) {
+            console.error('❌ [SECURITY ERROR] Error getting organization ID:', error);
+            return 'default-org';
+        }
+    }
+
+    /**
+     * Get user ID from phone number
+     */
+    private async getUserIdFromPhone(phoneNumber: string): Promise<string> {
+        try {
+            // Normalize phone number to international format
+            const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
+
+            const userSnapshot = await this.db.collection('users')
+                .where('whatsappNumber', '==', normalizedPhone)
+                .limit(1)
+                .get();
+
+            if (!userSnapshot.empty) {
+                const userId = userSnapshot.docs[0].id;
+                console.log(`✅ [FALLBACK] Found userId: ${userId} for phone: ${normalizedPhone}`);
+                return userId;
+            }
+
+            console.warn(`⚠️ [FALLBACK] No userId found for phone: ${normalizedPhone}, using phone as fallback`);
+            return normalizedPhone; // Fallback to phone number
+        } catch (error) {
+            console.error('Error getting user ID:', error);
+            return phoneNumber;
+        }
+    }
 }
