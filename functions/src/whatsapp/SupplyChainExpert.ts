@@ -1488,8 +1488,9 @@ export class SupplyChainExpert {
      */
     private async saveContext(phoneNumber: string, ctx: ConversationContext): Promise<void> {
         try {
-            // Keep only last 50 messages to avoid document size limits
-            const recentHistory = ctx.conversationHistory.slice(-50);
+            // UNLIMITED conversation history - no limits for seamless conversation flow
+            // Users should never need to reiterate - the AI remembers everything
+            const recentHistory = ctx.conversationHistory;
 
             await this.db.collection('conversation_contexts').doc(phoneNumber).set({
                 userId: ctx.userId,

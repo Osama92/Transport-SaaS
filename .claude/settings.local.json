@@ -38,7 +38,9 @@
       "Bash(npx vite build)",
       "Bash(git filter-branch:*)",
       "Bash(git checkout:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

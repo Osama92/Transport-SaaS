@@ -255,3 +255,62 @@ export const removeOrganizationMember = async (
         throw new Error('Failed to remove member from organization');
     }
 };
+
+/**
+ * Update organization payment details
+ */
+export const updateOrganizationPaymentDetails = async (
+    organizationId: string,
+    paymentDetails: Organization['paymentDetails']
+): Promise<void> => {
+    try {
+        const orgRef = doc(db, ORGANIZATIONS_COLLECTION, organizationId);
+
+        await updateDoc(orgRef, {
+            paymentDetails,
+            updatedAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error('Error updating payment details:', error);
+        throw new Error('Failed to update payment details');
+    }
+};
+
+/**
+ * Update organization branding (logo and signature URLs)
+ */
+export const updateOrganizationBranding = async (
+    organizationId: string,
+    branding: {
+        logoUrl?: string;
+        signatureUrl?: string;
+    }
+): Promise<void> => {
+    try {
+        const orgRef = doc(db, ORGANIZATIONS_COLLECTION, organizationId);
+
+        // Get current company details
+        const orgSnap = await getDoc(orgRef);
+        if (!orgSnap.exists()) {
+            throw new Error('Organization not found');
+        }
+
+        const org = orgSnap.data() as Organization;
+        const companyDetails = org.companyDetails || {};
+
+        // Update logo/signature URLs within companyDetails
+        const updatedCompanyDetails = {
+            ...companyDetails,
+            ...(branding.logoUrl !== undefined && { logoUrl: branding.logoUrl }),
+            ...(branding.signatureUrl !== undefined && { signatureUrl: branding.signatureUrl }),
+        };
+
+        await updateDoc(orgRef, {
+            companyDetails: updatedCompanyDetails,
+            updatedAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error('Error updating branding:', error);
+        throw new Error('Failed to update branding');
+    }
+};

@@ -135,34 +135,71 @@ export class FirebaseQueries {
         endDate?: string;
     }): Promise<any[]> {
         try {
-            let query = this.db.collection('invoices')
+            console.log('[FIRESTORE QUERY] Getting invoices for org:', params.organizationId);
+            console.log('[FIRESTORE QUERY] Filters:', { status: params.status, limit: params.limit });
+
+            // First, try to get ALL invoices without organizationId filter to see what's in the database
+            const allInvoicesSnapshot = await this.db.collection('invoices').limit(10).get();
+            console.log('[FIRESTORE QUERY] Total invoices in database (sample of 10):', allInvoicesSnapshot.docs.length);
+            if (allInvoicesSnapshot.docs.length > 0) {
+                allInvoicesSnapshot.docs.forEach((doc: any) => {
+                    const data = doc.data();
+                    console.log('[FIRESTORE QUERY] Invoice sample:', {
+                        id: doc.id,
+                        organizationId: data.organizationId,
+                        invoiceNumber: data.invoiceNumber,
+                        clientName: data.clientName
+                    });
+                });
+            }
+
+            let query: any = this.db.collection('invoices')
                 .where('organizationId', '==', params.organizationId);
 
             if (params.status) {
                 query = query.where('status', '==', params.status);
             }
 
-            if (params.startDate) {
-                query = query.where('date', '>=', params.startDate);
-            }
-
-            if (params.endDate) {
-                query = query.where('date', '<=', params.endDate);
-            }
-
-            query = query.orderBy('date', 'desc').limit(params.limit || 50);
+            // Note: Cannot use date filters with other where clauses without composite index
+            // We'll fetch all and filter in memory if needed
+            query = query.limit(params.limit || 50);
 
             const snapshot = await query.get();
-            let invoices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log('[FIRESTORE QUERY] Found', snapshot.docs.length, 'invoices matching organizationId:', params.organizationId);
+
+            let invoices = snapshot.docs.map((doc: any) => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // Sort by createdAt in memory (descending - newest first)
+            invoices.sort((a: any, b: any) => {
+                const dateA = a.createdAt?.toDate?.() || new Date(0);
+                const dateB = b.createdAt?.toDate?.() || new Date(0);
+                return dateB.getTime() - dateA.getTime();
+            });
 
             // Filter by amount if specified (can't do compound queries without index)
             if (params.minAmount !== undefined) {
                 invoices = invoices.filter((inv: any) => (inv.total || 0) >= (params.minAmount || 0));
             }
 
+            // Filter by date range if specified
+            if (params.startDate || params.endDate) {
+                invoices = invoices.filter((inv: any) => {
+                    const invDate = inv.issuedDate || inv.createdAt?.toDate?.()?.toISOString().split('T')[0];
+                    if (!invDate) return false;
+
+                    if (params.startDate && invDate < params.startDate) return false;
+                    if (params.endDate && invDate > params.endDate) return false;
+
+                    return true;
+                });
+            }
+
             return invoices;
         } catch (error) {
-            console.error('Error getting invoices:', error);
+            console.error('[FIRESTORE QUERY] ❌ Error getting invoices:', error);
             return [];
         }
     }
@@ -250,10 +287,59 @@ export class FirebaseQueries {
     }
 
     /**
-     * Get user's wallet balance
+     * Get user's wallet balance from Paystack virtual account
      */
     async getWalletBalance(userId: string): Promise<number> {
         try {
+            // First try to get organization ID from whatsapp_users
+            const whatsappUsersSnapshot = await this.db.collection('whatsapp_users')
+                .where('userId', '==', userId)
+                .limit(1)
+                .get();
+
+            if (!whatsappUsersSnapshot.empty) {
+                const whatsappUser = whatsappUsersSnapshot.docs[0].data();
+                const organizationId = whatsappUser.organizationId;
+
+                console.log('[WALLET BALANCE] User ID:', userId);
+                console.log('[WALLET BALANCE] Organization ID:', organizationId);
+
+                // CRITICAL: Get balance from Paystack virtual_accounts collection
+                // This is the REAL balance from Paystack, not mock data
+                const virtualAccountSnapshot = await this.db.collection('virtual_accounts')
+                    .where('organizationId', '==', organizationId)
+                    .limit(1)
+                    .get();
+
+                if (!virtualAccountSnapshot.empty) {
+                    const virtualAccount = virtualAccountSnapshot.docs[0].data();
+                    const balance = virtualAccount?.balance || 0;
+
+                    console.log('[WALLET BALANCE] ✅ Found Paystack virtual account');
+                    console.log('[WALLET BALANCE] Balance:', balance);
+                    console.log('[WALLET BALANCE] Account Number:', virtualAccount?.accountNumber);
+                    console.log('[WALLET BALANCE] Bank:', virtualAccount?.bankName);
+
+                    return balance;
+                }
+
+                console.log('[WALLET BALANCE] ⚠️ No Paystack virtual account found for org:', organizationId);
+
+                // Fallback: Check organizations collection for manual balance
+                const orgDoc = await this.db.collection('organizations').doc(organizationId).get();
+                if (orgDoc.exists) {
+                    const orgData = orgDoc.data();
+                    const balance = orgData?.walletBalance ||
+                                   orgData?.wallet?.balance ||
+                                   orgData?.balance ||
+                                   0;
+
+                    console.log('[WALLET BALANCE] Using organization fallback balance:', balance);
+                    return balance;
+                }
+            }
+
+            // Fallback to user wallet (old logic)
             const walletDoc = await this.db.collection('wallets').doc(userId).get();
             if (walletDoc.exists) {
                 const data = walletDoc.data();

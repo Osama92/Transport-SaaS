@@ -14,8 +14,9 @@ const getDb = () => admin.firestore();
  */
 function generateInvoiceHTML(invoice: any): string {
   // Calculate amounts with VAT
+  // Support both field name formats: quantity/unitPrice (new) and units/price (old)
   const subtotalAmount = invoice.items.reduce((sum: number, item: any) =>
-    sum + (item.units || 0) * (item.price || 0), 0
+    sum + (item.quantity || item.units || 0) * (item.unitPrice || item.price || 0), 0
   );
 
   const vatRate = invoice.vatRate || 0;
@@ -49,13 +50,16 @@ function generateInvoiceHTML(invoice: any): string {
   const template = invoice.template || 'classic';
 
   // Generate items HTML
+  // Support both field name formats: quantity/unitPrice (new) and units/price (old)
   const itemsHTML = invoice.items.map((item: any, index: number) => {
-    const itemTotal = (item.units || 0) * (item.price || 0);
+    const qty = item.quantity || item.units || 0;
+    const price = item.unitPrice || item.price || 0;
+    const itemTotal = qty * price;
     return `
       <tr style="border-bottom: 1px solid #e5e7eb;">
         <td style="padding: 12px 16px; text-align: left;">${item.description || ''}</td>
-        <td style="padding: 12px 16px; text-align: right;">${item.units || 0}</td>
-        <td style="padding: 12px 16px; text-align: right;">${formatCurrency(item.price || 0)}</td>
+        <td style="padding: 12px 16px; text-align: right;">${qty}</td>
+        <td style="padding: 12px 16px; text-align: right;">${formatCurrency(price)}</td>
         <td style="padding: 12px 16px; text-align: right; font-weight: 600;">${formatCurrency(itemTotal)}</td>
       </tr>
     `;
@@ -107,6 +111,11 @@ function generateInvoiceHTML(invoice: any): string {
       font-size: 28px;
       font-weight: bold;
       color: #1f2937;
+    }
+    .company-logo img {
+      max-height: 60px;
+      max-width: 200px;
+      object-fit: contain;
     }
     .dates {
       text-align: right;
@@ -232,6 +241,23 @@ function generateInvoiceHTML(invoice: any): string {
       color: #1e3a8a;
       line-height: 1.6;
     }
+    .signature-section {
+      margin-top: 60px;
+      padding-top: 30px;
+      border-top: 2px solid #e5e7eb;
+      text-align: right;
+    }
+    .signature-section img {
+      max-height: 80px;
+      max-width: 250px;
+      object-fit: contain;
+      display: inline-block;
+    }
+    .signature-section .label {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -242,7 +268,9 @@ function generateInvoiceHTML(invoice: any): string {
         <h1>INVOICE</h1>
         <div class="invoice-number">#${invoice.invoiceNumber || 'INV-XXXX'}</div>
       </div>
-      <div class="company-logo">${invoice.from?.name || 'Your Company'}</div>
+      <div class="company-logo">
+        ${invoice.from?.logoUrl ? `<img src="${invoice.from.logoUrl}" alt="${invoice.from?.name || 'Company'} Logo" />` : invoice.from?.name || 'Your Company'}
+      </div>
     </div>
 
     <!-- Dates -->
@@ -327,6 +355,14 @@ function generateInvoiceHTML(invoice: any): string {
     <div class="notes">
       <h3>Notes</h3>
       <p>${invoice.notes}</p>
+    </div>
+    ` : ''}
+
+    <!-- Signature -->
+    ${invoice.from?.signatureUrl ? `
+    <div class="signature-section">
+      <img src="${invoice.from.signatureUrl}" alt="Authorized Signature" />
+      <div class="label">Authorized Signature</div>
     </div>
     ` : ''}
   </div>

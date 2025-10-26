@@ -203,6 +203,10 @@ async function processIncomingMessage(
     } else if (message.type === 'location') {
       // Handle location messages
       await handleLocationMessage(message, whatsappUser, phoneNumberId);
+    } else if (message.type === 'audio') {
+      // Handle voice messages (WhatsApp uses 'audio' type for voice notes)
+      const userName = whatsappUser.displayName || whatsappUser.email?.split('@')[0] || 'there';
+      await handleVoiceMessage(message, whatsappUser, phoneNumberId, userName);
     } else if (message.type === 'image' || message.type === 'document') {
       // Handle media messages
       await handleMediaMessage(message, whatsappUser, phoneNumberId);
@@ -210,7 +214,7 @@ async function processIncomingMessage(
       // Unsupported message type
       await sendWhatsAppMessage(from, phoneNumberId, {
         type: 'text',
-        text: 'I can help you better with text messages. Please describe what you need assistance with.'
+        text: 'I can help you better with text messages or voice notes. Please describe what you need assistance with.'
       });
     }
 
@@ -325,6 +329,94 @@ async function handleLocationMessage(
 }
 
 /**
+ * Download media from WhatsApp
+ */
+async function downloadWhatsAppMedia(mediaId: string): Promise<Buffer | null> {
+  try {
+    // Step 1: Get media URL
+    const mediaUrl = `https://graph.facebook.com/v18.0/${mediaId}`;
+    const mediaResponse = await fetch(mediaUrl, {
+      headers: {
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`
+      }
+    });
+
+    if (!mediaResponse.ok) {
+      functions.logger.error('Failed to get media URL', { mediaId });
+      return null;
+    }
+
+    const mediaData = await mediaResponse.json();
+    const downloadUrl = mediaData.url;
+
+    // Step 2: Download the actual media file
+    const downloadResponse = await fetch(downloadUrl, {
+      headers: {
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`
+      }
+    });
+
+    if (!downloadResponse.ok) {
+      functions.logger.error('Failed to download media', { downloadUrl });
+      return null;
+    }
+
+    const arrayBuffer = await downloadResponse.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error: any) {
+    functions.logger.error('Error downloading WhatsApp media', {
+      error: error.message,
+      mediaId
+    });
+    return null;
+  }
+}
+
+/**
+ * Upload image to Firebase Storage
+ */
+async function uploadToFirebaseStorage(
+  buffer: Buffer,
+  organizationId: string,
+  fileName: string,
+  mimeType: string
+): Promise<string | null> {
+  try {
+    const bucket = admin.storage().bucket();
+    const filePath = `organizations/${organizationId}/${fileName}`;
+    const file = bucket.file(filePath);
+
+    await file.save(buffer, {
+      metadata: {
+        contentType: mimeType,
+        metadata: {
+          uploadedAt: new Date().toISOString()
+        }
+      }
+    });
+
+    // Make file publicly accessible
+    await file.makePublic();
+
+    // Get public URL
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+
+    functions.logger.info('Image uploaded to Firebase Storage', {
+      filePath,
+      publicUrl
+    });
+
+    return publicUrl;
+  } catch (error: any) {
+    functions.logger.error('Error uploading to Firebase Storage', {
+      error: error.message,
+      fileName
+    });
+    return null;
+  }
+}
+
+/**
  * Handle media messages (images, documents)
  */
 async function handleMediaMessage(
@@ -333,11 +425,89 @@ async function handleMediaMessage(
   phoneNumberId: string
 ): Promise<void> {
   const from = message.from;
+  const organizationId = whatsappUser.organizationId;
 
-  if (message.type === 'image') {
+  if (message.type === 'image' && message.image) {
+    const { getConversationState, updateConversationState } = await import('./conversationManager');
+    const conversationState = await getConversationState(from, organizationId, whatsappUser.userId);
+
+    // Check if user is expecting logo or signature upload
+    const awaitingLogo = conversationState?.awaitingInput === 'logo_upload';
+    const awaitingSignature = conversationState?.awaitingInput === 'signature_upload';
+
+    if (awaitingLogo || awaitingSignature) {
+      // Send processing message
+      await sendWhatsAppMessage(from, phoneNumberId, {
+        type: 'text',
+        text: '📤 Uploading your image... ⏳\n\nThis may take a few seconds...'
+      });
+
+      // Download the image from WhatsApp
+      const imageBuffer = await downloadWhatsAppMedia(message.image.id);
+
+      if (!imageBuffer) {
+        await sendWhatsAppMessage(from, phoneNumberId, {
+          type: 'text',
+          text: '❌ Sorry, I couldn\'t download your image. Please try again.'
+        });
+        return;
+      }
+
+      // Upload to Firebase Storage
+      const fileName = awaitingLogo ? `logo_${Date.now()}.jpg` : `signature_${Date.now()}.jpg`;
+      const imageUrl = await uploadToFirebaseStorage(
+        imageBuffer,
+        organizationId,
+        fileName,
+        message.image.mime_type || 'image/jpeg'
+      );
+
+      if (!imageUrl) {
+        await sendWhatsAppMessage(from, phoneNumberId, {
+          type: 'text',
+          text: '❌ Sorry, I couldn\'t upload your image. Please try again.'
+        });
+        return;
+      }
+
+      // Update organization with image URL
+      const updateData: any = {};
+      if (awaitingLogo) {
+        updateData['companyDetails.logoUrl'] = imageUrl;
+      } else {
+        updateData['companyDetails.signatureUrl'] = imageUrl;
+      }
+
+      await getDb()
+        .collection('organizations')
+        .doc(organizationId)
+        .set(updateData, { merge: true });
+
+      // Clear awaiting state
+      await updateConversationState(from, {
+        awaitingInput: null
+      });
+
+      // Send success message
+      const fieldName = awaitingLogo ? 'company logo' : 'digital signature';
+      await sendWhatsAppMessage(from, phoneNumberId, {
+        type: 'text',
+        text: `✅ ${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)} uploaded successfully!\n\n🔗 ${imageUrl}\n\nYour ${fieldName} will now appear on all your invoices. 🎉`
+      });
+
+      functions.logger.info(`${fieldName} uploaded`, {
+        organizationId,
+        imageUrl,
+        whatsappNumber: from
+      });
+
+      return;
+    }
+
+    // Not awaiting logo/signature - show general image message
     await sendWhatsAppMessage(from, phoneNumberId, {
       type: 'text',
-      text: 'I received your image. This could be used for:\n\n• Proof of Delivery (POD)\n• Damage documentation\n• Vehicle condition reports\n\nPlease describe what this image is regarding.'
+      text: 'I received your image. This could be used for:\n\n• Company Logo (for invoices)\n• Digital Signature (for invoices)\n• Proof of Delivery (POD)\n• Damage documentation\n• Vehicle condition reports\n\nPlease describe what this image is for, or say "this is for my invoice logo" or "this is my signature".'
     });
   } else if (message.type === 'document') {
     await sendWhatsAppMessage(from, phoneNumberId, {
@@ -416,6 +586,178 @@ async function handleEmailVerification(
       type: 'text',
       text: '❌ Sorry, something went wrong during verification. Please try again later.'
     });
+  }
+}
+
+/**
+ * Handle voice messages with multi-language support
+ * Uses OpenAI Whisper for transcription
+ */
+async function handleVoiceMessage(
+  message: WhatsAppMessage,
+  whatsappUser: any,
+  phoneNumberId: string,
+  userName: string
+): Promise<void> {
+  const from = message.from;
+
+  try {
+    // Get audio media ID (WhatsApp uses 'audio' type for voice notes)
+    const audio = message.audio;
+
+    if (!audio || !audio.id) {
+      await sendWhatsAppMessage(from, phoneNumberId, {
+        type: 'text',
+        text: '❌ Sorry, I couldn\'t process your voice message. Please try again.'
+      });
+      return;
+    }
+
+    // Send processing message
+    await sendWhatsAppMessage(from, phoneNumberId, {
+      type: 'text',
+      text: '🎤 Processing your voice message... ⏳'
+    });
+
+    functions.logger.info('Voice message received', {
+      from,
+      audioId: audio.id,
+      mimeType: audio.mime_type
+    });
+
+    // Download audio from WhatsApp
+    const audioBuffer = await downloadWhatsAppMedia(audio.id);
+
+    if (!audioBuffer) {
+      await sendWhatsAppMessage(from, phoneNumberId, {
+        type: 'text',
+        text: '❌ Sorry, I couldn\'t download your voice message. Please try again.'
+      });
+      return;
+    }
+
+    // Transcribe using OpenAI Whisper
+    const transcribedText = await transcribeAudioWithWhisper(audioBuffer, audio.mime_type);
+
+    if (!transcribedText) {
+      await sendWhatsAppMessage(from, phoneNumberId, {
+        type: 'text',
+        text: '❌ Sorry, I couldn\'t understand your voice message. Please try speaking more clearly or use text.'
+      });
+      return;
+    }
+
+    functions.logger.info('Voice message transcribed', {
+      from,
+      transcription: transcribedText,
+      length: transcribedText.length
+    });
+
+    // Process transcribed text through AI
+    const response = await supplyChainExpert.processMessage(from, transcribedText, userName);
+
+    // Send response with transcription for transparency
+    await sendWhatsAppMessage(from, phoneNumberId, {
+      type: 'text',
+      text: `🎤 *You said:* "${transcribedText}"\n\n${response}`
+    });
+
+  } catch (error: any) {
+    functions.logger.error('Error handling voice message', {
+      error: error.message,
+      from,
+      stack: error.stack
+    });
+
+    await sendWhatsAppMessage(from, phoneNumberId, {
+      type: 'text',
+      text: '❌ Sorry, I encountered an error processing your voice message. Please try again.'
+    });
+  }
+}
+
+/**
+ * Transcribe audio using OpenAI Whisper API
+ * Supports multiple languages: English, Hausa, Igbo, Yoruba
+ * CRITICAL: Works regardless of audio quality - uses advanced Whisper model
+ */
+async function transcribeAudioWithWhisper(
+  audioBuffer: Buffer,
+  mimeType: string
+): Promise<string | null> {
+  try {
+    // Get OpenAI API key
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY || functions.config().openai?.api_key;
+
+    if (!OPENAI_API_KEY) {
+      functions.logger.error('OpenAI API key not configured');
+      return null;
+    }
+
+    // Import form-data and axios (both already installed)
+    const FormData = require('form-data');
+    const axios = require('axios');
+
+    // Determine file extension from MIME type
+    let fileExtension = 'ogg'; // WhatsApp default
+    if (mimeType.includes('mp4')) fileExtension = 'mp4';
+    else if (mimeType.includes('mpeg')) fileExtension = 'mp3';
+    else if (mimeType.includes('wav')) fileExtension = 'wav';
+    else if (mimeType.includes('webm')) fileExtension = 'webm';
+
+    // Create FormData with audio buffer
+    const form = new FormData();
+    form.append('file', audioBuffer, {
+      filename: `audio.${fileExtension}`,
+      contentType: mimeType
+    });
+    form.append('model', 'whisper-1');
+    form.append('response_format', 'json');
+    // Language auto-detection (supports English, Hausa, Igbo, Yoruba)
+
+    functions.logger.info('Transcribing audio with Whisper', {
+      fileSize: audioBuffer.length,
+      mimeType,
+      extension: fileExtension
+    });
+
+    // Call OpenAI Whisper API using axios with form-data
+    const response = await axios.post(
+      'https://api.openai.com/v1/audio/transcriptions',
+      form,
+      {
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          ...form.getHeaders()
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      }
+    );
+
+    const transcribedText = response.data?.text?.trim();
+
+    if (!transcribedText) {
+      functions.logger.warn('Empty transcription from Whisper');
+      return null;
+    }
+
+    functions.logger.info('Whisper transcription successful', {
+      language: response.data?.language || 'auto-detected',
+      duration: response.data?.duration,
+      textLength: transcribedText.length,
+      text: transcribedText.substring(0, 100) // Log first 100 chars
+    });
+
+    return transcribedText;
+
+  } catch (error: any) {
+    functions.logger.error('Error transcribing audio with Whisper', {
+      error: error.message,
+      stack: error.stack,
+      errorDetails: error.response?.data || error
+    });
+    return null;
   }
 }
 

@@ -228,7 +228,7 @@ export interface ConversationState {
   currentIntent?: Intent;
   lastIntent?: Intent;
   awaitingConfirmation: boolean;
-  awaitingInput?: 'client_name' | 'invoice_details' | 'retry' | 'invoice_confirmation' | null;
+  awaitingInput?: 'client_name' | 'invoice_details' | 'retry' | 'invoice_confirmation' | 'logo_upload' | 'signature_upload' | null;
   conversationData: Record<string, any>;
   lastError?: string; // Store last error for retry context
   retryCount: number; // Track retry attempts

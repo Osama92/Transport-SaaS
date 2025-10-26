@@ -7,6 +7,12 @@ import Select from 'react-select';
 import { XMarkIcon, DocumentTextIcon, EnvelopeIcon, CreditCardIcon, PlusIcon, TrashIcon, ChevronDownIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon } from '../Icons';
 import { NIGERIAN_BANKS, PAYMENT_METHODS } from '../../constants/nigerianBanks';
 import { generateInvoicePdf } from '../../utils/pdfGenerator';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+    updateOrganizationCompanyDetails,
+    updateOrganizationPaymentDetails,
+    updateOrganizationBranding
+} from '../../services/firestore/organizations';
 
 interface InvoiceScreenModernProps {
     onCancel: () => void;
@@ -16,36 +22,7 @@ interface InvoiceScreenModernProps {
     clients: Client[];
 }
 
-// Load persisted invoice settings from localStorage
-const loadPersistedSettings = () => {
-    try {
-        const stored = localStorage.getItem('invoiceSettings');
-        if (stored) {
-            return JSON.parse(stored);
-        }
-    } catch (error) {
-        console.error('Error loading invoice settings:', error);
-    }
-    return null;
-};
-
-// Save invoice settings to localStorage
-const saveInvoiceSettings = (invoice: Partial<Invoice>) => {
-    try {
-        const settingsToSave = {
-            paymentDetails: invoice.paymentDetails,
-            companyLogoUrl: invoice.companyLogoUrl,
-            signatureUrl: invoice.signatureUrl,
-            from: invoice.from,
-        };
-        localStorage.setItem('invoiceSettings', JSON.stringify(settingsToSave));
-    } catch (error) {
-        console.error('Error saving invoice settings:', error);
-    }
-};
-
-const createInitialInvoice = (): Invoice => {
-    const persisted = loadPersistedSettings();
+const createInitialInvoice = (organization: any): Invoice => {
 
     const invoiceId = `INV${Date.now().toString().slice(-6)}`;
     const currentDate = new Date();
@@ -56,15 +33,15 @@ const createInitialInvoice = (): Invoice => {
     return {
         id: invoiceId,
         invoiceNumber: invoiceNumber,
-        organizationId: '', // Will be set when saving
+        organizationId: organization?.id || '', // Will be set when saving
         project: '',
         issuedDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
         dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-        from: persisted?.from || {
-            name: 'Your Company',
-            address: '123 Main Street',
-            email: 'billing@yourcompany.com',
-            phone: '(555) 123-4567',
+        from: {
+            name: organization?.name || 'Your Company',
+            address: organization?.companyDetails?.address || '123 Main Street',
+            email: organization?.companyDetails?.email || 'billing@yourcompany.com',
+            phone: organization?.companyDetails?.phone || '(555) 123-4567',
         },
         to: {
             name: '',
@@ -77,15 +54,15 @@ const createInitialInvoice = (): Invoice => {
         ],
         total: 0, // Will be calculated
         notes: 'Thank you for your business.',
-        paymentDetails: persisted?.paymentDetails || {
+        paymentDetails: {
             method: 'Bank Transfer',
-            accountName: 'Your Company Inc.',
-            code: '123456',
-            accountNumber: '987654321',
-            bankName: 'Your Bank'
+            accountName: organization?.paymentDetails?.bankAccountName || 'Your Company Inc.',
+            code: '',
+            accountNumber: organization?.paymentDetails?.bankAccountNumber || '987654321',
+            bankName: organization?.paymentDetails?.bankName || 'Your Bank'
         },
-        companyLogoUrl: persisted?.companyLogoUrl,
-        signatureUrl: persisted?.signatureUrl,
+        companyLogoUrl: organization?.companyDetails?.logoUrl,
+        signatureUrl: organization?.companyDetails?.signatureUrl,
         vatRate: 7.5,
         vatInclusive: false,
         status: 'Draft',
@@ -93,7 +70,8 @@ const createInitialInvoice = (): Invoice => {
 };
 
 const InvoiceScreenModern: React.FC<InvoiceScreenModernProps> = ({ onCancel, onSave, invoiceData, onEmailRequest, clients }) => {
-    const [invoice, setInvoice] = useState<Invoice>(invoiceData || createInitialInvoice());
+    const { organization, organizationId } = useAuth();
+    const [invoice, setInvoice] = useState<Invoice>(invoiceData || createInitialInvoice(organization));
     const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplateType>(invoiceData?.template || 'pdf');
 
     // Helper to convert date string to ISO format for input[type="date"]
@@ -143,12 +121,46 @@ const InvoiceScreenModern: React.FC<InvoiceScreenModernProps> = ({ onCancel, onS
         };
     }, [showSaveDropdown]);
 
-    // Save settings whenever payment details, branding, or company info changes
+    // Save settings to Firebase whenever payment details, branding, or company info changes
     useEffect(() => {
-        if (invoice) {
-            saveInvoiceSettings(invoice);
-        }
-    }, [invoice.paymentDetails, invoice.companyLogoUrl, invoice.signatureUrl, invoice.from]);
+        if (!organizationId || !invoice) return;
+
+        const saveToFirebase = async () => {
+            try {
+                // Update company details if changed
+                if (invoice.from) {
+                    await updateOrganizationCompanyDetails(organizationId, {
+                        address: invoice.from.address,
+                        email: invoice.from.email,
+                        phone: invoice.from.phone,
+                    });
+                }
+
+                // Update payment details if changed
+                if (invoice.paymentDetails) {
+                    await updateOrganizationPaymentDetails(organizationId, {
+                        bankAccountName: invoice.paymentDetails.accountName,
+                        bankAccountNumber: invoice.paymentDetails.accountNumber,
+                        bankName: invoice.paymentDetails.bankName,
+                    });
+                }
+
+                // Update branding if changed
+                if (invoice.companyLogoUrl || invoice.signatureUrl) {
+                    await updateOrganizationBranding(organizationId, {
+                        logoUrl: invoice.companyLogoUrl,
+                        signatureUrl: invoice.signatureUrl,
+                    });
+                }
+            } catch (error) {
+                console.error('Error saving invoice settings to Firebase:', error);
+            }
+        };
+
+        // Debounce the save to avoid too many Firebase writes
+        const timeoutId = setTimeout(saveToFirebase, 1000);
+        return () => clearTimeout(timeoutId);
+    }, [invoice.paymentDetails, invoice.companyLogoUrl, invoice.signatureUrl, invoice.from, organizationId]);
 
     // Calculate auto-fit scale
     useLayoutEffect(() => {

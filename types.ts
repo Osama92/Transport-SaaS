@@ -64,7 +64,13 @@ export interface Organization extends FirestoreDocument {
         tin?: string;
         cacNumber?: string;
         logoUrl?: string;
+        signatureUrl?: string;
         website?: string;
+    };
+    paymentDetails?: {
+        bankAccountName: string;
+        bankAccountNumber: string;
+        bankName: string;
     };
 }
 

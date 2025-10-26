@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import * as admin from 'firebase-admin';
 import { FirebaseQueries } from './firebaseQueries';
 import { AnalyticsEngine } from './analyticsEngine';
+import { handlePreviewInvoice } from './invoiceHandlers';
 
 /**
  * OpenAI Integration with Function Calling
@@ -127,9 +128,22 @@ export class OpenAIIntegration {
         message: string,
         conversationHistory: Array<{ role: 'user' | 'assistant'; message: string; timestamp: Date }>
     ): Promise<string> {
+        // Track if invoice was created to trigger automatic preview
+        let invoiceCreated = false;
+        let createdInvoiceNumber = '';
+
         try {
+            console.log('========================================');
+            console.log('🤖 [OPENAI] Starting message processing');
+            console.log('📱 [OPENAI] Phone:', phoneNumber);
+            console.log('💬 [OPENAI] Message:', message);
+            console.log('========================================');
+
             const organizationId = await this.getOrganizationId(phoneNumber);
             const userId = await this.getUserId(phoneNumber);
+
+            console.log('🔑 [OPENAI] Organization ID:', organizationId);
+            console.log('👤 [OPENAI] User ID:', userId);
 
             // Build conversation messages for OpenAI with optimized system prompt
             const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -141,10 +155,11 @@ CAPABILITIES: Query/create routes, drivers, vehicles, clients, invoices, expense
 
 RULES:
 1. ALWAYS use functions for real data - never fabricate
-2. Keep responses 2-3 sentences max
+2. CRITICAL: Keep ALL responses BRIEF and TO THE POINT - 1-2 sentences maximum unless more detail is specifically requested. Be CONCISE in ALL languages (English/Pidgin/Hausa/Igbo/Yoruba)
 3. Use Nigerian Naira (₦)
 4. Be warm, professional, match user's language (English/Pidgin/Hausa/Igbo/Yoruba)
 5. Extract all info from messages when possible
+6. BREVITY IS KEY - users prefer short, direct answers
 
 CONTEXT: OrgID=${organizationId}, UserID=${userId}
 
@@ -173,10 +188,9 @@ EXAMPLES:
                 }
             ];
 
-            // Add conversation history (last 4 messages only - cost optimization)
-            // This keeps context while reducing token usage by 60%
-            const recentHistory = conversationHistory.slice(-4);
-            for (const msg of recentHistory) {
+            // Add FULL conversation history - UNLIMITED memory for seamless conversations
+            // Users should never need to reiterate - the AI remembers everything
+            for (const msg of conversationHistory) {
                 messages.push({
                     role: msg.role === 'user' ? 'user' : 'assistant',
                     content: msg.message
@@ -315,13 +329,13 @@ EXAMPLES:
                     type: 'function',
                     function: {
                         name: 'get_expenses',
-                        description: 'Get expenses with optional filters by category or date range',
+                        description: 'Get expenses with optional filters by type or date range',
                         parameters: {
                             type: 'object',
                             properties: {
-                                category: {
+                                type: {
                                     type: 'string',
-                                    description: 'Filter expenses by category (e.g., Fuel, Maintenance, Salary)'
+                                    description: 'Filter expenses by type (e.g., Fuel, Maintenance, Salary)'
                                 },
                                 startDate: {
                                     type: 'string',
@@ -393,7 +407,7 @@ EXAMPLES:
                     type: 'function',
                     function: {
                         name: 'analyze_expenses',
-                        description: 'Analyze expenses by category and identify cost optimization opportunities',
+                        description: 'Analyze expenses by type and identify cost optimization opportunities',
                         parameters: {
                             type: 'object',
                             properties: {
@@ -514,10 +528,10 @@ EXAMPLES:
                                     type: 'string',
                                     description: 'Route ID to add expense to'
                                 },
-                                category: {
+                                type: {
                                     type: 'string',
                                     enum: ['Fuel', 'Tolls', 'Maintenance', 'Food', 'Accommodation', 'Other'],
-                                    description: 'Expense category'
+                                    description: 'Expense type'
                                 },
                                 amount: {
                                     type: 'number',
@@ -528,7 +542,7 @@ EXAMPLES:
                                     description: 'Description of the expense'
                                 }
                             },
-                            required: ['routeId', 'category', 'amount']
+                            required: ['routeId', 'type', 'amount']
                         }
                     }
                 },
@@ -808,6 +822,92 @@ EXAMPLES:
                 {
                     type: 'function',
                     function: {
+                        name: 'update_invoice',
+                        description: 'Update an existing invoice. Can update client, items, VAT settings, template, notes, status, or due date.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                invoiceNumber: {
+                                    type: 'string',
+                                    description: 'Invoice number to update (e.g., INV-202510-0001)'
+                                },
+                                clientName: {
+                                    type: 'string',
+                                    description: 'New client name (optional)'
+                                },
+                                items: {
+                                    type: 'array',
+                                    description: 'Updated list of items/services (optional)',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            description: {
+                                                type: 'string',
+                                                description: 'Item/service description'
+                                            },
+                                            quantity: {
+                                                type: 'number',
+                                                description: 'Quantity of items'
+                                            },
+                                            unitPrice: {
+                                                type: 'number',
+                                                description: 'Price per unit in Naira'
+                                            }
+                                        },
+                                        required: ['description', 'quantity', 'unitPrice']
+                                    }
+                                },
+                                vatRate: {
+                                    type: 'number',
+                                    description: 'New VAT percentage (optional, e.g., 7.5)'
+                                },
+                                vatInclusive: {
+                                    type: 'boolean',
+                                    description: 'Whether VAT is inclusive (optional)'
+                                },
+                                template: {
+                                    type: 'string',
+                                    enum: ['classic', 'modern', 'minimal', 'professional'],
+                                    description: 'Invoice template (optional)'
+                                },
+                                notes: {
+                                    type: 'string',
+                                    description: 'Updated notes or payment terms (optional)'
+                                },
+                                status: {
+                                    type: 'string',
+                                    enum: ['Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled'],
+                                    description: 'New invoice status (optional)'
+                                },
+                                dueDate: {
+                                    type: 'string',
+                                    description: 'New due date in YYYY-MM-DD format (optional)'
+                                }
+                            },
+                            required: ['invoiceNumber']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'delete_invoice',
+                        description: 'Delete an invoice. Only Draft or Cancelled invoices can be deleted. Paid invoices must be cancelled first.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                invoiceNumber: {
+                                    type: 'string',
+                                    description: 'Invoice number to delete (e.g., INV-202510-0001)'
+                                }
+                            },
+                            required: ['invoiceNumber']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
                         name: 'verify_bank_account',
                         description: 'Verify a Nigerian bank account number using Paystack API',
                         parameters: {
@@ -823,6 +923,118 @@ EXAMPLES:
                                 }
                             },
                             required: ['accountNumber', 'bankCode']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'get_organization_profile',
+                        description: 'Get current organization profile including company details and payment information',
+                        parameters: {
+                            type: 'object',
+                            properties: {}
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'update_company_details',
+                        description: 'Update company information such as name, address, email, phone, logo, website, TIN, or CAC number',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                name: {
+                                    type: 'string',
+                                    description: 'Company name'
+                                },
+                                address: {
+                                    type: 'string',
+                                    description: 'Company address'
+                                },
+                                email: {
+                                    type: 'string',
+                                    description: 'Company email'
+                                },
+                                phone: {
+                                    type: 'string',
+                                    description: 'Company phone number'
+                                },
+                                logoUrl: {
+                                    type: 'string',
+                                    description: 'Company logo URL'
+                                },
+                                website: {
+                                    type: 'string',
+                                    description: 'Company website'
+                                },
+                                tin: {
+                                    type: 'string',
+                                    description: 'Tax Identification Number'
+                                },
+                                cacNumber: {
+                                    type: 'string',
+                                    description: 'Corporate Affairs Commission Number'
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'update_payment_details',
+                        description: 'Update bank account details for invoice payments',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                bankAccountName: {
+                                    type: 'string',
+                                    description: 'Bank account holder name'
+                                },
+                                bankAccountNumber: {
+                                    type: 'string',
+                                    description: 'Bank account number'
+                                },
+                                bankName: {
+                                    type: 'string',
+                                    description: 'Bank name (e.g., Access Bank, GTBank, Opay)'
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'request_logo_upload',
+                        description: 'Request user to upload company logo image for invoices. Use when user says "upload logo", "add my logo", "change logo", "set company logo", etc.',
+                        parameters: {
+                            type: 'object',
+                            properties: {}
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'request_signature_upload',
+                        description: 'Request user to upload digital signature image for invoices. Use when user says "upload signature", "add signature", "change signature", "set my signature", etc.',
+                        parameters: {
+                            type: 'object',
+                            properties: {}
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'get_dashboard_stats',
+                        description: 'Get dashboard statistics including wallet balance, expected earnings, routes assigned, completed routes, and pending routes. Use when user says "show dashboard", "my dashboard", "show stats", "show overview", etc.',
+                        parameters: {
+                            type: 'object',
+                            properties: {}
                         }
                     }
                 }
@@ -853,7 +1065,10 @@ EXAMPLES:
                     const functionName = toolCall.function.name;
                     const functionArgs = JSON.parse(toolCall.function.arguments);
 
-                    console.log(`Calling function: ${functionName} with args:`, functionArgs);
+                    console.log('========================================');
+                    console.log(`⚡ [FUNCTION CALL] Function: ${functionName}`);
+                    console.log(`📦 [FUNCTION CALL] Arguments:`, JSON.stringify(functionArgs, null, 2));
+                    console.log('========================================');
 
                     let functionResult: any;
 
@@ -936,7 +1151,15 @@ EXAMPLES:
                             break;
 
                         case 'get_wallet_balance':
-                            functionResult = await this.queries.getWalletBalance(userId);
+                            // Use organization wallet balance (same as dashboard)
+                            const orgDoc = await this.db.collection('organizations').doc(organizationId).get();
+                            const orgData = orgDoc.data();
+                            const balance = orgData?.walletBalance ||
+                                          orgData?.wallet?.balance ||
+                                          orgData?.balance ||
+                                          0;
+                            functionResult = balance;
+                            console.log('[GET_WALLET_BALANCE] Balance:', balance);
                             break;
 
                         case 'get_notifications':
@@ -980,6 +1203,12 @@ EXAMPLES:
 
                         case 'create_invoice':
                             functionResult = await this.createInvoice(organizationId, phoneNumber, functionArgs);
+                            // Track invoice creation for automatic preview
+                            if (functionResult.success && functionResult.invoiceNumber) {
+                                invoiceCreated = true;
+                                createdInvoiceNumber = functionResult.invoiceNumber;
+                                console.log('[INVOICE CREATE] ✅ Invoice created, will trigger preview:', createdInvoiceNumber);
+                            }
                             break;
 
                         case 'get_invoice':
@@ -990,13 +1219,50 @@ EXAMPLES:
                             functionResult = await this.sendInvoice(organizationId, functionArgs.invoiceNumber);
                             break;
 
+                        case 'update_invoice':
+                            functionResult = await this.updateInvoice(organizationId, functionArgs.invoiceNumber, functionArgs);
+                            break;
+
+                        case 'delete_invoice':
+                            functionResult = await this.deleteInvoice(organizationId, functionArgs.invoiceNumber);
+                            break;
+
                         case 'verify_bank_account':
                             functionResult = await this.verifyBankAccount(functionArgs);
+                            break;
+
+                        case 'get_organization_profile':
+                            functionResult = await this.getOrganizationProfile(organizationId);
+                            break;
+
+                        case 'update_company_details':
+                            functionResult = await this.updateCompanyDetails(organizationId, functionArgs);
+                            break;
+
+                        case 'update_payment_details':
+                            functionResult = await this.updatePaymentDetails(organizationId, functionArgs);
+                            break;
+
+                        case 'request_logo_upload':
+                            functionResult = await this.requestLogoUpload(phoneNumber);
+                            break;
+
+                        case 'request_signature_upload':
+                            functionResult = await this.requestSignatureUpload(phoneNumber);
+                            break;
+
+                        case 'get_dashboard_stats':
+                            functionResult = await this.getDashboardStats(organizationId);
                             break;
 
                         default:
                             functionResult = { error: `Unknown function: ${functionName}` };
                     }
+
+                    console.log('========================================');
+                    console.log(`✅ [FUNCTION RESULT] Function: ${functionName}`);
+                    console.log(`📊 [FUNCTION RESULT] Result:`, JSON.stringify(functionResult, null, 2));
+                    console.log('========================================');
 
                     // Add function result to messages
                     messages.push({
@@ -1018,10 +1284,39 @@ EXAMPLES:
                 assistantMessage = response.choices[0].message;
             }
 
+            const finalResponse = assistantMessage.content || 'I processed your request but encountered an issue generating a response.';
+
+            console.log('========================================');
+            console.log('🎯 [OPENAI] Final Response:', finalResponse);
+            console.log('========================================');
+
+            // AFTER returning the response, trigger automatic invoice preview if invoice was created
+            if (invoiceCreated && createdInvoiceNumber) {
+                console.log('[INVOICE PREVIEW] Triggering automatic preview for:', createdInvoiceNumber);
+
+                // Get WhatsApp phone number ID from environment
+                const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+                if (phoneNumberId) {
+                    // Trigger preview generation asynchronously (don't await, let it run in background)
+                    handlePreviewInvoice(organizationId, createdInvoiceNumber, phoneNumber, phoneNumberId)
+                        .then(() => {
+                            console.log('[INVOICE PREVIEW] ✅ Preview sent successfully for:', createdInvoiceNumber);
+                        })
+                        .catch((err) => {
+                            console.error('[INVOICE PREVIEW] ❌ Error sending preview:', err);
+                        });
+                } else {
+                    console.error('[INVOICE PREVIEW] ❌ WhatsApp phone number ID not configured in environment');
+                }
+            }
+
             // Return final response
-            return assistantMessage.content || 'I processed your request but encountered an issue generating a response.';
+            return finalResponse;
         } catch (error) {
-            console.error('Error in OpenAI processing:', error);
+            console.error('========================================');
+            console.error('❌ [OPENAI] Error in processing:', error);
+            console.error('========================================');
             throw error;
         }
     }
@@ -1202,7 +1497,7 @@ EXAMPLES:
 
             // Create expense in subcollection
             const expenseData = {
-                category: data.category,
+                type: data.type,
                 amount: data.amount,
                 description: data.description || '',
                 date: admin.firestore.FieldValue.serverTimestamp(),
@@ -1219,7 +1514,7 @@ EXAMPLES:
             return {
                 success: true,
                 expenseId: expenseRef.id,
-                message: `${data.category} expense of ₦${data.amount.toLocaleString()} added to route`,
+                message: `${data.type} expense of ₦${data.amount.toLocaleString()} added to route`,
                 data: {
                     ...expenseData,
                     id: expenseRef.id,
@@ -1254,36 +1549,30 @@ EXAMPLES:
             }
 
             // Find driver by name in the organization
-            console.log('[ROUTE ASSIGN] Searching for driver:', data.driverName, 'in org:', organizationId);
-
             const driversSnapshot = await this.db.collection('drivers')
                 .where('organizationId', '==', organizationId)
                 .where('name', '==', data.driverName)
                 .limit(1)
                 .get();
 
-            console.log('[ROUTE ASSIGN] Drivers found:', driversSnapshot.size);
-
             if (driversSnapshot.empty) {
-                // List available drivers for debugging
+                // List available drivers
                 const allDriversSnapshot = await this.db.collection('drivers')
                     .where('organizationId', '==', organizationId)
-                    .limit(10)
+                    .limit(20)
                     .get();
 
-                const availableDrivers = allDriversSnapshot.docs.map((doc: any) => doc.data().name);
-                console.log('[ROUTE ASSIGN] Available drivers in org:', availableDrivers);
+                const availableDriverNames = allDriversSnapshot.docs.map((doc: any) => doc.data().name).filter(Boolean);
 
                 return {
                     success: false,
-                    error: `Driver "${data.driverName}" not found. Available drivers: ${availableDrivers.join(', ')}`
+                    error: `Driver "${data.driverName}" not found in your organization. Available drivers: ${availableDriverNames.join(', ') || 'None'}. Please check the spelling and try again.`
                 };
             }
 
             const driverDoc = driversSnapshot.docs[0];
             const driverId = driverDoc.id;
             const driverData = driverDoc.data();
-            console.log('[ROUTE ASSIGN] ✅ Found driver:', driverId, data.driverName);
 
             // Find vehicle by plate if provided
             let vehicleId = null;
@@ -1298,44 +1587,45 @@ EXAMPLES:
                 if (!vehiclesSnapshot.empty) {
                     vehicleId = vehiclesSnapshot.docs[0].id;
                     vehiclePlate = data.vehiclePlate.toUpperCase();
-                    console.log('[ROUTE ASSIGN] ✅ Found vehicle:', vehicleId, vehiclePlate);
                 } else {
-                    console.log('[ROUTE ASSIGN] ❌ Vehicle not found:', data.vehiclePlate);
-                    // Return error if vehicle was specified but not found
-                    return {
-                        success: false,
-                        error: `Vehicle with plate "${data.vehiclePlate}" not found in your organization`
-                    };
+                    // Vehicle not found, continue without it
+                    vehicleId = null;
+                    vehiclePlate = '';
                 }
             }
 
             // Update route with assignments
-            await this.db.collection('routes').doc(data.routeId).update({
+            const updateData: any = {
                 assignedDriverId: driverId,
                 assignedDriverName: data.driverName,
-                assignedVehicleId: vehicleId,
-                assignedVehiclePlate: vehiclePlate,
                 driverName: data.driverName,
                 driverId: driverId,
-                vehicleId: vehicleId,
-                vehicle: vehiclePlate,
                 driverAvatar: driverData.photoURL || '',
-                status: 'Pending', // Keep as pending until driver starts the route
+                status: 'In Progress', // Change to In Progress when assigned
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
+            };
 
-            console.log('[ROUTE ASSIGN] ✅ Route assigned successfully');
+            // Only add vehicle fields if vehicle was found
+            if (vehicleId) {
+                updateData.assignedVehicleId = vehicleId;
+                updateData.assignedVehiclePlate = vehiclePlate;
+                updateData.vehicleId = vehicleId;
+                updateData.vehicle = vehiclePlate;
+            }
+
+            await this.db.collection('routes').doc(data.routeId).update(updateData);
 
             return {
                 success: true,
                 message: vehiclePlate
-                    ? `Route assigned to driver ${data.driverName} with vehicle ${vehiclePlate}`
-                    : `Route assigned to driver ${data.driverName}`,
+                    ? `✅ Route assigned successfully!\n\n👤 Driver: ${data.driverName}\n🚛 Vehicle: ${vehiclePlate}\n📍 Status: In Progress`
+                    : `✅ Route assigned successfully!\n\n👤 Driver: ${data.driverName}\n🚛 Vehicle: Not assigned\n📍 Status: In Progress`,
                 data: {
                     routeId: data.routeId,
                     driverName: data.driverName,
                     driverId: driverId,
-                    vehiclePlate: vehiclePlate || 'Not assigned'
+                    vehiclePlate: vehiclePlate || 'Not assigned',
+                    status: 'In Progress'
                 }
             };
         } catch (error) {
@@ -1878,75 +2168,197 @@ EXAMPLES:
 
     /**
      * Create a new invoice in Firebase
+     * Document ID format: WA-YYYYMMDD-random (identifies WhatsApp-created invoices)
      */
     private async createInvoice(organizationId: string, phoneNumber: string, data: any): Promise<any> {
         try {
-            // Generate invoice number
-            const date = new Date();
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
+            console.log('[INVOICE CREATE] Starting invoice creation via WhatsApp...');
+            console.log('[INVOICE CREATE] Organization ID:', organizationId);
+            console.log('[INVOICE CREATE] Invoice data:', data);
 
-            // Get invoice count for this month
+            // Generate document ID in format: WA-YYYYMMDD-random
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const randomSuffix = Math.random().toString(36).substring(2, 8);
+            const invoiceId = `WA-${year}${month}${day}-${randomSuffix}`;
+
+            console.log('[INVOICE CREATE] Generated invoice document ID:', invoiceId);
+
+            // Generate invoice number for display (INV-YYYYMM-0001)
             const invoicesRef = this.db.collection('invoices')
                 .where('organizationId', '==', organizationId)
-                .where('createdAt', '>=', new Date(year, date.getMonth(), 1))
-                .where('createdAt', '<', new Date(year, date.getMonth() + 1, 1));
+                .where('createdAt', '>=', new Date(year, now.getMonth(), 1))
+                .where('createdAt', '<', new Date(year, now.getMonth() + 1, 1));
 
             const snapshot = await invoicesRef.get();
             const invoiceCount = snapshot.size + 1;
             const invoiceNumber = `INV-${year}${month}-${String(invoiceCount).padStart(4, '0')}`;
 
-            // Calculate totals
+            console.log('[INVOICE CREATE] Generated invoice number:', invoiceNumber);
+
+            // Get userId from phoneNumber
+            const userId = await this.getUserId(phoneNumber);
+
+            // Find client by name if provided
+            let clientId = null;
+            let clientEmail = '';
+            let clientAddress = '';
+            if (data.clientName) {
+                const clientsSnapshot = await this.db.collection('clients')
+                    .where('organizationId', '==', organizationId)
+                    .where('name', '==', data.clientName)
+                    .limit(1)
+                    .get();
+
+                if (!clientsSnapshot.empty) {
+                    const clientDoc = clientsSnapshot.docs[0];
+                    clientId = clientDoc.id;
+                    const clientData = clientDoc.data();
+                    clientEmail = clientData.email || '';
+                    clientAddress = clientData.address || '';
+                    console.log('[INVOICE CREATE] Found client:', clientId, data.clientName);
+                } else {
+                    console.log('[INVOICE CREATE] Client not found, will create invoice without client link');
+                }
+            }
+
+            // Get organization details for "from" field
+            const orgDoc = await this.db.collection('organizations').doc(organizationId).get();
+            const orgData = orgDoc.exists ? orgDoc.data() : null;
+
+            // Calculate totals based on VAT inclusive/exclusive
             const items = data.items || [];
             const subtotal = items.reduce((sum: number, item: any) =>
                 sum + (item.quantity * item.unitPrice), 0);
 
-            const vatRate = data.vatInclusive ? (data.vatRate || 7.5) : 0;
-            const vatAmount = subtotal * (vatRate / 100);
-            const total = subtotal + vatAmount;
+            const vatRate = data.vatRate || 7.5;
+            const vatInclusive = data.vatInclusive || false;
 
-            // Create invoice data
+            let vatAmount = 0;
+            let total = 0;
+
+            if (vatInclusive) {
+                // VAT is included in the price: VAT = Total × (Rate / (100 + Rate))
+                total = subtotal;
+                vatAmount = total * (vatRate / (100 + vatRate));
+            } else {
+                // VAT is added on top: VAT = Subtotal × Rate
+                vatAmount = subtotal * (vatRate / 100);
+                total = subtotal + vatAmount;
+            }
+
+            console.log('[INVOICE CREATE] Subtotal:', subtotal, 'VAT:', vatAmount, 'Total:', total);
+
+            // Create invoice data matching Firebase structure
             const invoiceData = {
                 organizationId,
                 invoiceNumber,
-                clientName: data.clientName,
-                items: items,
-                subtotal,
-                vatRate,
-                vatAmount,
-                total,
-                status: 'Draft',
+                clientId: clientId,
+                clientName: data.clientName || '',
+                clientEmail: clientEmail,
+                clientAddress: clientAddress,
+
+                // Invoice details
+                project: `WhatsApp Invoice for ${data.clientName}`,
+                issuedDate: now.toISOString().split('T')[0],
+                dueDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days
+
+                // Company details
+                from: {
+                    name: orgData?.companyDetails?.name || orgData?.name || 'Your Company',
+                    address: orgData?.companyDetails?.address || orgData?.address || '',
+                    city: orgData?.companyDetails?.city || orgData?.city || '',
+                    state: orgData?.companyDetails?.state || orgData?.state || '',
+                    phone: orgData?.companyDetails?.phone || orgData?.phone || '',
+                    email: orgData?.companyDetails?.email || orgData?.email || '',
+                    logoUrl: orgData?.companyDetails?.logoUrl || '',
+                    signatureUrl: orgData?.companyDetails?.signatureUrl || ''
+                },
+                to: {
+                    name: data.clientName || '',
+                    address: clientAddress,
+                    city: '',
+                    state: '',
+                    phone: '',
+                    email: clientEmail
+                },
+
+                // Line items
+                items: items.map((item: any) => ({
+                    description: item.description,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    total: item.quantity * item.unitPrice
+                })),
+
+                // Totals
+                subtotal: vatInclusive ? subtotal - vatAmount : subtotal,
+                tax: vatAmount,
+                vatAmount: vatAmount,
+                vatRate: vatRate,
+                vatInclusive: vatInclusive,
+                total: total,
+
+                // Payment details
+                paymentDetails: {
+                    method: 'Bank Transfer',
+                    accountName: orgData?.paymentDetails?.bankAccountName || '',
+                    accountNumber: orgData?.paymentDetails?.bankAccountNumber || '',
+                    bankName: orgData?.paymentDetails?.bankName || '',
+                    paymentInstructions: ''
+                },
+
+                // Status and metadata
+                status: 'Draft' as const,
+                template: data.template || 'classic',
                 notes: data.notes || '',
+
+                // Timestamps
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdBy: userId
             };
 
-            const invoiceRef = await this.db.collection('invoices').add(invoiceData);
+            console.log('[INVOICE CREATE] Saving invoice to Firestore with ID:', invoiceId);
+            await this.db.collection('invoices').doc(invoiceId).set(invoiceData);
+
+            console.log('[INVOICE CREATE] ✅ Invoice saved successfully!');
 
             // Store invoice number in conversation context for "show" and "send" commands
             await this.db.collection('whatsapp_conversations').doc(phoneNumber).set({
                 lastInvoiceNumber: invoiceNumber,
+                lastInvoiceId: invoiceId,
                 lastClientName: data.clientName,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
 
             return {
                 success: true,
-                invoiceId: invoiceRef.id,
-                invoiceNumber,
+                invoiceId: invoiceId,
+                invoiceNumber: invoiceNumber,
                 message: `Invoice ${invoiceNumber} created successfully`,
                 data: {
-                    ...invoiceData,
-                    subtotal: `₦${subtotal.toLocaleString()}`,
-                    vatAmount: vatAmount > 0 ? `₦${vatAmount.toLocaleString()}` : '₦0',
-                    total: `₦${total.toLocaleString()}`
+                    id: invoiceId,
+                    invoiceNumber: invoiceNumber,
+                    clientName: data.clientName,
+                    template: data.template || 'classic',
+                    vatInclusive: vatInclusive,
+                    subtotal: `₦${(vatInclusive ? subtotal - vatAmount : subtotal).toLocaleString()}`,
+                    vatAmount: `₦${vatAmount.toLocaleString()} (${vatRate}%)`,
+                    total: `₦${total.toLocaleString()}`,
+                    status: 'Draft',
+                    items: items.map((item: any) =>
+                        `${item.description} (${item.quantity} × ₦${item.unitPrice.toLocaleString()})`
+                    ).join(', ')
                 }
             };
         } catch (error) {
-            console.error('Error creating invoice:', error);
+            console.error('[INVOICE CREATE] ❌ Error creating invoice:', error);
             return {
                 success: false,
-                error: 'Failed to create invoice'
+                error: 'Failed to create invoice: ' + (error as Error).message
             };
         }
     }
@@ -2060,6 +2472,492 @@ EXAMPLES:
             return {
                 success: false,
                 error: 'Failed to send invoice'
+            };
+        }
+    }
+
+    /**
+     * Update an existing invoice in Firebase
+     */
+    private async updateInvoice(organizationId: string, invoiceNumber: string, updates: any): Promise<any> {
+        try {
+            console.log('[INVOICE UPDATE] Updating invoice:', invoiceNumber);
+            console.log('[INVOICE UPDATE] Updates:', updates);
+
+            // Find invoice by invoice number
+            const snapshot = await this.db.collection('invoices')
+                .where('organizationId', '==', organizationId)
+                .where('invoiceNumber', '==', invoiceNumber)
+                .limit(1)
+                .get();
+
+            if (snapshot.empty) {
+                return {
+                    success: false,
+                    error: `Invoice ${invoiceNumber} not found`
+                };
+            }
+
+            const invoiceDoc = snapshot.docs[0];
+            const invoiceData = invoiceDoc.data();
+
+            // Prepare update data
+            const updateData: any = {
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            };
+
+            // Update allowed fields
+            if (updates.clientName !== undefined) {
+                updateData.clientName = updates.clientName;
+
+                // Try to find and link client
+                if (updates.clientName) {
+                    const clientsSnapshot = await this.db.collection('clients')
+                        .where('organizationId', '==', organizationId)
+                        .where('name', '==', updates.clientName)
+                        .limit(1)
+                        .get();
+
+                    if (!clientsSnapshot.empty) {
+                        const clientDoc = clientsSnapshot.docs[0];
+                        const clientData = clientDoc.data();
+                        updateData.clientId = clientDoc.id;
+                        updateData.clientEmail = clientData.email || '';
+                        updateData.clientAddress = clientData.address || '';
+                    }
+                }
+            }
+
+            if (updates.items !== undefined) {
+                // Recalculate totals if items changed
+                const items = updates.items;
+                const subtotal = items.reduce((sum: number, item: any) =>
+                    sum + (item.quantity * item.unitPrice), 0);
+
+                const vatRate = updates.vatRate !== undefined ? updates.vatRate : (invoiceData.vatRate || 7.5);
+                const vatInclusive = updates.vatInclusive !== undefined ? updates.vatInclusive : (invoiceData.vatInclusive || false);
+
+                let vatAmount = 0;
+                let total = 0;
+
+                if (vatInclusive) {
+                    total = subtotal;
+                    vatAmount = total * (vatRate / (100 + vatRate));
+                } else {
+                    vatAmount = subtotal * (vatRate / 100);
+                    total = subtotal + vatAmount;
+                }
+
+                updateData.items = items.map((item: any) => ({
+                    description: item.description,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    total: item.quantity * item.unitPrice
+                }));
+                updateData.subtotal = vatInclusive ? subtotal - vatAmount : subtotal;
+                updateData.tax = vatAmount;
+                updateData.vatAmount = vatAmount;
+                updateData.total = total;
+            }
+
+            if (updates.vatRate !== undefined) updateData.vatRate = updates.vatRate;
+            if (updates.vatInclusive !== undefined) updateData.vatInclusive = updates.vatInclusive;
+            if (updates.template !== undefined) updateData.template = updates.template;
+            if (updates.notes !== undefined) updateData.notes = updates.notes;
+            if (updates.status !== undefined) updateData.status = updates.status;
+            if (updates.dueDate !== undefined) updateData.dueDate = updates.dueDate;
+
+            // Update invoice in Firestore
+            await invoiceDoc.ref.update(updateData);
+
+            console.log('[INVOICE UPDATE] ✅ Invoice updated successfully');
+
+            return {
+                success: true,
+                message: `Invoice ${invoiceNumber} updated successfully`,
+                data: {
+                    invoiceNumber: invoiceNumber,
+                    updated: Object.keys(updateData).filter(k => k !== 'updatedAt')
+                }
+            };
+        } catch (error) {
+            console.error('[INVOICE UPDATE] ❌ Error updating invoice:', error);
+            return {
+                success: false,
+                error: 'Failed to update invoice: ' + (error as Error).message
+            };
+        }
+    }
+
+    /**
+     * Delete an invoice from Firebase
+     */
+    private async deleteInvoice(organizationId: string, invoiceNumber: string): Promise<any> {
+        try {
+            console.log('[INVOICE DELETE] Deleting invoice:', invoiceNumber);
+
+            // Find invoice by invoice number
+            const snapshot = await this.db.collection('invoices')
+                .where('organizationId', '==', organizationId)
+                .where('invoiceNumber', '==', invoiceNumber)
+                .limit(1)
+                .get();
+
+            if (snapshot.empty) {
+                return {
+                    success: false,
+                    error: `Invoice ${invoiceNumber} not found`
+                };
+            }
+
+            const invoiceDoc = snapshot.docs[0];
+            const invoiceData = invoiceDoc.data();
+
+            // Check if invoice can be deleted (only Draft or Cancelled invoices)
+            if (invoiceData.status === 'Paid') {
+                return {
+                    success: false,
+                    error: `Cannot delete paid invoice ${invoiceNumber}. Please cancel it first.`
+                };
+            }
+
+            // Delete the invoice
+            await invoiceDoc.ref.delete();
+
+            console.log('[INVOICE DELETE] ✅ Invoice deleted successfully');
+
+            return {
+                success: true,
+                message: `Invoice ${invoiceNumber} deleted successfully`,
+                data: {
+                    invoiceNumber: invoiceNumber,
+                    clientName: invoiceData.clientName || 'Unknown'
+                }
+            };
+        } catch (error) {
+            console.error('[INVOICE DELETE] ❌ Error deleting invoice:', error);
+            return {
+                success: false,
+                error: 'Failed to delete invoice: ' + (error as Error).message
+            };
+        }
+    }
+
+    /**
+     * Get organization profile (company details + payment details)
+     */
+    private async getOrganizationProfile(organizationId: string): Promise<any> {
+        try {
+            console.log('[ORG PROFILE] Getting organization profile for:', organizationId);
+
+            const orgDoc = await this.db.collection('organizations').doc(organizationId).get();
+
+            if (!orgDoc.exists) {
+                return {
+                    success: false,
+                    error: 'Organization not found'
+                };
+            }
+
+            const orgData = orgDoc.data();
+
+            console.log('[ORG PROFILE] ✅ Organization profile retrieved');
+
+            return {
+                success: true,
+                profile: {
+                    name: orgData?.name || 'Not set',
+                    companyDetails: {
+                        address: orgData?.companyDetails?.address || 'Not set',
+                        email: orgData?.companyDetails?.email || 'Not set',
+                        phone: orgData?.companyDetails?.phone || 'Not set',
+                        tin: orgData?.companyDetails?.tin || 'Not set',
+                        cacNumber: orgData?.companyDetails?.cacNumber || 'Not set',
+                        logoUrl: orgData?.companyDetails?.logoUrl || 'Not set',
+                        website: orgData?.companyDetails?.website || 'Not set'
+                    },
+                    paymentDetails: {
+                        bankAccountName: orgData?.paymentDetails?.bankAccountName || 'Not set',
+                        bankAccountNumber: orgData?.paymentDetails?.bankAccountNumber || 'Not set',
+                        bankName: orgData?.paymentDetails?.bankName || 'Not set'
+                    }
+                }
+            };
+        } catch (error) {
+            console.error('[ORG PROFILE] ❌ Error getting organization profile:', error);
+            return {
+                success: false,
+                error: 'Failed to get organization profile: ' + (error as Error).message
+            };
+        }
+    }
+
+    /**
+     * Update company details (name, address, email, phone, logoUrl, website, tin, cacNumber)
+     */
+    private async updateCompanyDetails(organizationId: string, updates: any): Promise<any> {
+        try {
+            console.log('[COMPANY UPDATE] Updating company details for:', organizationId);
+            console.log('[COMPANY UPDATE] Updates:', updates);
+
+            // Prepare update data
+            const updateData: any = {
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            };
+
+            // Update company name at root level
+            if (updates.name !== undefined) {
+                updateData.name = updates.name;
+            }
+
+            // Build companyDetails update object
+            const companyDetailsUpdate: any = {};
+            if (updates.address !== undefined) companyDetailsUpdate.address = updates.address;
+            if (updates.email !== undefined) companyDetailsUpdate.email = updates.email;
+            if (updates.phone !== undefined) companyDetailsUpdate.phone = updates.phone;
+            if (updates.logoUrl !== undefined) companyDetailsUpdate.logoUrl = updates.logoUrl;
+            if (updates.website !== undefined) companyDetailsUpdate.website = updates.website;
+            if (updates.tin !== undefined) companyDetailsUpdate.tin = updates.tin;
+            if (updates.cacNumber !== undefined) companyDetailsUpdate.cacNumber = updates.cacNumber;
+
+            // Merge companyDetails if any updates
+            if (Object.keys(companyDetailsUpdate).length > 0) {
+                // Get current companyDetails
+                const orgDoc = await this.db.collection('organizations').doc(organizationId).get();
+                const orgData = orgDoc.exists ? orgDoc.data() : {};
+                const currentCompanyDetails = orgData?.companyDetails || {};
+
+                // Merge with new updates
+                updateData.companyDetails = {
+                    ...currentCompanyDetails,
+                    ...companyDetailsUpdate
+                };
+            }
+
+            // Update in Firestore (use set with merge to create if doesn't exist)
+            await this.db.collection('organizations').doc(organizationId).set(updateData, { merge: true });
+
+            console.log('[COMPANY UPDATE] ✅ Company details updated successfully');
+
+            return {
+                success: true,
+                message: 'Company details updated successfully',
+                updated: Object.keys(companyDetailsUpdate).concat(updates.name ? ['name'] : [])
+            };
+        } catch (error) {
+            console.error('[COMPANY UPDATE] ❌ Error updating company details:', error);
+            return {
+                success: false,
+                error: 'Failed to update company details: ' + (error as Error).message
+            };
+        }
+    }
+
+    /**
+     * Update payment details (bank account information)
+     */
+    private async updatePaymentDetails(organizationId: string, updates: any): Promise<any> {
+        try {
+            console.log('[PAYMENT UPDATE] Updating payment details for:', organizationId);
+            console.log('[PAYMENT UPDATE] Updates:', updates);
+
+            // Build paymentDetails update object
+            const paymentDetailsUpdate: any = {};
+            if (updates.bankAccountName !== undefined) paymentDetailsUpdate.bankAccountName = updates.bankAccountName;
+            if (updates.bankAccountNumber !== undefined) paymentDetailsUpdate.bankAccountNumber = updates.bankAccountNumber;
+            if (updates.bankName !== undefined) paymentDetailsUpdate.bankName = updates.bankName;
+
+            if (Object.keys(paymentDetailsUpdate).length === 0) {
+                return {
+                    success: false,
+                    error: 'No payment details provided to update'
+                };
+            }
+
+            // Get current paymentDetails
+            const orgDoc = await this.db.collection('organizations').doc(organizationId).get();
+            const orgData = orgDoc.exists ? orgDoc.data() : {};
+            const currentPaymentDetails = orgData?.paymentDetails || {};
+
+            // Merge with new updates
+            const updateData = {
+                paymentDetails: {
+                    ...currentPaymentDetails,
+                    ...paymentDetailsUpdate
+                },
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            };
+
+            // Update in Firestore (use set with merge to create if doesn't exist)
+            await this.db.collection('organizations').doc(organizationId).set(updateData, { merge: true });
+
+            console.log('[PAYMENT UPDATE] ✅ Payment details updated successfully');
+
+            return {
+                success: true,
+                message: 'Payment details updated successfully',
+                updated: Object.keys(paymentDetailsUpdate)
+            };
+        } catch (error) {
+            console.error('[PAYMENT UPDATE] ❌ Error updating payment details:', error);
+            return {
+                success: false,
+                error: 'Failed to update payment details: ' + (error as Error).message
+            };
+        }
+    }
+
+    /**
+     * Request logo upload - sets conversation state to await logo image
+     */
+    private async requestLogoUpload(whatsappNumber: string): Promise<any> {
+        try {
+            console.log('[LOGO UPLOAD] Requesting logo upload for:', whatsappNumber);
+
+            // Set conversation state to await logo upload
+            const { updateConversationState } = await import('./conversationManager');
+            await updateConversationState(whatsappNumber, {
+                awaitingInput: 'logo_upload'
+            });
+
+            return {
+                success: true,
+                message: 'Please send your company logo as an image.\n\n📸 Tips:\n• Use a clear, high-quality image\n• Square logos work best\n• PNG or JPG format\n• Max 5MB\n\nJust send the image when ready!'
+            };
+        } catch (error) {
+            console.error('[LOGO UPLOAD] ❌ Error requesting logo upload:', error);
+            return {
+                success: false,
+                error: 'Failed to request logo upload: ' + (error as Error).message
+            };
+        }
+    }
+
+    /**
+     * Request signature upload - sets conversation state to await signature image
+     */
+    private async requestSignatureUpload(whatsappNumber: string): Promise<any> {
+        try {
+            console.log('[SIGNATURE UPLOAD] Requesting signature upload for:', whatsappNumber);
+
+            // Set conversation state to await signature upload
+            const { updateConversationState } = await import('./conversationManager');
+            await updateConversationState(whatsappNumber, {
+                awaitingInput: 'signature_upload'
+            });
+
+            return {
+                success: true,
+                message: 'Please send your digital signature as an image.\n\n✍️ Tips:\n• Sign on white paper with black ink\n• Take a clear photo or scan\n• Crop to show only signature\n• PNG or JPG format\n• Max 5MB\n\nJust send the image when ready!'
+            };
+        } catch (error) {
+            console.error('[SIGNATURE UPLOAD] ❌ Error requesting signature upload:', error);
+            return {
+                success: false,
+                error: 'Failed to request signature upload: ' + (error as Error).message
+            };
+        }
+    }
+
+    /**
+     * Get dashboard statistics including wallet balance and expected earnings
+     */
+    private async getDashboardStats(organizationId: string): Promise<any> {
+        try {
+            // Get organization data for wallet balance
+            const orgDoc = await this.db.collection('organizations').doc(organizationId).get();
+            const orgData = orgDoc.data();
+
+            // Check multiple possible wallet balance field locations
+            const walletBalance = orgData?.walletBalance ||
+                                 orgData?.wallet?.balance ||
+                                 orgData?.balance ||
+                                 0;
+
+            console.log('[DASHBOARD STATS] Organization ID:', organizationId);
+            console.log('[DASHBOARD STATS] Wallet balance found:', walletBalance);
+            console.log('[DASHBOARD STATS] Organization data keys:', orgData ? Object.keys(orgData) : 'No data');
+
+            // Get all routes for this organization
+            const routesSnapshot = await this.db.collection('routes')
+                .where('organizationId', '==', organizationId)
+                .get();
+
+            let totalAssigned = 0;
+            let totalCompleted = 0;
+            let totalPending = 0;
+            let totalInProgress = 0;
+            let expectedEarnings = 0;
+
+            // Calculate expected earnings with expenses subtracted
+            const routeEarningsPromises = routesSnapshot.docs.map(async (doc: any) => {
+                const route = doc.data();
+                const status = route.status;
+                const routeId = doc.id;
+
+                // Count by status
+                if (status === 'Completed') {
+                    totalCompleted++;
+
+                    // Calculate net profit = rate - total expenses
+                    const routeRate = route.rate || 0;
+
+                    // Get expenses for this route
+                    const expensesSnapshot = await this.db.collection('routes')
+                        .doc(routeId)
+                        .collection('expenses')
+                        .get();
+
+                    let totalExpenses = 0;
+                    expensesSnapshot.forEach((expenseDoc: any) => {
+                        const expense = expenseDoc.data();
+                        totalExpenses += expense.amount || 0;
+                    });
+
+                    const netProfit = routeRate - totalExpenses;
+                    expectedEarnings += netProfit;
+
+                    console.log(`[DASHBOARD STATS] Route ${routeId}: Rate=₦${routeRate}, Expenses=₦${totalExpenses}, Net=₦${netProfit}`);
+                } else if (status === 'Pending') {
+                    totalPending++;
+                } else if (status === 'In Progress') {
+                    totalInProgress++;
+                    totalAssigned++;
+                    // Do NOT add in-progress routes to expected earnings
+                }
+            });
+
+            // Wait for all route earnings calculations to complete
+            await Promise.all(routeEarningsPromises);
+
+            // Total assigned routes are in-progress routes
+            totalAssigned = totalInProgress;
+
+            console.log('[DASHBOARD STATS] Completed routes:', totalCompleted);
+            console.log('[DASHBOARD STATS] In Progress routes:', totalInProgress);
+            console.log('[DASHBOARD STATS] Pending routes:', totalPending);
+            console.log('[DASHBOARD STATS] Expected earnings:', expectedEarnings);
+
+            return {
+                success: true,
+                data: {
+                    walletBalance: walletBalance,
+                    walletBalanceFormatted: `₦${walletBalance.toLocaleString()}`,
+                    expectedEarnings: expectedEarnings,
+                    expectedEarningsFormatted: `₦${expectedEarnings.toLocaleString()}`,
+                    totalRoutes: routesSnapshot.size,
+                    routesAssigned: totalAssigned,
+                    routesInProgress: totalInProgress,
+                    routesCompleted: totalCompleted,
+                    routesPending: totalPending
+                },
+                message: `📊 *Dashboard Overview*\n\n💰 *Available Balance*\n₦${walletBalance.toLocaleString()}\n\n📈 *Expected Earnings (Net Profit)*\n₦${expectedEarnings.toLocaleString()}\n${totalCompleted > 0 ? `From ${totalCompleted} completed route${totalCompleted > 1 ? 's' : ''}` : 'No completed routes yet'}\n\n🚛 *Total Route Assigned*\n${totalAssigned} route${totalAssigned !== 1 ? 's' : ''}\nThis month${totalAssigned > 0 ? ' • ++100%' : ''}\n\n✅ *Total Completed Route*\n${totalCompleted} route${totalCompleted !== 1 ? 's' : ''}\nThis month${totalCompleted > 0 ? ' • ++100%' : ''}\n\n⏳ *Pending Route*\n${totalPending} route${totalPending !== 1 ? 's' : ''}\n${totalPending > 0 ? 'Awaiting start' : 'No pending routes'}${totalPending > 0 ? ' • ++100%' : ''}`
+            };
+        } catch (error) {
+            console.error('[DASHBOARD STATS] ❌ Error fetching dashboard stats:', error);
+            return {
+                success: false,
+                error: 'Failed to fetch dashboard statistics'
             };
         }
     }
