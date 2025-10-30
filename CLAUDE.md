@@ -386,3 +386,178 @@ VITE_FIREBASE_MEASUREMENT_ID   # Optional (Analytics)
 ```
 
 Access in code via `import.meta.env.VITE_FIREBASE_API_KEY` (already configured in `firebase/firebaseConfig.ts`).
+
+---
+
+## CRITICAL: Git Branch Management Instructions for Claude Code
+
+### When User Says "Push to Main" (Production)
+
+**ALWAYS execute this EXACT sequence:**
+
+```bash
+cd "C:\Users\Admin\Downloads\Transport SaaS"
+git status
+git checkout main
+git pull origin main
+git add -A
+git commit -m "chore: [description]
+
+🤖 Generated with Claude Code"
+git push origin main
+git log -1 --oneline
+```
+
+### When User Says "Push to Develop" (Development)
+
+**ALWAYS execute this EXACT sequence:**
+
+```bash
+cd "C:\Users\Admin\Downloads\Transport SaaS"
+git status
+git checkout develop
+git pull origin develop
+git add -A
+git commit -m "feat: [description]
+
+🤖 Generated with Claude Code"
+git push origin develop
+git log -1 --oneline
+```
+
+### When User Says "Push to Staging" (Pre-Production)
+
+**ALWAYS execute this EXACT sequence:**
+
+```bash
+cd "C:\Users\Admin\Downloads\Transport SaaS"
+git status
+git checkout staging
+git pull origin staging
+git add -A
+git commit -m "[type]: [description]
+
+🤖 Generated with Claude Code"
+git push origin staging
+git log -1 --oneline
+```
+
+## Commit Message Types (Use Appropriate Prefix)
+
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `refactor:` - Code restructuring
+- `perf:` - Performance improvement
+- `docs:` - Documentation only
+- `style:` - Code formatting
+- `chore:` - Maintenance tasks
+- `hotfix:` - Emergency production fix
+
+## Safety Checks (MUST DO Before Every Push)
+
+1. ✅ Run `git status` - Verify all changes are intentional
+2. ✅ Run `git diff` - Review actual changes
+3. ✅ Check for sensitive data - NO API keys, passwords, or secrets
+4. ✅ Verify correct branch - Use `git branch` to confirm
+5. ✅ Pull before push - Avoid conflicts with `git pull origin [branch]`
+
+## Branch Protection Rules
+
+### MAIN (Production)
+- **Deploy to**: `firebase use default && firebase deploy`
+- **Merge from**: staging only (after testing)
+- **Never**: Direct commits or force push
+- **When to use**: After user explicitly says "push to main"
+
+### STAGING (Pre-Production Testing)
+- **Deploy to**: `firebase use staging && firebase deploy`
+- **Merge from**: develop only
+- **Purpose**: Final testing before production
+- **Never**: Skip testing on staging
+
+### DEVELOP (Active Development)
+- **Deploy to**: `firebase use dev && firebase deploy`
+- **Merge from**: feature branches
+- **Purpose**: Daily development work
+- **Default**: Use this for most work
+
+## Emergency Rollback Procedure
+
+If production breaks after push to main:
+
+```bash
+cd "C:\Users\Admin\Downloads\Transport SaaS"
+git checkout main
+git log --oneline -10  # Find last working commit
+git reset --hard [commit-hash]  # Rollback
+git push origin main --force  # EMERGENCY ONLY
+firebase use default
+firebase deploy
+# Immediately notify user
+```
+
+## When User Says "Deploy to Production"
+
+```bash
+cd "C:\Users\Admin\Downloads\Transport SaaS"
+git checkout main
+git pull origin main
+firebase use default
+firebase deploy
+git tag -a v1.X.X -m "Release v1.X.X: [description]"
+git push origin v1.X.X
+```
+
+## Critical File Locations
+
+### Documentation (Keep Updated)
+- `README.md` - Project overview
+- `CLAUDE.md` - THIS FILE (Git instructions)
+- `docs/GIT_WORKFLOW.md` - User-friendly Git guide
+- `docs/WHATSAPP_BOT_REFACTOR_PLAN.md` - Bot architecture
+- `docs/FIRESTORE_SETUP.md` - Database setup
+- `docs/PAYROLL_SYSTEM_GUIDE.md` - Nigerian PAYE
+
+### Code Structure
+- `src/` - React frontend
+- `functions/src/whatsapp/` - WhatsApp bot (needs refactor!)
+- `components/` - React components
+- `services/firestore/` - Database services
+- `types.ts` - TypeScript types
+
+### Configuration
+- `.firebaserc` - Firebase project aliases
+- `firebase.json` - Firebase config
+- `.gitignore` - Files to ignore
+
+## NEVER Commit These Files
+
+- `.env*` files (except `.env.example`)
+- `node_modules/`
+- `.firebase/` directory
+- Firebase debug logs
+- API keys or passwords
+- Personal data
+
+## Communication Rules with User
+
+1. **Always confirm** before destructive operations
+2. **Show `git status`** before pushing
+3. **Explain what changed** in simple terms
+4. **Ask if unsure** - don't guess
+5. **Provide rollback options** for risky changes
+
+## WhatsApp Bot Status (As of 2025-10-30)
+
+**Current State**: MESSY - 35+ files, multiple AI systems, hard to maintain
+
+**Recent Fixes**:
+- ✅ Collection naming: `whatsappUsers` → `whatsapp_users`
+- ✅ Branding: "Glyde Systems" → "Amana"
+- ✅ Security: Removed `default_org` fallback
+
+**Recommended**: Build clean v2 from scratch (see docs/WHATSAPP_BOT_REFACTOR_PLAN.md)
+
+## Last Updated
+
+2025-10-30 - Added comprehensive Git workflow instructions
