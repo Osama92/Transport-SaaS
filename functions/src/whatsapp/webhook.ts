@@ -71,9 +71,12 @@ export const whatsappWebhook = functions
     if (req.method === 'POST') {
       const body = req.body as WhatsAppWebhookEvent;
 
-      functions.logger.info('WhatsApp webhook received', {
+      // ENHANCED LOGGING: Log full webhook payload for debugging
+      functions.logger.info('========== WHATSAPP WEBHOOK RECEIVED ==========', {
+        timestamp: new Date().toISOString(),
         object: body.object,
-        entryCount: body.entry?.length
+        entryCount: body.entry?.length,
+        fullPayload: JSON.stringify(body, null, 2)
       });
 
       // Verify it's a WhatsApp event
@@ -97,12 +100,23 @@ export const whatsappWebhook = functions
             // Process each message asynchronously (don't block webhook response)
             if (value.messages && value.messages.length > 0) {
               for (const message of value.messages) {
+                // ENHANCED LOGGING: Log incoming message details
+                functions.logger.info('========== NEW MESSAGE DETECTED ==========', {
+                  from: message.from,
+                  messageId: message.id,
+                  type: message.type,
+                  timestamp: message.timestamp,
+                  text: message.type === 'text' ? message.text?.body : undefined
+                });
+
                 // Process message asynchronously (don't block webhook response)
                 processIncomingMessage(message, value.metadata.phone_number_id)
                   .catch(error => {
-                    functions.logger.error('Error processing message', {
+                    functions.logger.error('========== ERROR PROCESSING MESSAGE ==========', {
                       error: error.message,
-                      messageId: message.id
+                      stack: error.stack,
+                      messageId: message.id,
+                      from: message.from
                     });
                   });
               }
@@ -196,10 +210,28 @@ async function processIncomingMessage(
       const userName = whatsappUser.displayName || whatsappUser.email?.split('@')[0] || 'there';
 
       // Process with SupplyChainExpert for natural conversation
+      functions.logger.info('========== SENDING TO AI FOR PROCESSING ==========', {
+        from,
+        userName,
+        messageLength: messageText.length,
+        messagePreview: messageText.substring(0, 100)
+      });
+
       const response = await supplyChainExpert.processMessage(from, messageText, userName);
+
+      functions.logger.info('========== AI RESPONSE GENERATED ==========', {
+        from,
+        responseLength: response.length,
+        responsePreview: response.substring(0, 100)
+      });
 
       // Send the response
       await sendWhatsAppMessage(from, phoneNumberId, { type: 'text', text: response });
+
+      functions.logger.info('========== RESPONSE SENT TO USER ==========', {
+        from,
+        phoneNumberId
+      });
     } else if (message.type === 'location') {
       // Handle location messages
       await handleLocationMessage(message, whatsappUser, phoneNumberId);
@@ -220,19 +252,24 @@ async function processIncomingMessage(
 
     // Log performance metrics
     const duration = Date.now() - startTime;
-    functions.logger.info('Message processed successfully', {
+    functions.logger.info('========== MESSAGE PROCESSING COMPLETED ==========', {
       messageId: message.id,
+      from: from,
       duration: `${duration}ms`,
-      cached: userCache.has(from)
+      cached: userCache.has(from),
+      processingTimestamp: new Date().toISOString(),
+      success: true
     });
 
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    functions.logger.error('Error in processIncomingMessage', {
+    functions.logger.error('========== MESSAGE PROCESSING FAILED ==========', {
       error: error.message,
       messageId: message.id,
+      from: message.from,
       duration: `${duration}ms`,
-      stack: error.stack
+      stack: error.stack,
+      failureTimestamp: new Date().toISOString()
     });
     throw error;
   }
@@ -253,7 +290,7 @@ async function getWhatsAppUser(whatsappNumber: string) {
 
     // Cache miss or expired - fetch from Firestore
     const userDoc = await getDb()
-      .collection('whatsappUsers')
+      .collection('whatsapp_users')
       .doc(whatsappNumber)
       .get();
 
@@ -289,9 +326,9 @@ async function getWhatsAppUser(whatsappNumber: string) {
  * Send onboarding message to new user
  */
 async function sendOnboardingMessage(to: string, phoneNumberId: string): Promise<void> {
-  const message = `Welcome to Glyde Systems!
+  const message = `Welcome to Amana! 👋
 
-I'm your AI-powered supply chain assistant, here to help optimize your transport and logistics operations.
+I'm Amana, your trusted AI assistant for transport and logistics operations.
 
 Quick Start:
 • Type "HELP" to see what I can do
@@ -556,7 +593,7 @@ async function handleEmailVerification(
     }
 
     // Register WhatsApp number with user
-    await getDb().collection('whatsappUsers').doc(whatsappNumber).set({
+    await getDb().collection('whatsapp_users').doc(whatsappNumber).set({
       whatsappNumber,
       userId: userDoc.id,
       organizationId,
@@ -573,7 +610,7 @@ async function handleEmailVerification(
 
     await sendWhatsAppMessage(whatsappNumber, phoneNumberId, {
       type: 'text',
-      text: `✅ Account linked successfully!\n\nWelcome ${userData.displayName || 'back'}! 🎉\n\nYour WhatsApp is now connected to your Glyde Systems account.\n\nType "HELP" to see what I can do for you! 🚀`
+      text: `✅ Account linked successfully!\n\nWelcome ${userData.displayName || 'back'}! 🎉\n\nYour WhatsApp is now connected to Amana, your trusted transport assistant.\n\nType "HELP" to see what I can do for you! 🚀`
     });
   } catch (error: any) {
     functions.logger.error('Error in handleEmailVerification', {

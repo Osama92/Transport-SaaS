@@ -24,6 +24,7 @@ import PayslipModal from '../modals/PayslipModal';
 import CreatePayrollRunModal from '../modals/CreatePayrollRunModal'; // Import the new modal
 import EditDriverPayModal from '../modals/EditDriverPayModal'; // Import the new pay modal
 import ManageFundsModal from '../modals/ManageFundsModal';
+import AddBonusModal from '../modals/AddBonusModal';
 import DriversTable from '../DriversTable';
 import VehiclesTable from '../VehiclesTable';
 import ClientsTable from '../ClientsTable';
@@ -60,6 +61,10 @@ import {
     getNotifications,
     getPayrollRuns,
     calculatePayslipsForPeriod,
+    createBonus,
+    getBonuses,
+    approveBonus,
+    deleteBonus,
 } from '../../firebase/config';
 
 import DriversScreen from '../screens/DriversScreen';
@@ -117,7 +122,7 @@ interface PartnerDashboardProps {
   onSubscribeClick?: () => void;
 }
 
-type ModalType = 'addVehicle' | 'addDriver' | 'editDriver' | 'createRoute' | 'addClient' | 'editClient' | 'confirmDeleteClient' | 'confirmToggleClientStatus' | 'assignDriver' | 'viewPOD' | 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'updateVehicleStatus' | 'addMaintenanceLog' | 'uploadDocument' | 'emailInvoice' | 'confirmMarkAsPaid' | 'profileSettings' | 'addExpense' | 'viewPayslip' | 'createPayrollRun' | 'editDriverPay' | 'deletePayrollRun' | 'manageFunds' | null;
+type ModalType = 'addVehicle' | 'addDriver' | 'editDriver' | 'createRoute' | 'addClient' | 'editClient' | 'confirmDeleteClient' | 'confirmToggleClientStatus' | 'assignDriver' | 'viewPOD' | 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'updateVehicleStatus' | 'addMaintenanceLog' | 'uploadDocument' | 'emailInvoice' | 'confirmMarkAsPaid' | 'profileSettings' | 'addExpense' | 'viewPayslip' | 'createPayrollRun' | 'editDriverPay' | 'deletePayrollRun' | 'manageFunds' | 'addBonus' | null;
 type RouteStatusFilter = 'All' | 'Pending' | 'In Progress' | 'Completed';
 type InvoiceView = 'list' | 'create' | 'edit';
 
@@ -545,6 +550,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
   // Payroll Filter State
   const [payrollStatusFilter, setPayrollStatusFilter] = useState<PayrollRun['status'] | 'All'>('All');
   const [payrollDateFilter, setPayrollDateFilter] = useState<{ start: Date | null, end: Date | null }>({ start: null, end: null });
+  const [isCreatingPayroll, setIsCreatingPayroll] = useState(false);
+  const [isDeletingPayroll, setIsDeletingPayroll] = useState(false);
 
   // Analytics State
   const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
@@ -964,21 +971,49 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
     setActiveModal(null);
   };
 
-  const handleUpdateDriverPay = async (driverId: number, newPayInfo: { baseSalary: number, pensionContributionRate: number, nhfContributionRate: number }) => {
+  const handleUpdateDriverPay = async (driverId: number, newPayInfo: {
+    baseSalary: number;
+    pensionContribution?: number;
+    nhfContribution?: number;
+    nhisContribution?: number;
+    annualRent?: number;
+    loanInterest?: number;
+    lifeInsurance?: number;
+  }) => {
     if (isDemoMode) {
-      setMockDrivers(prev => prev.map(d => d.id === driverId ? { ...d, ...newPayInfo } : d));
+      setMockDrivers(prev => prev.map(d => d.id === driverId ? { ...d, payrollInfo: { ...d.payrollInfo, ...newPayInfo } } : d));
       setActiveModal(null);
     } else {
       try {
         // Convert driverId to string for Firestore
         const driverIdStr = typeof driverId === 'string' ? driverId : `DRV-${driverId}`;
 
+        // Prepare update payload - only include optional fields if they have values
+        const updatePayload: any = {
+          'payrollInfo.baseSalary': newPayInfo.baseSalary,
+        };
+
+        if (newPayInfo.pensionContribution !== undefined) {
+          updatePayload['payrollInfo.pensionContribution'] = newPayInfo.pensionContribution;
+        }
+        if (newPayInfo.nhfContribution !== undefined) {
+          updatePayload['payrollInfo.nhfContribution'] = newPayInfo.nhfContribution;
+        }
+        if (newPayInfo.nhisContribution !== undefined) {
+          updatePayload['payrollInfo.nhisContribution'] = newPayInfo.nhisContribution;
+        }
+        if (newPayInfo.annualRent !== undefined) {
+          updatePayload['payrollInfo.annualRent'] = newPayInfo.annualRent;
+        }
+        if (newPayInfo.loanInterest !== undefined) {
+          updatePayload['payrollInfo.loanInterest'] = newPayInfo.loanInterest;
+        }
+        if (newPayInfo.lifeInsurance !== undefined) {
+          updatePayload['payrollInfo.lifeInsurance'] = newPayInfo.lifeInsurance;
+        }
+
         // Update driver payroll info in Firestore
-        await updateDriver(driverIdStr, {
-          baseSalary: newPayInfo.baseSalary,
-          pensionContributionRate: newPayInfo.pensionContributionRate,
-          nhfContributionRate: newPayInfo.nhfContributionRate,
-        });
+        await updateDriver(driverIdStr, updatePayload);
 
         setActiveModal(null);
         alert('Driver pay information updated successfully!');
@@ -1236,22 +1271,23 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
   };
 
   const handleCreatePayrollRun = async (periodStart: string, periodEnd: string) => {
-    if (isDemoMode) {
-      // Demo mode: use mock calculation
-      const newPayslips = await calculatePayslipsForPeriod(drivers, periodStart, periodEnd);
-      const newRun: PayrollRun = {
-          id: `PR-${new Date().getFullYear()}-${new Date().getMonth() + 1}`,
-          periodStart,
-          periodEnd,
-          payDate: new Date(new Date(periodEnd).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 5 days after period end
-          status: 'Draft',
-          payslips: newPayslips,
-      };
-      setMockPayrollRuns(prev => [newRun, ...prev]);
-      setActiveModal(null);
-    } else {
-      // Production mode: use Firestore
-      try {
+    setIsCreatingPayroll(true);
+    try {
+      if (isDemoMode) {
+        // Demo mode: use mock calculation
+        const newPayslips = await calculatePayslipsForPeriod(drivers, periodStart, periodEnd);
+        const newRun: PayrollRun = {
+            id: `PR-${new Date().getFullYear()}-${new Date().getMonth() + 1}`,
+            periodStart,
+            periodEnd,
+            payDate: new Date(new Date(periodEnd).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 5 days after period end
+            status: 'Draft',
+            payslips: newPayslips,
+        };
+        setMockPayrollRuns(prev => [newRun, ...prev]);
+        setActiveModal(null);
+      } else {
+        // Production mode: use Firestore
         if (!organizationId || !currentUser) {
           alert('Organization or user information is missing. Please refresh the page.');
           return;
@@ -1262,10 +1298,23 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
 
         setActiveModal(null);
         alert('Payroll run created successfully!');
-      } catch (error) {
-        console.error('Error creating payroll run:', error);
-        alert('Failed to create payroll run. Please ensure all drivers have pay information set.');
       }
+    } catch (error) {
+      console.error('Error creating payroll run:', error);
+      alert('Failed to create payroll run. Please ensure all drivers have pay information set.');
+    } finally {
+      setIsCreatingPayroll(false);
+    }
+  };
+
+  const handleCreateBonus = async (bonus: any) => {
+    try {
+      await createBonus(bonus);
+      setActiveModal(null);
+      alert('Bonus created successfully! It must be approved before it appears in payroll.');
+    } catch (error) {
+      console.error('Error creating bonus:', error);
+      alert('Failed to create bonus. Please try again.');
     }
   };
 
@@ -1286,20 +1335,24 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
   };
 
   const handleDeletePayrollRun = async (payrollRunId: string) => {
-    if (isDemoMode) {
-      // Demo mode: remove from mock array
-      setMockPayrollRuns(prev => prev.filter(run => run.id !== payrollRunId));
-    } else {
-      // Production mode: delete from Firestore
-      try {
+    setIsDeletingPayroll(true);
+    try {
+      if (isDemoMode) {
+        // Demo mode: remove from mock array
+        setMockPayrollRuns(prev => prev.filter(run => run.id !== payrollRunId));
+      } else {
+        // Production mode: delete from Firestore
         await deletePayrollRun(payrollRunId);
         alert('Payroll run deleted successfully!');
         // Trigger refresh
         window.dispatchEvent(new Event('refreshPayrollRuns'));
-      } catch (error) {
-        console.error('Error deleting payroll run:', error);
-        alert('Failed to delete payroll run.');
       }
+    } catch (error) {
+      console.error('Error deleting payroll run:', error);
+      alert('Failed to delete payroll run.');
+    } finally {
+      setIsDeletingPayroll(false);
+      setActiveModal(null);
     }
   };
 
@@ -1402,9 +1455,11 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
       case 'viewPayslip':
         return <PayslipModal payslip={selectedItem as Payslip} onClose={() => setActiveModal(null)} />;
       case 'createPayrollRun':
-        return <CreatePayrollRunModal onClose={() => setActiveModal(null)} onConfirm={handleCreatePayrollRun} />;
+        return <CreatePayrollRunModal onClose={() => setActiveModal(null)} onConfirm={handleCreatePayrollRun} isCreating={isCreatingPayroll} />;
       case 'editDriverPay':
         return <EditDriverPayModal driver={selectedItem as Driver} onClose={() => setActiveModal(null)} onSave={handleUpdateDriverPay} />;
+      case 'addBonus':
+        return <AddBonusModal drivers={drivers} onClose={() => setActiveModal(null)} onSave={handleCreateBonus} />;
       case 'deletePayrollRun':
         return <ConfirmActionModal
             isOpen={true}
@@ -1510,6 +1565,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
           onRemove={(driver) => handleDriverAction('confirmRemoval', driver)}
           onEditPay={(driver) => handleDriverAction('editDriverPay', driver)}
           onEditDriver={(driver) => handleDriverAction('editDriver', driver)}
+          onAddBonus={() => setActiveModal('addBonus')}
           dateRange={dateRange}
           selectedDriver1={analyticsDriver1}
           onDriver1Change={setAnalyticsDriver1}
@@ -1580,6 +1636,7 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
             onStatusFilterChange={setPayrollStatusFilter}
             dateFilter={payrollDateFilter}
             onDateFilterChange={setPayrollDateFilter}
+            isDeletingPayroll={isDeletingPayroll}
         />;
       case 'Notifications':
         return (

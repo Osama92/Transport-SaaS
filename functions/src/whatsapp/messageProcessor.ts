@@ -743,9 +743,9 @@ async function downloadWhatsAppMedia(
  * Send help/menu message
  */
 export async function sendHelpMessage(to: string, phoneNumberId: string): Promise<void> {
-  const helpMessage = `*Glyde Systems - Supply Chain Assistant*
+  const helpMessage = `*Amana - Your Trusted Transport Assistant*
 
-I'm your AI-powered supply chain expert, specializing in transport and logistics optimization.
+I'm Amana, your AI-powered logistics expert, specializing in transport and supply chain optimization.
 
 *What I Can Help You With:*
 

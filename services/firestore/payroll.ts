@@ -14,61 +14,12 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import type { PayrollRun, Payslip, Driver } from '../../types';
+import { calculateNigerianPAYE } from '../../firebase/config';
 
 const PAYROLL_RUNS_COLLECTION = 'payrollRuns';
 
-/**
- * Nigerian PAYE Tax Calculation (2026 Reform)
- * Progressive tax brackets with CRA and deductions
- */
-const calculateNigerianPAYE = (
-    annualGrossIncome: number,
-    pensionContribution: number,
-    nhfContribution: number
-): number => {
-    // 1. Calculate Consolidated Relief Allowance (CRA)
-    const cra = 200000 + (0.20 * annualGrossIncome);
-
-    // 2. Determine Total Reliefs
-    const totalReliefs = cra + pensionContribution + nhfContribution;
-
-    // 3. Calculate Taxable Income
-    let taxableIncome = annualGrossIncome - totalReliefs;
-    if (taxableIncome <= 0) {
-        return Math.max(0.01 * annualGrossIncome, 0); // Minimum tax is 1% of gross income
-    }
-
-    // 4. Apply Tax Brackets (Proposed Annual)
-    let tax = 0;
-
-    if (taxableIncome > 20000000) {
-        tax += (taxableIncome - 20000000) * 0.35;
-        taxableIncome = 20000000;
-    }
-    if (taxableIncome > 12000000) {
-        tax += (taxableIncome - 12000000) * 0.30;
-        taxableIncome = 12000000;
-    }
-    if (taxableIncome > 8000000) {
-        tax += (taxableIncome - 8000000) * 0.25;
-        taxableIncome = 8000000;
-    }
-    if (taxableIncome > 4000000) {
-        tax += (taxableIncome - 4000000) * 0.20;
-        taxableIncome = 4000000;
-    }
-    if (taxableIncome > 2000000) {
-        tax += (taxableIncome - 2000000) * 0.15;
-        taxableIncome = 2000000;
-    }
-    if (taxableIncome > 0) {
-        tax += taxableIncome * 0.10;
-    }
-
-    // 5. Apply Minimum Tax Rule
-    const minimumTax = 0.01 * annualGrossIncome;
-    return Math.max(tax, minimumTax);
-};
+// NOTE: calculateNigerianPAYE is now imported from firebase/config.ts
+// This ensures EXACT consistency between driver pay screen and payslip calculations
 
 /**
  * Calculate payslips for drivers - matches types.ts schema
@@ -82,30 +33,51 @@ const calculatePayslips = (
     const payPeriod = `${payPeriodDate.toLocaleString('default', { month: 'short' })} ${payPeriodDate.getFullYear()}`;
     const payDate = new Date(new Date(periodEnd).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    console.log('[PAYROLL] Calculating payslips for', drivers.length, 'drivers, period:', payPeriod);
+
     return drivers.map((driver, index) => {
-        // Use default values if fields are missing
-        // Check nested payrollInfo first, then fall back to flat structure
-        const annualGross = driver.payrollInfo?.baseSalary || driver.baseSalary || 0;
-        const pensionRate = driver.payrollInfo?.pensionContributionRate || driver.pensionContributionRate || 8;
-        const nhfRate = driver.payrollInfo?.nhfContributionRate || driver.nhfContributionRate || 2.5;
+        console.log('[PAYROLL] Processing driver:', driver.name, '(ID:', driver.id, ')');
+
+        // Use payrollInfo structure ONLY - no fallback to deprecated percentage fields
+        const annualGross = driver.payrollInfo?.baseSalary ?? driver.baseSalary ?? 0;
+
+        // Use NEW Naira-based deductions ONLY (ignore deprecated percentage fields)
+        const pensionContribution = driver.payrollInfo?.pensionContribution ?? 0;
+        const nhfContribution = driver.payrollInfo?.nhfContribution ?? 0;
+        const nhisContribution = driver.payrollInfo?.nhisContribution ?? 0;
+        const annualRent = driver.payrollInfo?.annualRent ?? 0;
+        const loanInterest = driver.payrollInfo?.loanInterest ?? 0;
+        const lifeInsurance = driver.payrollInfo?.lifeInsurance ?? 0;
+
+        console.log('[PAYROLL] Driver', driver.name, '- Annual salary:', annualGross);
+        console.log('[PAYROLL] Driver', driver.name, '- Pension (annual):', pensionContribution, 'NHF:', nhfContribution);
 
         const monthlyBasePay = annualGross / 12;
-        const bonuses = Math.random() > 0.5 ? Math.round(Math.random() * (monthlyBasePay * 0.1)) : 0;
-        const monthlyGrossPay = monthlyBasePay + bonuses;
 
-        // Calculate annual deductions for tax calculation
-        const annualPension = annualGross * (pensionRate / 100);
-        const annualNhf = annualGross * (nhfRate / 100);
+        // NO RANDOM BONUSES! Bonuses come from the separate Bonus collection
+        const totalBonusAmount = 0; // TODO: Aggregate approved bonuses from bonuses collection
 
-        // Calculate annual tax
-        const annualTax = calculateNigerianPAYE(annualGross, annualPension, annualNhf);
+        const monthlyGrossPay = monthlyBasePay + totalBonusAmount;
 
-        // Convert to monthly
-        const monthlyTax = annualTax / 12;
-        const monthlyPension = annualPension / 12;
-        const monthlyNhf = annualNhf / 12;
+        // Calculate tax using NEW function with all deductions
+        const taxCalculation = calculateNigerianPAYE(
+            annualGross,
+            pensionContribution,
+            nhfContribution,
+            nhisContribution,
+            loanInterest,
+            lifeInsurance,
+            annualRent
+        );
+
+        // Convert annual deductions back to monthly for the payslip
+        const monthlyTax = taxCalculation.monthlyTax;
+        const monthlyPension = pensionContribution / 12;
+        const monthlyNhf = nhfContribution / 12;
 
         const netPay = monthlyGrossPay - monthlyTax - monthlyPension - monthlyNhf;
+
+        console.log('[PAYROLL] Driver', driver.name, '- Monthly base:', monthlyBasePay, 'Tax:', monthlyTax, 'Pension:', monthlyPension, 'NHF:', monthlyNhf, 'Net:', netPay);
 
         const payslip: Payslip = {
             id: `PS-${driver.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -114,13 +86,20 @@ const calculatePayslips = (
             payPeriod,
             payDate,
             basePay: Math.round(monthlyBasePay),
-            bonuses: Math.round(bonuses),
+            bonuses: Math.round(totalBonusAmount),
             grossPay: Math.round(monthlyGrossPay),
             tax: Math.round(monthlyTax),
             pension: Math.round(monthlyPension),
             nhf: Math.round(monthlyNhf),
             netPay: Math.round(netPay),
             status: 'Draft' as const,
+            // Transparency fields from tax calculation
+            annualGrossIncome: taxCalculation.grossIncome,
+            cra: Math.round(taxCalculation.cra),
+            totalDeductions: Math.round(taxCalculation.totalDeductions),
+            taxableIncome: taxCalculation.taxableIncome,
+            taxBreakdown: taxCalculation.taxBreakdown,
+            effectiveTaxRate: taxCalculation.effectiveTaxRate,
         };
 
         // Add bank info if available

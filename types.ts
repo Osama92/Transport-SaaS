@@ -223,8 +223,17 @@ export interface Driver extends FirestoreDocument {
     // Payroll Information
     payrollInfo: {
         baseSalary: number; // Annual base salary
-        pensionContributionRate: number; // Employee's contribution percentage, e.g., 8 for 8%
-        nhfContributionRate: number; // National Housing Fund contribution, e.g., 2.5 for 2.5%
+        // NOTE: Bonuses are now managed separately via the Bonus system (see Bonus type)
+        // Optional deductions (all in Naira, based on fiscalreforms.ng PIT calculator)
+        pensionContribution?: number; // Annual pension contribution amount
+        nhfContribution?: number; // Annual National Housing Fund contribution
+        nhisContribution?: number; // Annual NHIS contribution amount
+        loanInterest?: number; // Annual interest on loan for owner-occupied house
+        lifeInsurance?: number; // Annual life insurance premium (self & spouse)
+        annualRent?: number; // Annual rent payment (for rent relief)
+        // Deprecated fields (kept for backward compatibility)
+        pensionContributionRate?: number; // OLD: Employee's contribution percentage
+        nhfContributionRate?: number; // OLD: National Housing Fund contribution percentage
     };
     // Bank Information (for withdrawals)
     bankInfo?: {
@@ -642,6 +651,20 @@ export interface Material {
     defaultUom: string;
 }
 
+export interface Bonus extends FirestoreDocument {
+    id: string;
+    organizationId: string; // Foreign key to organization
+    driverId: number | string; // Foreign key to driver
+    driverName: string; // Denormalized for display
+    amount: number; // Bonus amount in Naira
+    reason: string; // Why the bonus is being given (shows on payslip)
+    type: 'One-Time' | 'Recurring'; // One-time or recurring bonus
+    payPeriod: string; // Format: 'Oct 2025' - which pay period to include the bonus
+    status: 'Pending' | 'Approved' | 'Paid'; // Approval workflow
+    approvedBy?: string; // User ID who approved
+    approvedAt?: string; // Timestamp of approval
+}
+
 export interface Payslip {
     id: string;
     driverId: number;
@@ -649,7 +672,8 @@ export interface Payslip {
     payPeriod: string;
     payDate: string;
     basePay: number; // Monthly base pay
-    bonuses: number;
+    bonuses: number; // Total bonuses for this period (aggregated from Bonus records)
+    bonusDetails?: Array<{ reason: string; amount: number }>; // Itemized bonus breakdown
     grossPay: number; // base + bonuses
     tax: number; // PAYE tax
     pension: number; // Employee pension contribution
@@ -661,6 +685,13 @@ export interface Payslip {
         accountName: string;
         bankName: string;
     };
+    // Transparency fields (from calculateNigerianPAYE)
+    annualGrossIncome?: number; // Annual gross salary
+    cra?: number; // Consolidated Relief Allowance
+    totalDeductions?: number; // Sum of all tax deductions/reliefs
+    taxableIncome?: number; // Gross income used as taxable base
+    taxBreakdown?: Array<{ bracket: string; rate: string; amount: number }>; // Progressive tax brackets
+    effectiveTaxRate?: number; // Percentage of income paid as tax
 }
 
 export interface PayrollRun extends FirestoreDocument {

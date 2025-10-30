@@ -387,6 +387,14 @@ service cloud.firestore {
       allow delete: if belongsToUserOrg();
     }
 
+    // Bonuses collection - organization-scoped
+    match /bonuses/{bonusId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
     // Default deny all other documents
     match /{document=**} {
       allow read, write: if false;

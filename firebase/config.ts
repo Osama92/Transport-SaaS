@@ -1,12 +1,12 @@
-import type { 
-    Transporter, 
-    Shipment, 
-    Product, 
-    Visit, 
-    Driver, 
-    Vehicle, 
-    Client, 
-    Route, 
+import type {
+    Transporter,
+    Shipment,
+    Product,
+    Visit,
+    Driver,
+    Vehicle,
+    Client,
+    Route,
     Invoice,
     Notification,
     DeliveryContact,
@@ -14,7 +14,8 @@ import type {
     SubscriptionPlan,
     Material,
     PayrollRun,
-    Payslip
+    Payslip,
+    Bonus
 } from '../types';
 
 // --- START OF MOCK DATA ---
@@ -380,55 +381,126 @@ export const getPayrollRuns = async () => { await sleep(200); return initialPayr
 // --- PAYROLL CALCULATION LOGIC ---
 
 /**
- * Calculates PAYE tax based on the proposed 2026 Nigerian tax reform.
+ * Calculates PAYE tax based on the NEW Nigerian tax law (2025+).
+ * Source: https://fiscalreforms.ng/index.php/pit-calculator/
+ *
  * @param annualGrossIncome - The total annual gross income.
- * @param pensionContribution - The total annual pension contribution.
- * @param nhfContribution - The total annual National Housing Fund contribution.
- * @returns The calculated annual tax.
+ * @param pensionContribution - The total annual pension contribution (optional, in Naira).
+ * @param nhfContribution - The total annual National Housing Fund contribution (optional, in Naira).
+ * @param nhisContribution - The total annual NHIS contribution (optional, in Naira).
+ * @param loanInterest - Annual interest on loan for owner-occupied house (optional, in Naira).
+ * @param lifeInsurance - Annual life insurance premium for you & spouse (optional, in Naira).
+ * @param annualRent - Annual rent payment (optional, in Naira).
+ * @returns Object with detailed tax breakdown.
  */
-const calculateNigerianPAYE = (annualGrossIncome: number, pensionContribution: number, nhfContribution: number): number => {
+export const calculateNigerianPAYE = (
+    annualGrossIncome: number,
+    pensionContribution: number = 0,
+    nhfContribution: number = 0,
+    nhisContribution: number = 0,
+    loanInterest: number = 0,
+    lifeInsurance: number = 0,
+    annualRent: number = 0
+): {
+    grossIncome: number;
+    cra: number;
+    totalDeductions: number;
+    taxableIncome: number;
+    taxBreakdown: Array<{bracket: string; rate: string; amount: number}>;
+    totalTax: number;
+    netAnnualPay: number;
+    monthlyPay: number;
+    monthlyTax: number;
+    effectiveTaxRate: number;
+} => {
     // 1. Calculate Consolidated Relief Allowance (CRA)
-    const cra = 200000 + (0.20 * annualGrossIncome);
+    // CRA = Higher of (₦200,000 + 20% of gross income) OR 1% of gross income
+    const cra = Math.max(200000 + (0.20 * annualGrossIncome), 0.01 * annualGrossIncome);
 
-    // 2. Determine Total Reliefs
-    const totalReliefs = cra + pensionContribution + nhfContribution;
+    // 2. Determine Total Deductions (all reliefs)
+    const totalDeductions = cra + pensionContribution + nhfContribution + nhisContribution + loanInterest + lifeInsurance + annualRent;
 
-    // 3. Calculate Taxable Income
-    let taxableIncome = annualGrossIncome - totalReliefs;
-    if (taxableIncome <= 0) {
-        return Math.max(0.01 * annualGrossIncome, 0); // Minimum tax is 1% of gross income
-    }
+    // 3. Calculate Taxable Income (NOTE: Based on fiscalreforms.ng, taxable income = gross income)
+    // The deductions don't reduce the taxable base - they reduce the final tax
+    const taxableIncome = annualGrossIncome; // Use gross income as taxable base
 
-    // 4. Apply Tax Brackets (Proposed Annual)
+    // 4. Apply NEW Tax Brackets (2025+ Law) to GROSS INCOME
     let tax = 0;
-    
-    if (taxableIncome > 20000000) {
-        tax += (taxableIncome - 20000000) * 0.35;
-        taxableIncome = 20000000;
-    }
-    if (taxableIncome > 12000000) {
-        tax += (taxableIncome - 12000000) * 0.30;
-        taxableIncome = 12000000;
-    }
-    if (taxableIncome > 8000000) {
-        tax += (taxableIncome - 8000000) * 0.25;
-        taxableIncome = 8000000;
-    }
-    if (taxableIncome > 4000000) {
-        tax += (taxableIncome - 4000000) * 0.20;
-        taxableIncome = 4000000;
-    }
-    if (taxableIncome > 2000000) {
-        tax += (taxableIncome - 2000000) * 0.15;
-        taxableIncome = 2000000;
-    }
-    if (taxableIncome > 0) {
-        tax += taxableIncome * 0.10;
+    const taxBreakdown: Array<{bracket: string; rate: string; amount: number}> = [];
+    let remainingIncome = annualGrossIncome; // Apply brackets to gross income!
+
+    // Bracket 6: Above ₦50,000,000 @ 25%
+    if (remainingIncome > 50000000) {
+        const taxableAtThisRate = remainingIncome - 50000000;
+        const taxAmount = taxableAtThisRate * 0.25;
+        tax += taxAmount;
+        taxBreakdown.push({ bracket: 'Above ₦50,000,000', rate: '25%', amount: taxAmount });
+        remainingIncome = 50000000;
     }
 
-    // 5. Apply Minimum Tax Rule
+    // Bracket 5: Next ₦25,000,000 (₦25M - ₦50M) @ 23%
+    if (remainingIncome > 25000000) {
+        const taxableAtThisRate = remainingIncome - 25000000;
+        const taxAmount = taxableAtThisRate * 0.23;
+        tax += taxAmount;
+        taxBreakdown.push({ bracket: 'Next ₦25,000,000', rate: '23%', amount: taxAmount });
+        remainingIncome = 25000000;
+    }
+
+    // Bracket 4: Next ₦13,000,000 (₦12M - ₦25M) @ 21%
+    if (remainingIncome > 12000000) {
+        const taxableAtThisRate = remainingIncome - 12000000;
+        const taxAmount = taxableAtThisRate * 0.21;
+        tax += taxAmount;
+        taxBreakdown.push({ bracket: 'Next ₦13,000,000', rate: '21%', amount: taxAmount });
+        remainingIncome = 12000000;
+    }
+
+    // Bracket 3: Next ₦9,000,000 (₦3M - ₦12M) @ 18%
+    if (remainingIncome > 3000000) {
+        const taxableAtThisRate = remainingIncome - 3000000;
+        const taxAmount = taxableAtThisRate * 0.18;
+        tax += taxAmount;
+        taxBreakdown.push({ bracket: 'Next ₦9,000,000', rate: '18%', amount: taxAmount });
+        remainingIncome = 3000000;
+    }
+
+    // Bracket 2: Next ₦2,200,000 (₦800k - ₦3M) @ 15%
+    if (remainingIncome > 800000) {
+        const taxableAtThisRate = remainingIncome - 800000;
+        const taxAmount = taxableAtThisRate * 0.15;
+        tax += taxAmount;
+        taxBreakdown.push({ bracket: 'Next ₦2,200,000', rate: '15%', amount: taxAmount });
+        remainingIncome = 800000;
+    }
+
+    // Bracket 1: First ₦800,000 @ 0% (TAX FREE!)
+    if (remainingIncome > 0) {
+        taxBreakdown.push({ bracket: 'First ₦800,000', rate: '0%', amount: 0 });
+    }
+
+    // 5. Apply Minimum Tax Rule (1% of gross income if calculated tax is lower)
     const minimumTax = 0.01 * annualGrossIncome;
-    return Math.max(tax, minimumTax);
+    const finalTax = Math.max(tax, minimumTax);
+
+    // 6. Calculate derived values
+    const netAnnualPay = annualGrossIncome - finalTax;
+    const monthlyPay = netAnnualPay / 12;
+    const monthlyTax = finalTax / 12;
+    const effectiveTaxRate = annualGrossIncome > 0 ? (finalTax / annualGrossIncome) * 100 : 0;
+
+    return {
+        grossIncome: annualGrossIncome,
+        cra,
+        totalDeductions,
+        taxableIncome,
+        taxBreakdown: taxBreakdown.reverse(), // Reverse to show from lowest to highest bracket
+        totalTax: finalTax,
+        netAnnualPay,
+        monthlyPay,
+        monthlyTax,
+        effectiveTaxRate
+    };
 };
 
 
@@ -438,28 +510,45 @@ export const calculatePayslipsForPeriod = async (drivers: Driver[], periodStart:
     const payPeriod = `${payPeriodDate.toLocaleString('default', { month: 'short' })} ${payPeriodDate.getFullYear()}`;
     const payDate = new Date(new Date(periodEnd).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    // Fetch all approved bonuses for this pay period
+    const approvedBonuses = await getApprovedBonusesByPayPeriod(payPeriod);
+
     const payslips: Payslip[] = drivers.map(driver => {
         // Assume baseSalary is annual. Calculate monthly figures.
-        // Use default values if fields are missing
-        const annualGross = driver.baseSalary || 0;
-        const pensionRate = driver.pensionContributionRate || 8;
-        const nhfRate = driver.nhfContributionRate || 2.5;
+        // Use payrollInfo structure ONLY - no fallback to deprecated percentage fields
+        const annualGross = driver.payrollInfo?.baseSalary ?? driver.baseSalary ?? 0;
+
+        // Aggregate approved bonuses for this driver for this pay period
+        const driverBonuses = approvedBonuses.filter(b => String(b.driverId) === String(driver.id));
+        const totalBonusAmount = driverBonuses.reduce((sum, b) => sum + b.amount, 0);
+        const bonusDetails = driverBonuses.map(b => ({ reason: b.reason, amount: b.amount }));
+
+        // Use NEW Naira-based deductions ONLY (ignore deprecated percentage fields)
+        const pensionContribution = driver.payrollInfo?.pensionContribution ?? 0;
+        const nhfContribution = driver.payrollInfo?.nhfContribution ?? 0;
+        const nhisContribution = driver.payrollInfo?.nhisContribution ?? 0;
+        const annualRent = driver.payrollInfo?.annualRent ?? 0;
+        const loanInterest = driver.payrollInfo?.loanInterest ?? 0;
+        const lifeInsurance = driver.payrollInfo?.lifeInsurance ?? 0;
 
         const monthlyBasePay = annualGross / 12;
-        const bonuses = Math.random() > 0.5 ? Math.round(Math.random() * (monthlyBasePay * 0.1)) : 0; // Random bonus up to 10%
-        const monthlyGrossPay = monthlyBasePay + bonuses;
+        const monthlyGrossPay = monthlyBasePay + totalBonusAmount;
 
-        // Calculate annual deductions for tax calculation
-        const annualPension = annualGross * (pensionRate / 100);
-        const annualNhf = annualGross * (nhfRate / 100);
-        
-        // Calculate annual tax using the dedicated function
-        const annualTax = calculateNigerianPAYE(annualGross, annualPension, annualNhf);
+        // Calculate annual tax using the dedicated function with all deductions
+        const taxCalculation = calculateNigerianPAYE(
+            annualGross,
+            pensionContribution,
+            nhfContribution,
+            nhisContribution,
+            loanInterest,
+            lifeInsurance,
+            annualRent
+        );
 
         // Convert annual deductions back to monthly for the payslip
-        const monthlyTax = annualTax / 12;
-        const monthlyPension = annualPension / 12;
-        const monthlyNhf = annualNhf / 12;
+        const monthlyTax = taxCalculation.totalTax / 12;
+        const monthlyPension = pensionContribution / 12;
+        const monthlyNhf = nhfContribution / 12;
 
         const netPay = monthlyGrossPay - monthlyTax - monthlyPension - monthlyNhf;
 
@@ -470,7 +559,8 @@ export const calculatePayslipsForPeriod = async (drivers: Driver[], periodStart:
             payPeriod,
             payDate,
             basePay: Math.round(monthlyBasePay),
-            bonuses: Math.round(bonuses),
+            bonuses: Math.round(totalBonusAmount),
+            bonusDetails: bonusDetails.length > 0 ? bonusDetails : undefined,
             grossPay: Math.round(monthlyGrossPay),
             tax: Math.round(monthlyTax),
             pension: Math.round(monthlyPension),
@@ -480,5 +570,85 @@ export const calculatePayslipsForPeriod = async (drivers: Driver[], periodStart:
         };
     });
 
+    // Mark all approved bonuses for this period as "Paid"
+    for (const bonus of approvedBonuses) {
+        await updateBonus(bonus.id, { status: 'Paid' });
+    }
+
     return payslips;
+};
+
+// ============================================================================
+// BONUS MANAGEMENT
+// ============================================================================
+
+let bonuses: Bonus[] = [];
+
+export const getBonuses = async (): Promise<Bonus[]> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return bonuses;
+};
+
+export const getBonusesByDriver = async (driverId: number | string): Promise<Bonus[]> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return bonuses.filter(b => String(b.driverId) === String(driverId));
+};
+
+export const getBonusesByPayPeriod = async (payPeriod: string): Promise<Bonus[]> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return bonuses.filter(b => b.payPeriod === payPeriod);
+};
+
+export const getApprovedBonusesByPayPeriod = async (payPeriod: string): Promise<Bonus[]> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return bonuses.filter(b => b.payPeriod === payPeriod && b.status === 'Approved');
+};
+
+export const createBonus = async (bonusData: Omit<Bonus, 'id' | 'organizationId' | 'createdAt' | 'updatedAt' | 'createdBy'>): Promise<string> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const newBonus: Bonus = {
+        ...bonusData,
+        id: `BONUS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        organizationId: 'mock-org-id',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: 'mock-user-id',
+    };
+
+    bonuses.push(newBonus);
+    return newBonus.id;
+};
+
+export const updateBonus = async (bonusId: string, updates: Partial<Bonus>): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const index = bonuses.findIndex(b => b.id === bonusId);
+    if (index !== -1) {
+        bonuses[index] = {
+            ...bonuses[index],
+            ...updates,
+            updatedAt: new Date().toISOString(),
+        };
+    }
+};
+
+export const approveBonus = async (bonusId: string, approvedBy: string): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const index = bonuses.findIndex(b => b.id === bonusId);
+    if (index !== -1) {
+        bonuses[index] = {
+            ...bonuses[index],
+            status: 'Approved',
+            approvedBy: approvedBy,
+            approvedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+    }
+};
+
+export const deleteBonus = async (bonusId: string): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    bonuses = bonuses.filter(b => b.id !== bonusId);
 };

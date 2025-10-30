@@ -8,6 +8,8 @@ import LimitReachedModal from '../LimitReachedModal';
 import { verifyBankAccount, NIGERIAN_BANKS } from '../../services/bankVerification';
 import { uploadDriverPhoto, uploadDriverLicense } from '../../services/firestore/storage';
 import { notifyDriverOnboarded } from '../../services/notificationTriggers';
+import { calculateNigerianPAYE } from '../../firebase/config';
+import TaxBreakdownModal from './TaxBreakdownModal';
 
 interface AddDriverModalProps {
     onClose: () => void;
@@ -33,6 +35,8 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
     const [verifying, setVerifying] = useState(false);
     const [accountName, setAccountName] = useState('');
     const [selectedBankCode, setSelectedBankCode] = useState('');
+    const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
+    const [taxData, setTaxData] = useState<any>(null);
 
     // Get subscription limits
     const subscriptionPlan = organization?.subscription?.plan || 'basic';
@@ -107,8 +111,12 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
             const license = formData.get('license') as string;
             const nin = formData.get('nin') as string;
             const baseSalary = formData.get('baseSalary') as string;
-            const pensionRate = formData.get('pensionRate') as string;
-            const nhfRate = formData.get('nhfRate') as string;
+            const pensionContribution = formData.get('pensionContribution') as string;
+            const nhfContribution = formData.get('nhfContribution') as string;
+            const nhisContribution = formData.get('nhisContribution') as string;
+            const annualRent = formData.get('annualRent') as string;
+            const loanInterest = formData.get('loanInterest') as string;
+            const lifeInsurance = formData.get('lifeInsurance') as string;
             const accountNumber = formData.get('accountNumber') as string;
             const accountName = formData.get('accountName') as string;
             const bankName = formData.get('bankName') as string;
@@ -140,8 +148,12 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
                     licensePhotoUrl: '',
                     payrollInfo: {
                         baseSalary: Number(baseSalary),
-                        pensionContributionRate: pensionRate ? Number(pensionRate) : 8,
-                        nhfContributionRate: nhfRate ? Number(nhfRate) : 2.5,
+                        pensionContribution: pensionContribution ? Number(pensionContribution) : undefined,
+                        nhfContribution: nhfContribution ? Number(nhfContribution) : undefined,
+                        nhisContribution: nhisContribution ? Number(nhisContribution) : undefined,
+                        annualRent: annualRent ? Number(annualRent) : undefined,
+                        loanInterest: loanInterest ? Number(loanInterest) : undefined,
+                        lifeInsurance: lifeInsurance ? Number(lifeInsurance) : undefined,
                     },
                     bankInfo: accountNumber && accountName && bankName ? {
                         accountNumber: accountNumber,
@@ -204,6 +216,45 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
         }
     };
 
+    const handlePreviewTax = () => {
+        // Get form values
+        const baseSalaryInput = document.getElementById('baseSalary') as HTMLInputElement;
+        const pensionContributionInput = document.getElementById('pensionContribution') as HTMLInputElement;
+        const nhfContributionInput = document.getElementById('nhfContribution') as HTMLInputElement;
+        const nhisContributionInput = document.getElementById('nhisContribution') as HTMLInputElement;
+        const annualRentInput = document.getElementById('annualRent') as HTMLInputElement;
+        const loanInterestInput = document.getElementById('loanInterest') as HTMLInputElement;
+        const lifeInsuranceInput = document.getElementById('lifeInsurance') as HTMLInputElement;
+
+        const baseSalary = Number(baseSalaryInput?.value || 0);
+        const pensionContribution = Number(pensionContributionInput?.value || 0);
+        const nhfContribution = Number(nhfContributionInput?.value || 0);
+        const nhisContribution = Number(nhisContributionInput?.value || 0);
+        const annualRent = Number(annualRentInput?.value || 0);
+        const loanInterest = Number(loanInterestInput?.value || 0);
+        const lifeInsurance = Number(lifeInsuranceInput?.value || 0);
+
+        if (!baseSalary || baseSalary <= 0) {
+            setError('Please enter a valid base salary to preview tax calculation');
+            return;
+        }
+
+        // Calculate tax breakdown
+        const calculation = calculateNigerianPAYE(
+            baseSalary,
+            pensionContribution,
+            nhfContribution,
+            nhisContribution,
+            loanInterest,
+            lifeInsurance,
+            annualRent
+        );
+
+        setTaxData(calculation);
+        setShowTaxBreakdown(true);
+        setError(null);
+    };
+
     return (
         <>
             <LimitReachedModal
@@ -213,6 +264,13 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
                 currentPlan={subscriptionPlan}
                 onUpgrade={handleUpgrade}
             />
+            {showTaxBreakdown && taxData && (
+                <TaxBreakdownModal
+                    isOpen={showTaxBreakdown}
+                    onClose={() => setShowTaxBreakdown(false)}
+                    taxData={taxData}
+                />
+            )}
             <ModalBase title={t('modals.addDriver.title')} onClose={onClose}>
                 <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Subscription Limit Warning Banner */}
@@ -295,10 +353,65 @@ const AddDriverModal: React.FC<AddDriverModalProps> = ({ onClose, currentDriverC
 
                 <div className="border-t pt-4 mt-4 dark:border-slate-700">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Payroll Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <InputField label="Annual Base Salary (₦)" id="baseSalary" type="number" placeholder="e.g., 3600000" />
-                        <InputField label="Pension Rate (%)" id="pensionRate" type="number" placeholder="e.g., 8" />
-                        <InputField label="NHF Rate (%)" id="nhfRate" type="number" placeholder="e.g., 2.5" />
+                    <InputField label="Annual Base Salary (₦)" id="baseSalary" type="number" placeholder="e.g., 3000000" />
+
+                    {/* NOTE: Bonuses are now managed via the "Add Bonus" button in the Drivers screen */}
+
+                    {/* All Deductions (Optional) */}
+                    <div className="mt-4">
+                        <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Deductions (Optional - All amounts in Naira)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <InputField
+                                label="Pension Contribution (Annual ₦)"
+                                id="pensionContribution"
+                                type="number"
+                                placeholder="e.g., 0"
+                            />
+                            <InputField
+                                label="NHF Contribution (Annual ₦)"
+                                id="nhfContribution"
+                                type="number"
+                                placeholder="e.g., 0"
+                            />
+                            <InputField
+                                label="NHIS Contribution (Annual ₦)"
+                                id="nhisContribution"
+                                type="number"
+                                placeholder="e.g., 0"
+                            />
+                            <InputField
+                                label="Annual Rent (₦)"
+                                id="annualRent"
+                                type="number"
+                                placeholder="e.g., 0"
+                            />
+                            <InputField
+                                label="Loan Interest (Annual ₦)"
+                                id="loanInterest"
+                                type="number"
+                                placeholder="e.g., 0"
+                            />
+                            <InputField
+                                label="Life Insurance Premium (Annual ₦)"
+                                id="lifeInsurance"
+                                type="number"
+                                placeholder="e.g., 0"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Preview Tax Calculation Button */}
+                    <div className="mt-4">
+                        <button
+                            type="button"
+                            onClick={handlePreviewTax}
+                            className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            Preview Tax Calculation
+                        </button>
                     </div>
                 </div>
 

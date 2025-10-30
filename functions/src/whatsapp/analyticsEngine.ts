@@ -39,18 +39,19 @@ export class AnalyticsEngine {
                     startDate.setMonth(now.getMonth() - 1);
             }
 
-            const routes = await this.queries.getRoutes({
+            const result = await this.queries.getRoutes({
                 organizationId: params.organizationId,
                 startDate: startDate.toISOString().split('T')[0],
                 endDate: now.toISOString().split('T')[0],
                 limit: 1000
             });
 
+            const routes = result.routes || [];
             const totalRoutes = routes.length;
-            const completedRoutes = routes.filter(r => r.status === 'Completed').length;
-            const pendingRoutes = routes.filter(r => r.status === 'Pending').length;
-            const inProgressRoutes = routes.filter(r => r.status === 'In Progress').length;
-            const cancelledRoutes = routes.filter(r => r.status === 'Cancelled').length;
+            const completedRoutes = routes.filter((r: any) => r.status === 'Completed').length;
+            const pendingRoutes = routes.filter((r: any) => r.status === 'Pending').length;
+            const inProgressRoutes = routes.filter((r: any) => r.status === 'In Progress').length;
+            const cancelledRoutes = routes.filter((r: any) => r.status === 'Cancelled').length;
 
             const completionRate = totalRoutes > 0 ? (completedRoutes / totalRoutes) * 100 : 0;
             const cancellationRate = totalRoutes > 0 ? (cancelledRoutes / totalRoutes) * 100 : 0;
@@ -86,15 +87,17 @@ export class AnalyticsEngine {
                 limit: 100
             });
 
-            const routes = await this.queries.getRoutes({
+            const routeResult = await this.queries.getRoutes({
                 organizationId: params.organizationId,
                 limit: 1000
             });
 
+            const routes = routeResult.routes || [];
+
             // Calculate routes per driver
             const driverStats = drivers.map(driver => {
-                const driverRoutes = routes.filter(r => r.driverId === driver.id);
-                const completedRoutes = driverRoutes.filter(r => r.status === 'Completed').length;
+                const driverRoutes = routes.filter((r: any) => r.driverId === driver.id);
+                const completedRoutes = driverRoutes.filter((r: any) => r.status === 'Completed').length;
 
                 return {
                     id: driver.id,
@@ -112,7 +115,7 @@ export class AnalyticsEngine {
 
             const topDrivers = driverStats.slice(0, params.topN || 5);
             const idleDrivers = drivers.filter(d => {
-                const driverRoutes = routes.filter(r => r.driverId === d.id && r.status === 'In Progress');
+                const driverRoutes = routes.filter((r: any) => r.driverId === d.id && r.status === 'In Progress');
                 return driverRoutes.length === 0;
             });
 
@@ -267,17 +270,19 @@ export class AnalyticsEngine {
                 limit: 100
             });
 
-            const routes = await this.queries.getRoutes({
+            const routeResult = await this.queries.getRoutes({
                 organizationId: params.organizationId,
                 status: 'In Progress',
                 limit: 1000
             });
 
+            const routes = routeResult.routes || [];
+
             const activeVehicles = vehicles.filter(v => v.status === 'Active').length;
             const maintenanceVehicles = vehicles.filter(v => v.status === 'Maintenance').length;
             const outOfServiceVehicles = vehicles.filter(v => v.status === 'Out of Service').length;
 
-            const vehiclesInUse = new Set(routes.map(r => r.vehicleId)).size;
+            const vehiclesInUse = new Set(routes.map((r: any) => r.vehicleId)).size;
             const idleVehicles = activeVehicles - vehiclesInUse;
 
             const utilizationRate = activeVehicles > 0 ?

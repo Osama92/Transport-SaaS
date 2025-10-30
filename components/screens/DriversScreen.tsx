@@ -13,6 +13,7 @@ interface DriversScreenProps {
     onRemove: (driver: Driver) => void;
     onEditPay: (driver: Driver) => void;
     onEditDriver?: (driver: Driver) => void;
+    onAddBonus?: () => void;
     dateRange: { start: Date, end: Date };
     selectedDriver1: string;
     onDriver1Change: (id: string) => void;
@@ -22,7 +23,7 @@ interface DriversScreenProps {
 
 const DriversScreen: React.FC<DriversScreenProps> = (props) => {
     const {
-        setActiveModal, drivers, onSendFunds, onManageWallet, onViewDetails, onRemove, onEditPay, onEditDriver,
+        setActiveModal, drivers, onSendFunds, onManageWallet, onViewDetails, onRemove, onEditPay, onEditDriver, onAddBonus,
         dateRange, selectedDriver1, onDriver1Change, selectedDriver2, onDriver2Change
     } = props;
     const [activeTab, setActiveTab] = useState<'all' | 'analytics'>('all');
@@ -34,9 +35,19 @@ const DriversScreen: React.FC<DriversScreenProps> = (props) => {
                     <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Drivers</h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Manage, analyze, and view details for all registered drivers.</p>
                 </div>
-                <button onClick={() => setActiveModal('addDriver')} className="flex items-center gap-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
-                    <UserPlusIcon className="w-5 h-5"/> Add New Driver
-                </button>
+                <div className="flex items-center gap-2">
+                    {onAddBonus && (
+                        <button onClick={onAddBonus} className="flex items-center gap-2 text-sm bg-green-500 hover:bg-green-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Add Bonus
+                        </button>
+                    )}
+                    <button onClick={() => setActiveModal('addDriver')} className="flex items-center gap-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
+                        <UserPlusIcon className="w-5 h-5"/> Add New Driver
+                    </button>
+                </div>
             </div>
             
             {/* Tabs */}

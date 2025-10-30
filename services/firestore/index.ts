@@ -7,3 +7,5 @@ export * from './routes';
 export * from './clients';
 export * from './invoices';
 export * from './payroll';
+export * from './bonuses';
+export * from './notifications';

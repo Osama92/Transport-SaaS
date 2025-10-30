@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import * as admin from 'firebase-admin';
+import * as firebaseFunctions from 'firebase-functions';
 import { FirebaseQueries } from './firebaseQueries';
 import { AnalyticsEngine } from './analyticsEngine';
 import { handlePreviewInvoice } from './invoiceHandlers';
@@ -77,19 +78,25 @@ export class OpenAIIntegration {
                 if (!orgId || orgId === 'default_org') {
                     console.error(`⚠️ [SECURITY WARNING] User ${normalizedPhone} has invalid organizationId: ${orgId}`);
                     console.error(`⚠️ [SECURITY WARNING] User data:`, JSON.stringify(userData));
+                    // CRITICAL FIX: Throw error instead of using default_org
+                    throw new Error(`Your account is not properly configured. Please contact support to link your WhatsApp number to your organization.`);
                 }
 
                 console.log(`✅ [SECURITY] Found organizationId: ${orgId} for phone: ${normalizedPhone}`);
-                return orgId || 'default_org';
+                return orgId;
             }
 
-            // If no user found, log error
+            // If no user found, throw error instead of using default
             console.error(`❌ [SECURITY ERROR] No user record found for whatsappNumber: ${normalizedPhone}`);
             console.error(`❌ [SECURITY ERROR] User must have whatsappNumber field set in users collection`);
-            return 'default_org';
-        } catch (error) {
+            throw new Error(`Your WhatsApp number ${normalizedPhone} is not registered. Please sign up at https://app.glydeafrica.com or contact support.`);
+        } catch (error: any) {
             console.error('❌ [SECURITY ERROR] Error getting organization ID:', error);
-            return 'default_org';
+            // Re-throw if it's our custom error message
+            if (error.message && error.message.includes('not registered')) {
+                throw error;
+            }
+            throw new Error('Unable to verify your account. Please try again or contact support.');
         }
     }
 
@@ -146,6 +153,9 @@ export class OpenAIIntegration {
             console.log('👤 [OPENAI] User ID:', userId);
 
             // Build conversation messages for OpenAI with optimized system prompt
+            // Add timestamp to bust cache for real-time data queries
+            const currentTimestamp = new Date().toISOString();
+
             const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
                 {
                     role: 'system',
@@ -161,7 +171,46 @@ RULES:
 5. Extract all info from messages when possible
 6. BREVITY IS KEY - users prefer short, direct answers
 
-CONTEXT: OrgID=${organizationId}, UserID=${userId}
+LANGUAGE CONSISTENCY - CRITICAL:
+- NEVER mix languages in a single response
+- If user speaks English, respond ONLY in English
+- If user speaks Yoruba, respond ONLY in Yoruba (not Pidgin)
+- If user speaks Igbo, respond ONLY in Igbo (not Pidgin)
+- If user speaks Hausa, respond ONLY in Hausa (not Pidgin)
+- If user speaks Pidgin, respond ONLY in Pidgin
+- Match the user's language EXACTLY - no mixing or code-switching
+
+ROUTE DISPLAY FORMATTING - CRITICAL:
+When displaying routes (from get_routes function), ALWAYS use this EXACT format:
+
+### Completed Routes
+1. *Route to [Destination]*
+   - *ID:* [Route ID]
+   - *Origin:* [Origin]
+   - *Destination:* [Destination]
+   - *Distance:* [Distance] km
+   - *Rate:* ₦[Rate]
+   - *Vehicle:* [Vehicle or "Unassigned"]
+   - *Driver:* [Driver or "Unassigned"]
+   - *Status:* Completed
+
+### In Progress Routes
+[Same format as above]
+
+### Pending Routes
+[Same format as above]
+
+### Cancelled Routes
+[Same format as above]
+
+### Summary
+- *Total Routes:* [count]
+- *Completed Routes:* [count]
+- *In Progress:* [count]
+- *Pending Routes:* [count]
+- *Cancelled Routes:* [count]
+
+CONTEXT: OrgID=${organizationId}, UserID=${userId}, QueryTime=${currentTimestamp}
 
 DRIVER REGISTRATION:
 "Register driver John Doe, 07031167360, license T123, NIN 123456, salary 800000, account 7031167360 Opay" → Extract all data, call create_driver
@@ -1042,12 +1091,14 @@ EXAMPLES:
 
             // Call OpenAI with function calling (cost-optimized model)
             // gpt-4o-mini: $0.15/1M input, $0.60/1M output (67x cheaper than gpt-4-turbo!)
+            // store: false - Disable caching to always fetch fresh real-time data from Firebase
             let response = await this.openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages,
                 tools: functions,
                 tool_choice: 'auto',
-                max_tokens: 300 // Limit response length for cost savings
+                max_tokens: 300, // Limit response length for cost savings
+                store: false // CRITICAL: Disable response caching for real-time logistics data
             });
 
             // Handle function calls
@@ -1075,10 +1126,32 @@ EXAMPLES:
                     // Execute the appropriate function
                     switch (functionName) {
                         case 'get_routes':
+                            firebaseFunctions.logger.info('🔍 [DEBUG] ========== GET_ROUTES CALLED ==========');
+                            firebaseFunctions.logger.info('🔍 [DEBUG] organizationId:', organizationId);
+                            firebaseFunctions.logger.info('🔍 [DEBUG] phoneNumber:', phoneNumber);
+                            firebaseFunctions.logger.info('🔍 [DEBUG] functionArgs:', JSON.stringify(functionArgs, null, 2));
+
                             functionResult = await this.queries.getRoutes({
                                 organizationId,
                                 ...functionArgs
                             });
+
+                            firebaseFunctions.logger.info('🔍 [DEBUG] ========== GET_ROUTES RESULT ==========');
+                            firebaseFunctions.logger.info('🔍 [DEBUG] Total routes returned:', functionResult?.routes?.length || 0);
+                            firebaseFunctions.logger.info('🔍 [DEBUG] Summary:', JSON.stringify(functionResult?.summary, null, 2));
+                            if (functionResult?.routes && functionResult.routes.length > 0) {
+                                firebaseFunctions.logger.info('🔍 [DEBUG] First 3 routes:');
+                                functionResult.routes.slice(0, 3).forEach((route: any, index: number) => {
+                                    firebaseFunctions.logger.info(`🔍 [DEBUG] Route ${index + 1}:`, {
+                                        id: route.id,
+                                        origin: route.origin,
+                                        destination: route.destination,
+                                        status: route.status,
+                                        createdAt: route.createdAt
+                                    });
+                                });
+                            }
+                            firebaseFunctions.logger.info('🔍 [DEBUG] ========================================');
                             break;
 
                         case 'get_drivers':
@@ -1273,12 +1346,14 @@ EXAMPLES:
                 }
 
                 // Get next response from OpenAI (cost-optimized)
+                // store: false - Disable caching to always fetch fresh real-time data
                 response = await this.openai.chat.completions.create({
                     model: 'gpt-4o-mini',
                     messages,
                     tools: functions,
                     tool_choice: 'auto',
-                    max_tokens: 300
+                    max_tokens: 300,
+                    store: false // CRITICAL: Disable response caching for real-time logistics data
                 });
 
                 assistantMessage = response.choices[0].message;
@@ -1313,11 +1388,18 @@ EXAMPLES:
 
             // Return final response
             return finalResponse;
-        } catch (error) {
+        } catch (error: any) {
             console.error('========================================');
             console.error('❌ [OPENAI] Error in processing:', error);
             console.error('========================================');
-            throw error;
+
+            // Handle user registration errors gracefully
+            if (error.message && (error.message.includes('not registered') || error.message.includes('not properly configured'))) {
+                return error.message;
+            }
+
+            // For other errors, return a generic message
+            return 'Sorry, I encountered an error processing your request. Please try again or contact support if the issue persists.';
         }
     }
 

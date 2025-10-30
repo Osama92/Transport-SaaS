@@ -40,7 +40,10 @@
       "Bash(git checkout:*)",
       "Bash(git branch:*)",
       "Bash(tasklist:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(gcloud functions describe:*)",
+      "Bash(move FIRESTORE_SETUP.md docs )",
+      "Bash(move PAYROLL_SYSTEM_GUIDE.md docs )"
     ],
     "deny": [],
     "ask": []

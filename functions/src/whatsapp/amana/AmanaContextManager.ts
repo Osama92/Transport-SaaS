@@ -164,7 +164,7 @@ async function getUserProfile(
 ): Promise<UserContext['userProfile'] | null> {
   try {
     // Try to find user by WhatsApp number
-    const whatsappUsersRef = db.collection('whatsappUsers');
+    const whatsappUsersRef = db.collection('whatsapp_users');
     const userQuery = await whatsappUsersRef
       .where('whatsappNumber', '==', whatsappNumber)
       .where('organizationId', '==', organizationId)

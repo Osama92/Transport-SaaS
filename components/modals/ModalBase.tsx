@@ -5,9 +5,10 @@ interface ModalBaseProps {
     title: string;
     onClose: () => void;
     children: React.ReactNode;
+    zIndex?: string; // Optional z-index override (e.g., 'z-60', 'z-[60]')
 }
 
-const ModalBase: React.FC<ModalBaseProps> = ({ title, onClose, children }) => {
+const ModalBase: React.FC<ModalBaseProps> = ({ title, onClose, children, zIndex = 'z-50' }) => {
     useEffect(() => {
         const handleEsc = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
@@ -21,8 +22,8 @@ const ModalBase: React.FC<ModalBaseProps> = ({ title, onClose, children }) => {
     }, [onClose]);
 
     return (
-        <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4"
+        <div
+            className={`fixed inset-0 bg-black bg-opacity-50 ${zIndex} flex justify-center items-center p-4`}
             onClick={onClose}
             aria-modal="true"
             role="dialog"

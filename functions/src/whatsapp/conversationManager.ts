@@ -256,7 +256,7 @@ export async function handleOutOfScope(
 
   if (isGreeting) {
     const greetingResponses = [
-      `Hey there! 👋\n\nI'm your Glyde Systems AI assistant. I can help you with:\n\n✅ Create invoices\n✅ Manage clients\n✅ Track routes & drivers\n✅ Check wallet balance\n\nWhat would you like to do today?`,
+      `Hey there! 👋\n\nI'm Amana, your AI assistant. I can help you with:\n\n✅ Create invoices\n✅ Manage clients\n✅ Track routes & drivers\n✅ Check wallet balance\n\nWhat would you like to do today?`,
       `Hello! 😊\n\nGreat to hear from you! I'm here to help manage your transport business.\n\nType "HELP" to see everything I can do, or just tell me what you need!`,
       `Hi! 🚚\n\nReady to help with your logistics needs!\n\nSome quick options:\n• Create invoice\n• List routes\n• Check balance\n\nWhat's on your mind?`
     ];

@@ -2,62 +2,22 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import ModalBase from './ModalBase';
 import type { Driver } from '../../types';
+import { calculateNigerianPAYE } from '../../firebase/config';
+import TaxBreakdownModal from './TaxBreakdownModal';
 
 interface EditDriverPayModalProps {
     driver: Driver | null;
     onClose: () => void;
-    onSave: (driverId: number, newPayInfo: { baseSalary: number; pensionContributionRate: number; nhfContributionRate: number; }) => void;
+    onSave: (driverId: number, newPayInfo: {
+        baseSalary: number;
+        pensionContribution?: number;
+        nhfContribution?: number;
+        nhisContribution?: number;
+        annualRent?: number;
+        loanInterest?: number;
+        lifeInsurance?: number;
+    }) => void;
 }
-
-/**
- * Calculate Nigerian PAYE tax based on 2026 reform
- */
-const calculateNigerianPAYE = (annualGross: number, pensionRate: number, nhfRate: number): number => {
-    const annualPension = annualGross * (pensionRate / 100);
-    const annualNhf = annualGross * (nhfRate / 100);
-
-    // 1. Calculate Consolidated Relief Allowance (CRA)
-    const cra = 200000 + (0.20 * annualGross);
-
-    // 2. Determine Total Reliefs
-    const totalReliefs = cra + annualPension + annualNhf;
-
-    // 3. Calculate Taxable Income
-    let taxableIncome = annualGross - totalReliefs;
-    if (taxableIncome <= 0) {
-        return Math.max(0.01 * annualGross, 0);
-    }
-
-    // 4. Apply Tax Brackets
-    let tax = 0;
-    if (taxableIncome > 20000000) {
-        tax += (taxableIncome - 20000000) * 0.35;
-        taxableIncome = 20000000;
-    }
-    if (taxableIncome > 12000000) {
-        tax += (taxableIncome - 12000000) * 0.30;
-        taxableIncome = 12000000;
-    }
-    if (taxableIncome > 8000000) {
-        tax += (taxableIncome - 8000000) * 0.25;
-        taxableIncome = 8000000;
-    }
-    if (taxableIncome > 4000000) {
-        tax += (taxableIncome - 4000000) * 0.20;
-        taxableIncome = 4000000;
-    }
-    if (taxableIncome > 2000000) {
-        tax += (taxableIncome - 2000000) * 0.15;
-        taxableIncome = 2000000;
-    }
-    if (taxableIncome > 0) {
-        tax += taxableIncome * 0.10;
-    }
-
-    // 5. Apply Minimum Tax Rule
-    const minimumTax = 0.01 * annualGross;
-    return Math.max(tax, minimumTax);
-};
 
 const InputField: React.FC<{ label: string; id: string; type: string; value: string | number; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; addon?: string }> =
     ({ label, id, type, value, onChange, addon }) => (
@@ -82,19 +42,33 @@ const InputField: React.FC<{ label: string; id: string; type: string; value: str
 const EditDriverPayModal: React.FC<EditDriverPayModalProps> = ({ driver, onClose, onSave }) => {
     const { t } = useTranslation();
     const [salary, setSalary] = useState(0);
-    const [pensionRate, setPensionRate] = useState(8); // Default 8%
-    const [nhfRate, setNhfRate] = useState(2.5); // Default 2.5%
+    const [pensionContribution, setPensionContribution] = useState(0);
+    const [nhfContribution, setNhfContribution] = useState(0);
+    const [nhisContribution, setNhisContribution] = useState(0);
+    const [annualRent, setAnnualRent] = useState(0);
+    const [loanInterest, setLoanInterest] = useState(0);
+    const [lifeInsurance, setLifeInsurance] = useState(0);
+    const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
+    const [taxData, setTaxData] = useState<any>(null);
 
     useEffect(() => {
         if (driver) {
             // Check both payrollInfo and flat fields for backward compatibility
             const baseSalary = driver.payrollInfo?.baseSalary ?? driver.baseSalary ?? 0;
-            const pension = driver.payrollInfo?.pensionContributionRate ?? driver.pensionContributionRate ?? 8;
-            const nhf = driver.payrollInfo?.nhfContributionRate ?? driver.nhfContributionRate ?? 2.5;
+            const pension = driver.payrollInfo?.pensionContribution ?? 0;
+            const nhf = driver.payrollInfo?.nhfContribution ?? 0;
+            const nhis = driver.payrollInfo?.nhisContribution ?? 0;
+            const rent = driver.payrollInfo?.annualRent ?? 0;
+            const loan = driver.payrollInfo?.loanInterest ?? 0;
+            const insurance = driver.payrollInfo?.lifeInsurance ?? 0;
 
             setSalary(baseSalary);
-            setPensionRate(pension);
-            setNhfRate(nhf);
+            setPensionContribution(pension);
+            setNhfContribution(nhf);
+            setNhisContribution(nhis);
+            setAnnualRent(rent);
+            setLoanInterest(loan);
+            setLifeInsurance(insurance);
         }
     }, [driver]);
 
@@ -102,21 +76,29 @@ const EditDriverPayModal: React.FC<EditDriverPayModalProps> = ({ driver, onClose
     const calculations = useMemo(() => {
         if (salary <= 0) return null;
 
-        const annualTax = calculateNigerianPAYE(salary, pensionRate, nhfRate);
-        const annualPension = salary * (pensionRate / 100);
-        const annualNhf = salary * (nhfRate / 100);
-        const annualTotalDeductions = annualTax + annualPension + annualNhf;
+        const taxCalculation = calculateNigerianPAYE(
+            salary,
+            pensionContribution,
+            nhfContribution,
+            nhisContribution,
+            loanInterest,
+            lifeInsurance,
+            annualRent
+        );
+
+        const annualTax = taxCalculation.totalTax;
+        const annualTotalDeductions = annualTax + pensionContribution + nhfContribution;
         const annualNetPay = salary - annualTotalDeductions;
 
         return {
             monthlyGross: salary / 12,
             monthlyTax: annualTax / 12,
-            monthlyPension: annualPension / 12,
-            monthlyNhf: annualNhf / 12,
+            monthlyPension: pensionContribution / 12,
+            monthlyNhf: nhfContribution / 12,
             monthlyTotalDeductions: annualTotalDeductions / 12,
             monthlyNetPay: annualNetPay / 12,
         };
-    }, [salary, pensionRate, nhfRate]);
+    }, [salary, pensionContribution, nhfContribution, nhisContribution, loanInterest, lifeInsurance, annualRent]);
 
     if (!driver) return null;
 
@@ -124,9 +106,32 @@ const EditDriverPayModal: React.FC<EditDriverPayModalProps> = ({ driver, onClose
         e.preventDefault();
         onSave(driver.id, {
             baseSalary: salary,
-            pensionContributionRate: pensionRate,
-            nhfContributionRate: nhfRate,
+            pensionContribution: pensionContribution > 0 ? pensionContribution : undefined,
+            nhfContribution: nhfContribution > 0 ? nhfContribution : undefined,
+            nhisContribution: nhisContribution > 0 ? nhisContribution : undefined,
+            annualRent: annualRent > 0 ? annualRent : undefined,
+            loanInterest: loanInterest > 0 ? loanInterest : undefined,
+            lifeInsurance: lifeInsurance > 0 ? lifeInsurance : undefined,
         });
+    };
+
+    const handlePreviewTax = () => {
+        if (!salary || salary <= 0) {
+            return;
+        }
+
+        const calculation = calculateNigerianPAYE(
+            salary,
+            pensionContribution,
+            nhfContribution,
+            nhisContribution,
+            loanInterest,
+            lifeInsurance,
+            annualRent
+        );
+
+        setTaxData(calculation);
+        setShowTaxBreakdown(true);
     };
 
     const formatCurrency = (amount: number) => {
@@ -134,34 +139,95 @@ const EditDriverPayModal: React.FC<EditDriverPayModalProps> = ({ driver, onClose
     };
 
     return (
-        <ModalBase title={t('screens.payroll.editPayTitle', { name: driver.name })} onClose={onClose}>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                 <InputField
-                    label={t('screens.payroll.annualSalary')}
-                    id="baseSalary"
-                    type="number"
-                    value={salary}
-                    onChange={(e) => setSalary(Number(e.target.value))}
-                    addon="₦"
+        <>
+            {showTaxBreakdown && taxData && (
+                <TaxBreakdownModal
+                    isOpen={showTaxBreakdown}
+                    onClose={() => setShowTaxBreakdown(false)}
+                    taxData={taxData}
                 />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            )}
+            <ModalBase title={t('screens.payroll.editPayTitle', { name: driver.name })} onClose={onClose}>
+                <form onSubmit={handleSubmit} className="space-y-4">
                      <InputField
-                        label={t('screens.payroll.pensionRate')}
-                        id="pensionRate"
+                        label={t('screens.payroll.annualSalary')}
+                        id="baseSalary"
                         type="number"
-                        value={pensionRate}
-                        onChange={(e) => setPensionRate(Number(e.target.value))}
-                        addon="%"
+                        value={salary}
+                        onChange={(e) => setSalary(Number(e.target.value))}
+                        addon="₦"
                     />
-                     <InputField
-                        label={t('screens.payroll.nhfRate')}
-                        id="nhfRate"
-                        type="number"
-                        value={nhfRate}
-                        onChange={(e) => setNhfRate(Number(e.target.value))}
-                        addon="%"
-                    />
-                </div>
+
+                    {/* NOTE: Bonuses are now managed via the "Add Bonus" button in the Drivers screen */}
+
+                    {/* All Deductions (Optional) */}
+                    <div className="border-t pt-4 mt-4 dark:border-slate-700">
+                        <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Deductions (Optional - All amounts in Naira)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <InputField
+                                label="Pension Contribution (Annual ₦)"
+                                id="pensionContribution"
+                                type="number"
+                                value={pensionContribution}
+                                onChange={(e) => setPensionContribution(Number(e.target.value))}
+                                addon="₦"
+                            />
+                            <InputField
+                                label="NHF Contribution (Annual ₦)"
+                                id="nhfContribution"
+                                type="number"
+                                value={nhfContribution}
+                                onChange={(e) => setNhfContribution(Number(e.target.value))}
+                                addon="₦"
+                            />
+                            <InputField
+                                label="NHIS Contribution (Annual ₦)"
+                                id="nhisContribution"
+                                type="number"
+                                value={nhisContribution}
+                                onChange={(e) => setNhisContribution(Number(e.target.value))}
+                                addon="₦"
+                            />
+                            <InputField
+                                label="Annual Rent (₦)"
+                                id="annualRent"
+                                type="number"
+                                value={annualRent}
+                                onChange={(e) => setAnnualRent(Number(e.target.value))}
+                                addon="₦"
+                            />
+                            <InputField
+                                label="Loan Interest (Annual ₦)"
+                                id="loanInterest"
+                                type="number"
+                                value={loanInterest}
+                                onChange={(e) => setLoanInterest(Number(e.target.value))}
+                                addon="₦"
+                            />
+                            <InputField
+                                label="Life Insurance Premium (Annual ₦)"
+                                id="lifeInsurance"
+                                type="number"
+                                value={lifeInsurance}
+                                onChange={(e) => setLifeInsurance(Number(e.target.value))}
+                                addon="₦"
+                            />
+                        </div>
+
+                        {/* Preview Tax Calculation Button */}
+                        <div className="mt-4">
+                            <button
+                                type="button"
+                                onClick={handlePreviewTax}
+                                className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                Preview Tax Calculation
+                            </button>
+                        </div>
+                    </div>
 
                 {/* Live Calculation Preview */}
                 {calculations && (
@@ -178,14 +244,18 @@ const EditDriverPayModal: React.FC<EditDriverPayModalProps> = ({ driver, onClose
                                     <span className="ml-2">Tax (PAYE)</span>
                                     <span>{formatCurrency(calculations.monthlyTax)}</span>
                                 </div>
-                                <div className="flex justify-between text-red-600 dark:text-red-400">
-                                    <span className="ml-2">Pension ({pensionRate}%)</span>
-                                    <span>{formatCurrency(calculations.monthlyPension)}</span>
-                                </div>
-                                <div className="flex justify-between text-red-600 dark:text-red-400">
-                                    <span className="ml-2">NHF ({nhfRate}%)</span>
-                                    <span>{formatCurrency(calculations.monthlyNhf)}</span>
-                                </div>
+                                {pensionContribution > 0 && (
+                                    <div className="flex justify-between text-red-600 dark:text-red-400">
+                                        <span className="ml-2">Pension</span>
+                                        <span>{formatCurrency(calculations.monthlyPension)}</span>
+                                    </div>
+                                )}
+                                {nhfContribution > 0 && (
+                                    <div className="flex justify-between text-red-600 dark:text-red-400">
+                                        <span className="ml-2">NHF</span>
+                                        <span>{formatCurrency(calculations.monthlyNhf)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between font-medium text-red-700 dark:text-red-300 mt-1 pt-1 border-t border-red-200 dark:border-red-800">
                                     <span className="ml-2">Total Deductions</span>
                                     <span>{formatCurrency(calculations.monthlyTotalDeductions)}</span>
@@ -208,6 +278,7 @@ const EditDriverPayModal: React.FC<EditDriverPayModalProps> = ({ driver, onClose
                 </div>
             </form>
         </ModalBase>
+        </>
     );
 };
 

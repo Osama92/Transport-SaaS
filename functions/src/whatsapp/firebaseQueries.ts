@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import * as firebaseFunctions from 'firebase-functions';
 
 /**
  * Firebase Query Functions for OpenAI Function Calling
@@ -21,10 +22,12 @@ export class FirebaseQueries {
         limit?: number;
         startDate?: string;
         endDate?: string;
-    }): Promise<any[]> {
+    }): Promise<any> {
         try {
-            console.log('[FIRESTORE QUERY] Getting routes for org:', params.organizationId);
-            console.log('[FIRESTORE QUERY] Filters:', { status: params.status, limit: params.limit });
+            firebaseFunctions.logger.info('🔍 [FIRESTORE QUERY] ========== GET_ROUTES QUERY START ==========');
+            firebaseFunctions.logger.info('🔍 [FIRESTORE QUERY] Searching for organizationId:', params.organizationId);
+            firebaseFunctions.logger.info('🔍 [FIRESTORE QUERY] Status filter:', params.status || 'ALL');
+            firebaseFunctions.logger.info('🔍 [FIRESTORE QUERY] Limit:', params.limit || 50);
 
             let query: any = this.db.collection('routes')
                 .where('organizationId', '==', params.organizationId);
@@ -38,24 +41,63 @@ export class FirebaseQueries {
             query = query.limit(params.limit || 50);
 
             const snapshot = await query.get();
-            console.log('[FIRESTORE QUERY] Found', snapshot.docs.length, 'routes');
+            firebaseFunctions.logger.info('🔍 [FIRESTORE QUERY] Firestore returned', snapshot.docs.length, 'routes');
 
-            let routes = snapshot.docs.map((doc: any) => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+            // Log each route's organizationId for debugging - CRITICAL for data leakage detection
+            firebaseFunctions.logger.info('🔍 [FIRESTORE QUERY] ========== ROUTES DETAILS ==========');
+            snapshot.docs.forEach((doc: any, index: number) => {
+                const data = doc.data();
+                firebaseFunctions.logger.info(`🔍 [FIRESTORE QUERY] Route ${index + 1}/${snapshot.docs.length}:`, {
+                    id: doc.id,
+                    organizationId: data.organizationId,
+                    matchesQuery: data.organizationId === params.organizationId ? '✅ MATCH' : '❌ MISMATCH',
+                    origin: data.origin?.address || data.origin || 'N/A',
+                    destination: data.destination?.address || data.destination || 'N/A',
+                    status: data.status,
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : 'N/A'
+                });
+            });
+            firebaseFunctions.logger.info('🔍 [FIRESTORE QUERY] ========================================');
+
+            // Transform routes with clean data for AI
+            let routes = snapshot.docs.map((doc: any) => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    origin: data.origin?.address || data.origin || 'N/A',
+                    destination: data.destination?.address || data.destination || 'N/A',
+                    status: data.status || 'Unknown',
+                    progress: data.progress || 0,
+                    rate: data.rate || 0,
+                    vehicle: data.vehicle || 'Unassigned',
+                    driver: data.driver || 'Unassigned',
+                    distance: data.distance || 0,
+                    duration: data.duration || 0,
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString().split('T')[0] : 'N/A',
+                    updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString().split('T')[0] : 'N/A'
+                };
+            });
 
             // Sort by createdAt in memory (descending - newest first)
             routes.sort((a: any, b: any) => {
-                const dateA = a.createdAt?.toDate?.() || new Date(0);
-                const dateB = b.createdAt?.toDate?.() || new Date(0);
+                const dateA = a.createdAt !== 'N/A' ? new Date(a.createdAt) : new Date(0);
+                const dateB = b.createdAt !== 'N/A' ? new Date(b.createdAt) : new Date(0);
                 return dateB.getTime() - dateA.getTime();
             });
 
-            return routes;
+            // Add summary statistics
+            const summary = {
+                total: routes.length,
+                completed: routes.filter((r: any) => r.status === 'Completed').length,
+                inProgress: routes.filter((r: any) => r.status === 'In Progress').length,
+                pending: routes.filter((r: any) => r.status === 'Pending').length,
+                cancelled: routes.filter((r: any) => r.status === 'Cancelled').length
+            };
+
+            return { routes, summary };
         } catch (error) {
             console.error('[FIRESTORE QUERY] ❌ Error getting routes:', error);
-            return [];
+            return { routes: [], summary: { total: 0, completed: 0, inProgress: 0, pending: 0, cancelled: 0 } };
         }
     }
 
