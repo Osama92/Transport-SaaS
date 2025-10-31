@@ -7,6 +7,7 @@ import { useClients } from '../../hooks/useFirestore';
 import { canAddResource, getSubscriptionLimits } from '../../services/firestore/subscriptions';
 import LimitReachedModal from '../LimitReachedModal';
 import { calculateDistanceFallback } from '../../utils/distanceCalculator';
+import GooglePlacesAutocomplete from '../GooglePlacesAutocomplete';
 
 interface CreateRouteModalProps {
     onClose: () => void;
@@ -28,6 +29,8 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
     const { data: clients } = useClients(organizationId);
     const [origin, setOrigin] = useState('');
     const [destination, setDestination] = useState('');
+    const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>(null);
     const [distance, setDistance] = useState('');
     const [stops, setStops] = useState('');
     const [rate, setRate] = useState('');
@@ -43,41 +46,63 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
     const limits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
     const routeLimit = limits?.routes;
 
-    // Auto-calculate distance when both origin and destination are filled
+    // Auto-calculate distance when both locations are selected with coordinates
     useEffect(() => {
         const calculateDistance = async () => {
-            if (!origin || !destination) {
+            if (!originCoords || !destCoords) {
                 return;
             }
 
-            // Debounce: wait 1 second after user stops typing
-            const timeoutId = setTimeout(async () => {
-                setCalculatingDistance(true);
+            setCalculatingDistance(true);
+            setDistanceCalculationError(null);
+
+            try {
+                // Calculate using Haversine since we have exact coordinates
+                const straightLineDistance = haversineDistance(
+                    originCoords.lat,
+                    originCoords.lng,
+                    destCoords.lat,
+                    destCoords.lng
+                );
+
+                // Add 30% buffer for realistic road distance
+                const estimatedRoadDistance = Math.round(straightLineDistance * 1.3);
+
+                setDistance(String(estimatedRoadDistance));
                 setDistanceCalculationError(null);
-
-                try {
-                    const result = await calculateDistanceFallback(origin, destination);
-
-                    if (result.success) {
-                        setDistance(String(result.distance));
-                        setDistanceCalculationError(null);
-                    } else {
-                        setDistanceCalculationError(result.error || 'Could not calculate distance');
-                        // Keep existing value if calculation fails
-                    }
-                } catch (err: any) {
-                    console.error('Error calculating distance:', err);
-                    setDistanceCalculationError('Failed to calculate distance');
-                } finally {
-                    setCalculatingDistance(false);
-                }
-            }, 1000);
-
-            return () => clearTimeout(timeoutId);
+            } catch (err: any) {
+                console.error('Error calculating distance:', err);
+                setDistanceCalculationError('Failed to calculate distance');
+            } finally {
+                setCalculatingDistance(false);
+            }
         };
 
         calculateDistance();
-    }, [origin, destination]);
+    }, [originCoords, destCoords]);
+
+    // Haversine distance calculation helper
+    const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+        const R = 6371; // Earth's radius in kilometers
+        const dLat = toRadians(lat2 - lat1);
+        const dLon = toRadians(lon2 - lon1);
+
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRadians(lat1)) *
+            Math.cos(toRadians(lat2)) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c;
+
+        return Math.round(distance);
+    };
+
+    const toRadians = (degrees: number): number => {
+        return degrees * (Math.PI / 180);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -252,20 +277,26 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
                         {error}
                     </div>
                 )}
-                <InputField
+                <GooglePlacesAutocomplete
                     label="Origin"
                     id="origin"
-                    placeholder="e.g., Lagos"
+                    placeholder="e.g., Lagos, Ojota Bus Stop"
                     value={origin}
-                    onChange={(e) => setOrigin(e.target.value)}
+                    onChange={(value, placeId, coordinates) => {
+                        setOrigin(value);
+                        if (coordinates) setOriginCoords(coordinates);
+                    }}
                     required
                 />
-                <InputField
+                <GooglePlacesAutocomplete
                     label="Destination"
                     id="destination"
-                    placeholder="e.g., Abuja"
+                    placeholder="e.g., Abuja, Kano"
                     value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
+                    onChange={(value, placeId, coordinates) => {
+                        setDestination(value);
+                        if (coordinates) setDestCoords(coordinates);
+                    }}
                     required
                 />
                 <div>
