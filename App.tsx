@@ -24,17 +24,6 @@ const AppContent: React.FC = () => {
     const [isSubscription, setIsSubscription] = useState(false);
     const [forceShowSubscription, setForceShowSubscription] = useState(false);
 
-    // Debug logging
-    useEffect(() => {
-        console.log('[APP DEBUG] State changed:', {
-            loading,
-            currentUser: currentUser?.email,
-            userRole,
-            isOnboarding,
-            isSubscription,
-        });
-    }, [loading, currentUser, userRole, isOnboarding, isSubscription]);
-
     // Driver portal state
     const [driverSession, setDriverSession] = useState<Driver | null>(null);
     const [checkingDriverSession, setCheckingDriverSession] = useState(true);
@@ -93,7 +82,6 @@ const AppContent: React.FC = () => {
 
     // Show a loading screen while checking for sessions
     if (loading || checkingDriverSession) {
-        console.log('[APP DEBUG] Showing loading screen');
         return (
             <div className="flex h-screen items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
                 <div className="text-center">
@@ -129,26 +117,21 @@ const AppContent: React.FC = () => {
     // Regular user flow (admin portal)
     // User is logged in
     if (currentUser) {
-        console.log('[APP DEBUG] User is logged in, checking flow...');
-
         // TODO: Check if user is verified (email or WhatsApp)
         // For now, we'll show verification after signup, then onboarding
         const isVerified = true; // TODO: Get from user profile
 
         // If explicitly in verification flow
         if (isVerification && !isVerified) {
-            console.log('[APP DEBUG] Showing verification page');
             return <VerificationPage onVerificationComplete={handleVerificationComplete} />;
         }
 
         // If explicitly in onboarding or subscription flow, show those pages
         if (isOnboarding && !userRole) {
-            console.log('[APP DEBUG] Showing onboarding (explicit)');
             return <OnboardingPage onComplete={handleRoleSelection} />;
         }
 
         if (isSubscription) {
-            console.log('[APP DEBUG] Showing subscription page');
             return <SubscriptionPage roleId={userRole || 'business'} onComplete={handleSubscriptionComplete} onBack={handleBackToOnboarding} />
         }
 
@@ -161,23 +144,19 @@ const AppContent: React.FC = () => {
             const subscriptionStatus = organization?.subscription?.status;
 
             if (forceShowSubscription || isTrialExpired || subscriptionStatus === 'expired' || subscriptionStatus === 'cancelled') {
-                console.log('[APP DEBUG] Trial expired or subscription required, showing subscription page');
                 return <SubscriptionPage roleId={userRole} onComplete={handleSubscriptionComplete} onBack={() => setForceShowSubscription(false)} />;
             }
 
             // Trial active or subscription active - show dashboard
-            console.log('[APP DEBUG] User has active trial/subscription, showing dashboard');
             return <Dashboard role={userRole} onSubscribeClick={() => setForceShowSubscription(true)} />;
         }
 
         // User hasn't been verified yet - show verification
         if (!isVerified) {
-            console.log('[APP DEBUG] User not verified, showing verification');
             return <VerificationPage onVerificationComplete={handleVerificationComplete} />;
         }
 
         // User hasn't completed onboarding - show onboarding page
-        console.log('[APP DEBUG] No role found, showing onboarding');
         return <OnboardingPage onComplete={handleRoleSelection} />;
     }
 

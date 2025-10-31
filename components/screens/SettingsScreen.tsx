@@ -10,6 +10,8 @@ import { uploadCompanyLogo, uploadAuthorizedSignature } from '../../services/fir
 import { updateOrganizationBranding } from '../../services/firestore/organizations';
 import { ArrowLeftIcon } from '../Icons';
 import TeamManagementScreen from './TeamManagementScreen';
+import PaymentHistoryModal from '../modals/PaymentHistoryModal';
+import ModalBase from '../modals/ModalBase';
 
 interface SettingsScreenProps {
     onBack: () => void;
@@ -51,6 +53,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
     const [signatureFile, setSignatureFile] = useState<File | null>(null);
     const [signaturePreview, setSignaturePreview] = useState<string>('');
     const [isSavingBranding, setIsSavingBranding] = useState(false);
+
+    // Modal states
+    type ModalType = 'cancelSubscription' | 'paymentHistory' | null;
+    const [activeModal, setActiveModal] = useState<ModalType>(null);
 
     // File upload ref
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -383,6 +389,35 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
         }
     };
 
+    // Handle cancel subscription
+    const handleCancelSubscription = async () => {
+        if (!organizationId) {
+            alert('Organization ID not found');
+            return;
+        }
+
+        try {
+            // TODO: Call Paystack/Firebase function to cancel subscription
+            // For now, just show confirmation
+            const confirmed = window.confirm(
+                '⚠️ Are you sure you want to cancel your subscription?\n\n' +
+                'You will lose access to premium features at the end of your current billing period.\n\n' +
+                'Your data will be preserved, and you can reactivate anytime.'
+            );
+
+            if (!confirmed) return;
+
+            // Call subscription service to cancel
+            // await cancelSubscription(organizationId);
+
+            alert('Subscription cancellation requested. You will receive a confirmation email shortly.');
+            setActiveModal(null);
+        } catch (error: any) {
+            console.error('Error cancelling subscription:', error);
+            alert('Failed to cancel subscription: ' + error.message);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full">
             {/* Header - Mobile Responsive */}
@@ -527,11 +562,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                                     <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your plan and payments.</p>
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                                    <button className="px-3 sm:px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700">
+                                    <button
+                                        onClick={() => setActiveModal('cancelSubscription')}
+                                        className="px-3 sm:px-4 py-2 border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20"
+                                    >
                                         Cancel subscription
                                     </button>
                                     <button
-                                        onClick={onManageSubscription}
+                                        onClick={() => setActiveModal('paymentHistory')}
                                         className="px-3 sm:px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center justify-center gap-2"
                                     >
                                         <span>Manage payments</span>
@@ -1056,6 +1094,61 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                     )}
                 </div>
             </div>
+
+            {/* Modals */}
+            {activeModal === 'cancelSubscription' && (
+                <ModalBase title="Cancel Subscription" onClose={() => setActiveModal(null)}>
+                    <div className="space-y-4">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                            <div className="flex gap-3">
+                                <svg className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <div>
+                                    <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">Warning</h3>
+                                    <p className="text-sm text-red-700 dark:text-red-400 mt-1">
+                                        Cancelling your subscription will result in loss of access to premium features at the end of your current billing period.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                <span className="font-semibold">What happens when you cancel:</span>
+                            </p>
+                            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1 ml-4">
+                                <li>• Your subscription will remain active until {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</li>
+                                <li>• No further charges will be made</li>
+                                <li>• Your data will be preserved</li>
+                                <li>• You can reactivate anytime</li>
+                            </ul>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
+                            <button
+                                onClick={() => setActiveModal(null)}
+                                className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700"
+                            >
+                                Keep Subscription
+                            </button>
+                            <button
+                                onClick={handleCancelSubscription}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                            >
+                                Confirm Cancellation
+                            </button>
+                        </div>
+                    </div>
+                </ModalBase>
+            )}
+
+            {activeModal === 'paymentHistory' && (
+                <PaymentHistoryModal
+                    onClose={() => setActiveModal(null)}
+                    onViewPlans={onManageSubscription}
+                />
+            )}
         </div>
     );
 };

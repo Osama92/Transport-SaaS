@@ -1375,17 +1375,10 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
     }
   };
 
-  console.log('[PARTNER DASHBOARD] Routes from hook:', routes);
-  console.log('[PARTNER DASHBOARD] Routes count:', routes?.length || 0);
-  console.log('[PARTNER DASHBOARD] Routes status filter:', routeStatusFilter);
-
   const filteredRoutes = routes.filter(route => {
     if (routeStatusFilter === 'All') return true;
     return route.status === routeStatusFilter;
   });
-
-  console.log('[PARTNER DASHBOARD] Filtered routes:', filteredRoutes);
-  console.log('[PARTNER DASHBOARD] Filtered routes count:', filteredRoutes?.length || 0);
   
   const filteredPayrollRuns = useMemo(() => {
     return payrollRuns.filter(run => {

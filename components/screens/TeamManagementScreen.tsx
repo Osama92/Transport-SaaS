@@ -116,20 +116,12 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ onBack }) =
                         <div>
                             <h1 className="text-xl font-bold text-gray-800 dark:text-white">Team Management</h1>
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Manage credentials • {drivers.length}/{driverLimit} drivers
+                                Manage credentials
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => setShowInviteModal(true)}
-                        disabled={!canAddMoreDrivers}
-                        className="flex items-center gap-1 md:gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-2 py-1.5 md:px-4 md:py-2 rounded-lg transition-colors text-xs md:text-sm whitespace-nowrap"
-                    >
-                        <PlusIcon className="w-4 h-4 md:w-5 md:h-5" />
-                        <span className="hidden xs:inline">Invite Driver</span>
-                        <span className="xs:hidden">Invite</span>
-                    </button>
+                    {/* Invite button removed */}
                 </div>
 
                 {!canAddMoreDrivers && (

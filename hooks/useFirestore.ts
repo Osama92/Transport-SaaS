@@ -165,35 +165,22 @@ export function useRoutes(organizationId: string | null) {
 
     useEffect(() => {
         if (!organizationId) {
-            console.log('[ROUTES HOOK] No organizationId provided, clearing data');
             setData([]);
             setLoading(false);
             return;
         }
 
-        console.log('[ROUTES HOOK] Setting up listener for organizationId:', organizationId);
-
         let unsubscribe: Unsubscribe;
         const expenseUnsubscribes: Unsubscribe[] = [];
 
         const fetchRoutesWithExpenses = async (querySnapshot: any) => {
-            console.log('[ROUTES HOOK] 📥 Received snapshot with', querySnapshot.docs.length, 'routes');
-
             const routesPromises = querySnapshot.docs.map(async (doc: any) => {
                 const rawData = doc.data();
-                console.log('[ROUTES HOOK] Processing route:', doc.id, {
-                    origin: rawData.origin,
-                    destination: rawData.destination,
-                    organizationId: rawData.organizationId,
-                    status: rawData.status
-                });
-
                 const convertedData = convertTimestamps(rawData);
 
                 // Fetch expenses subcollection for this route (with error handling)
                 let expenses: any[] = [];
                 try {
-                    console.log('[ROUTES HOOK] Fetching expenses for route:', doc.id);
                     const expensesRef = collection(db, 'routes', doc.id, 'expenses');
                     const expensesQuery = query(expensesRef, orderBy('date', 'desc'));
                     const expensesSnapshot = await getDocs(expensesQuery);
@@ -205,11 +192,7 @@ export function useRoutes(organizationId: string | null) {
                             ...convertTimestamps(expenseData)
                         };
                     });
-                    console.log('[ROUTES HOOK] ✅ Loaded', expenses.length, 'expenses for route:', doc.id);
                 } catch (expenseError: any) {
-                    console.warn('[ROUTES HOOK] ⚠️ Could not fetch expenses for route:', doc.id);
-                    console.warn('[ROUTES HOOK] Expense error:', expenseError.code, expenseError.message);
-                    console.warn('[ROUTES HOOK] This is OK - continuing with empty expenses array');
                     // Continue with empty expenses - don't fail the entire route load
                     expenses = [];
                 }
@@ -220,38 +203,16 @@ export function useRoutes(organizationId: string | null) {
                     expenses,
                 };
 
-                console.log('[ROUTES HOOK] ✅ Route processed:', {
-                    id: route.id,
-                    origin: route.origin,
-                    destination: route.destination,
-                    status: route.status,
-                    expenseCount: expenses.length
-                });
-
                 return route;
             });
 
-            console.log('[ROUTES HOOK] ⏳ Waiting for all routes to process...');
             const routes = await Promise.all(routesPromises);
-            console.log('[ROUTES HOOK] ✅ All routes processed successfully! Total:', routes.length);
-            console.log('[ROUTES HOOK] Final routes data:', routes.map(r => ({
-                id: r.id,
-                origin: r.origin,
-                destination: r.destination,
-                status: r.status,
-                expenses: r.expenses?.length || 0
-            })));
-
-            console.log('[ROUTES HOOK] 🎯 Setting data state with', routes.length, 'routes');
             setData(routes);
-            console.log('[ROUTES HOOK] 🎯 Setting loading to false');
             setLoading(false);
-            console.log('[ROUTES HOOK] ✨ DONE! Routes should now be visible in UI');
         };
 
         const setupListener = async () => {
             try {
-                console.log('[ROUTES HOOK] 🔌 Setting up Firestore listener...');
                 setLoading(true);
                 setError(null);
 
@@ -262,25 +223,17 @@ export function useRoutes(organizationId: string | null) {
                     orderBy('createdAt', 'desc')
                 );
 
-                console.log('[ROUTES HOOK] Query:', {
-                    collection: 'routes',
-                    where: { organizationId },
-                    orderBy: 'createdAt desc'
-                });
-
                 unsubscribe = onSnapshot(
                     q,
                     fetchRoutesWithExpenses,
                     (err) => {
-                        console.error('[ROUTES HOOK] ❌ Error listening to routes:', err);
-                        console.error('[ROUTES HOOK] Error code:', (err as any)?.code);
-                        console.error('[ROUTES HOOK] Error message:', err.message);
+                        console.error('Error listening to routes:', err);
                         setError(err as Error);
                         setLoading(false);
                     }
                 );
             } catch (err) {
-                console.error('[ROUTES HOOK] ❌ Error setting up routes listener:', err);
+                console.error('Error setting up routes listener:', err);
                 setError(err as Error);
                 setLoading(false);
             }

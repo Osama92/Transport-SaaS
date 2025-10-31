@@ -45,8 +45,21 @@ const ManageSubscriptionScreen: React.FC<ManageSubscriptionScreenProps> = ({ onB
         return createdAt >= startOfMonth;
     }).length;
 
-    const plans = subscriptionData[userRole as keyof typeof subscriptionData || 'individual'];
+    const allPlans = subscriptionData[userRole as keyof typeof subscriptionData || 'individual'];
     const currentPlanKey = organization?.subscription?.plan || 'basic';
+
+    // Check if user should see trial plan
+    const shouldHideTrial =
+        organization?.subscription?.trialEndsAt || // Has used trial
+        organization?.subscription?.convertedFromTrial || // Converted from trial
+        (organization?.subscription?.status === 'active' && organization?.subscription?.plan && organization.subscription.plan !== 'trial') || // Has active non-trial plan
+        (organization?.subscription?.plan && organization.subscription.plan !== 'trial'); // Has any non-trial plan
+
+    // Filter out trial plan if user has already used it or is an active subscriber
+    const plans = shouldHideTrial
+        ? allPlans.filter(plan => plan.key !== 'trial')
+        : allPlans;
+
     const currentPlan = plans.find(p => p.key === currentPlanKey) || plans[0];
 
     // Get plan name with fallback

@@ -25,7 +25,21 @@ const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ roleId, onComplete,
     const [verifying, setVerifying] = useState(false);
     const [error, setError] = useState<string>('');
     const [selectedPlan, setSelectedPlan] = useState<any>(null);
-    const plans = subscriptionData[roleId as keyof typeof subscriptionData] || subscriptionData.individual; // Fallback to individual plans
+
+    // Get all plans for the role
+    const allPlans = subscriptionData[roleId as keyof typeof subscriptionData] || subscriptionData.individual;
+
+    // Check if user should see trial plan
+    const shouldHideTrial =
+        organization?.subscription?.trialEndsAt || // Has used trial
+        organization?.subscription?.convertedFromTrial || // Converted from trial
+        (organization?.subscription?.status === 'active' && organization?.subscription?.plan && organization.subscription.plan !== 'trial') || // Has active non-trial plan
+        (organization?.subscription?.plan && organization.subscription.plan !== 'trial'); // Has any non-trial plan
+
+    // Filter out trial plan if user has already used it or is an active subscriber
+    const plans = shouldHideTrial
+        ? allPlans.filter(plan => plan.key !== 'trial')
+        : allPlans;
 
     // Paystack public key from environment
     const paystackPublicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
