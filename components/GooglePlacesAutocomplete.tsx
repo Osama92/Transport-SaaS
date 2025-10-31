@@ -25,33 +25,63 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
     const [loadError, setLoadError] = useState(false);
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const autocompleteServiceRef = useRef<any>(null);
-    const placesServiceRef = useRef<any>(null);
 
     useEffect(() => {
         setInputValue(value);
     }, [value]);
 
-    // Load Google Maps API with new Places library
+    // Load Google Maps API with new Places library (v2)
     useEffect(() => {
         const loadGoogleMaps = async () => {
             try {
                 // Check if already loaded
-                if ((window as any).google?.maps?.places) {
-                    initializeServices();
+                if ((window as any).google?.maps?.places?.Place) {
                     setIsLoaded(true);
                     return;
                 }
 
-                // Dynamically load the Google Maps script
+                // Check if script is already being loaded
+                const existingScript = document.querySelector(`script[src*="maps.googleapis.com/maps/api/js"]`);
+                if (existingScript) {
+                    // Script is loading, wait for it
+                    const checkInterval = setInterval(() => {
+                        if ((window as any).google?.maps?.places?.Place) {
+                            clearInterval(checkInterval);
+                            setIsLoaded(true);
+                        }
+                    }, 100);
+
+                    // Timeout after 10 seconds
+                    setTimeout(() => {
+                        clearInterval(checkInterval);
+                        if (!(window as any).google?.maps?.places?.Place) {
+                            setLoadError(true);
+                        }
+                    }, 10000);
+                    return;
+                }
+
+                // Dynamically load the Google Maps script with new Places library
                 const script = document.createElement('script');
                 script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`;
                 script.async = true;
                 script.defer = true;
 
                 script.onload = () => {
-                    initializeServices();
-                    setIsLoaded(true);
+                    // Wait for Google to be fully available
+                    const checkGoogle = setInterval(() => {
+                        if ((window as any).google?.maps?.places?.Place) {
+                            clearInterval(checkGoogle);
+                            setIsLoaded(true);
+                        }
+                    }, 100);
+
+                    setTimeout(() => {
+                        clearInterval(checkGoogle);
+                        if (!(window as any).google?.maps?.places?.Place) {
+                            setLoadError(true);
+                        }
+                    }, 5000);
                 };
 
                 script.onerror = () => {
@@ -65,20 +95,10 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
             }
         };
 
-        const initializeServices = () => {
-            const google = (window as any).google;
-            if (google && google.maps && google.maps.places) {
-                autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
-                // We'll create a hidden div for Places Service
-                const div = document.createElement('div');
-                placesServiceRef.current = new google.maps.places.PlacesService(div);
-            }
-        };
-
         loadGoogleMaps();
     }, []);
 
-    // Handle input changes and fetch suggestions
+    // Handle input changes and fetch suggestions using new Places API
     const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.value;
         setInputValue(newValue);
@@ -90,55 +110,64 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
             return;
         }
 
-        if (!autocompleteServiceRef.current) return;
+        if (!isLoaded) {
+            return;
+        }
 
         try {
-            autocompleteServiceRef.current.getPlacePredictions(
-                {
-                    input: newValue,
-                    componentRestrictions: { country: 'ng' },
-                    types: ['geocode', 'establishment']
-                },
-                (predictions: any, status: any) => {
-                    if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && predictions) {
-                        setSuggestions(predictions);
-                        setShowSuggestions(true);
-                    } else {
-                        setSuggestions([]);
-                        setShowSuggestions(false);
-                    }
-                }
-            );
+            // Use the new Places API (New) with autocomplete text search
+            const { AutocompleteSuggestion } = await (window as any).google.maps.importLibrary("places");
+
+            const request = {
+                input: newValue,
+                includedRegionCodes: ['ng'], // Restrict to Nigeria
+            };
+
+            // Use the new AutocompleteSuggestion API
+            const { suggestions: autocompleteSuggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+
+            if (autocompleteSuggestions && autocompleteSuggestions.length > 0) {
+                setSuggestions(autocompleteSuggestions);
+                setShowSuggestions(true);
+            } else {
+                setSuggestions([]);
+                setShowSuggestions(false);
+            }
         } catch (error) {
             console.error('Error fetching suggestions:', error);
+            setSuggestions([]);
+            setShowSuggestions(false);
         }
     };
 
-    // Handle suggestion selection
-    const handleSuggestionClick = (suggestion: any) => {
-        if (!placesServiceRef.current) return;
+    // Handle suggestion selection using new Places API
+    const handleSuggestionClick = async (suggestion: any) => {
+        try {
+            const { Place } = await (window as any).google.maps.importLibrary("places");
 
-        // Get place details
-        placesServiceRef.current.getDetails(
-            {
-                placeId: suggestion.place_id,
-                fields: ['geometry', 'formatted_address', 'name']
-            },
-            (place: any, status: any) => {
-                if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && place) {
-                    const formattedAddress = place.formatted_address || place.name || '';
-                    const coordinates = place.geometry?.location ? {
-                        lat: place.geometry.location.lat(),
-                        lng: place.geometry.location.lng()
-                    } : undefined;
+            // Get the place using the new API
+            const place = new Place({
+                id: suggestion.placePrediction.placeId,
+            });
 
-                    setInputValue(formattedAddress);
-                    onChange(formattedAddress, suggestion.place_id, coordinates);
-                    setSuggestions([]);
-                    setShowSuggestions(false);
-                }
-            }
-        );
+            // Fetch fields we need
+            await place.fetchFields({
+                fields: ['displayName', 'formattedAddress', 'location', 'id']
+            });
+
+            const formattedAddress = place.formattedAddress || place.displayName || '';
+            const coordinates = place.location ? {
+                lat: place.location.lat(),
+                lng: place.location.lng()
+            } : undefined;
+
+            setInputValue(formattedAddress);
+            onChange(formattedAddress, place.id, coordinates);
+            setSuggestions([]);
+            setShowSuggestions(false);
+        } catch (error) {
+            console.error('Error getting place details:', error);
+        }
     };
 
     if (loadError) {
@@ -209,27 +238,34 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
                 {/* Suggestions dropdown */}
                 {showSuggestions && suggestions.length > 0 && (
                     <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        {suggestions.map((suggestion, index) => (
-                            <button
-                                key={suggestion.place_id}
-                                type="button"
-                                onClick={() => handleSuggestionClick(suggestion)}
-                                className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-start gap-2 border-b border-gray-100 dark:border-slate-700 last:border-b-0"
-                            >
-                                <svg className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                <div className="flex-1">
-                                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                        {suggestion.structured_formatting.main_text}
+                        {suggestions.map((suggestion, index) => {
+                            const mainText = suggestion.placePrediction?.text?.text || '';
+                            const secondaryText = suggestion.placePrediction?.structuredFormat?.secondaryText?.text || '';
+
+                            return (
+                                <button
+                                    key={suggestion.placePrediction?.placeId || index}
+                                    type="button"
+                                    onClick={() => handleSuggestionClick(suggestion)}
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-start gap-2 border-b border-gray-100 dark:border-slate-700 last:border-b-0"
+                                >
+                                    <svg className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <div className="flex-1">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                            {mainText}
+                                        </div>
+                                        {secondaryText && (
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                {secondaryText}
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        {suggestion.structured_formatting.secondary_text}
-                                    </div>
-                                </div>
-                            </button>
-                        ))}
+                                </button>
+                            );
+                        })}
                     </div>
                 )}
             </div>
