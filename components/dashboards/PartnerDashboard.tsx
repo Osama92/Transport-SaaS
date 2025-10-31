@@ -81,7 +81,6 @@ import VehicleTrackingScreen from '../screens/VehicleTrackingScreen';
 import PayrollScreen from '../screens/PayrollScreen';
 import PayrollRunDetailsScreen from '../screens/PayrollRunDetailsScreen';
 import PartnerAnalyticsScreen from '../screens/PartnerAnalyticsScreen';
-import BonusManagementScreen from '../screens/BonusManagementScreen';
 import InvoiceTemplate from '../invoice/InvoiceTemplates';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -1664,8 +1663,6 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
             onDateFilterChange={setPayrollDateFilter}
             isDeletingPayroll={isDeletingPayroll}
         />;
-      case 'Bonuses':
-        return <BonusManagementScreen />;
       case 'Notifications':
         return (
           <AllNotificationsScreen

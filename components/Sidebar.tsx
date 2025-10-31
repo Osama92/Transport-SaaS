@@ -37,7 +37,6 @@ const partnerNavItems = [
     { icon: <WalletIcon className="w-6 h-6" />, name: 'Wallet' },
     { icon: <AnalyticsIcon className="w-6 h-6" />, name: 'Analytics' },
     { icon: <PayrollIcon className="w-6 h-6" />, name: 'Payroll' },
-    { icon: <BanknotesIcon className="w-6 h-6" />, name: 'Bonuses' },
     { icon: <SettingsIcon className="w-6 h-6" />, name: 'Settings' },
 ];
 
