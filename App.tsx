@@ -143,7 +143,7 @@ const AppContent: React.FC = () => {
             // Check if trial has expired or subscription is required
             const subscriptionStatus = organization?.subscription?.status;
 
-            if (forceShowSubscription || isTrialExpired || subscriptionStatus === 'expired' || subscriptionStatus === 'cancelled') {
+            if (forceShowSubscription || isTrialExpired || subscriptionStatus === 'cancelled' || subscriptionStatus === 'inactive') {
                 return <SubscriptionPage roleId={userRole} onComplete={handleSubscriptionComplete} onBack={() => setForceShowSubscription(false)} />;
             }
 
