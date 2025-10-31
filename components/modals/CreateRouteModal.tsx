@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import ModalBase from './ModalBase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -6,6 +6,7 @@ import { createRoute } from '../../services/firestore/routes';
 import { useClients } from '../../hooks/useFirestore';
 import { canAddResource, getSubscriptionLimits } from '../../services/firestore/subscriptions';
 import LimitReachedModal from '../LimitReachedModal';
+import { calculateDistanceFallback } from '../../utils/distanceCalculator';
 
 interface CreateRouteModalProps {
     onClose: () => void;
@@ -34,11 +35,49 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
+    const [calculatingDistance, setCalculatingDistance] = useState(false);
+    const [distanceCalculationError, setDistanceCalculationError] = useState<string | null>(null);
 
     // Get subscription limits
     const subscriptionPlan = organization?.subscription?.plan || 'basic';
     const limits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
     const routeLimit = limits?.routes;
+
+    // Auto-calculate distance when both origin and destination are filled
+    useEffect(() => {
+        const calculateDistance = async () => {
+            if (!origin || !destination) {
+                return;
+            }
+
+            // Debounce: wait 1 second after user stops typing
+            const timeoutId = setTimeout(async () => {
+                setCalculatingDistance(true);
+                setDistanceCalculationError(null);
+
+                try {
+                    const result = await calculateDistanceFallback(origin, destination);
+
+                    if (result.success) {
+                        setDistance(String(result.distance));
+                        setDistanceCalculationError(null);
+                    } else {
+                        setDistanceCalculationError(result.error || 'Could not calculate distance');
+                        // Keep existing value if calculation fails
+                    }
+                } catch (err: any) {
+                    console.error('Error calculating distance:', err);
+                    setDistanceCalculationError('Failed to calculate distance');
+                } finally {
+                    setCalculatingDistance(false);
+                }
+            }, 1000);
+
+            return () => clearTimeout(timeoutId);
+        };
+
+        calculateDistance();
+    }, [origin, destination]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -229,15 +268,56 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
                     onChange={(e) => setDestination(e.target.value)}
                     required
                 />
-                <InputField
-                    label="Distance (km)"
-                    id="distance"
-                    type="number"
-                    placeholder="e.g., 750"
-                    value={distance}
-                    onChange={(e) => setDistance(e.target.value)}
-                    required
-                />
+                <div>
+                    <label htmlFor="distance" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Distance (km) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                        <input
+                            type="number"
+                            id="distance"
+                            name="distance"
+                            placeholder="Auto-calculated or enter manually"
+                            required
+                            value={distance}
+                            onChange={(e) => setDistance(e.target.value)}
+                            disabled={calculatingDistance}
+                            className="w-full px-3 py-2 pr-10 rounded-lg bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200 disabled:opacity-50 disabled:cursor-wait"
+                        />
+                        {calculatingDistance && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <svg className="animate-spin h-5 w-5 text-indigo-600" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                            </div>
+                        )}
+                    </div>
+                    {calculatingDistance && (
+                        <p className="mt-1 text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Calculating driving distance...
+                        </p>
+                    )}
+                    {distanceCalculationError && (
+                        <p className="mt-1 text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {distanceCalculationError} - Please enter manually
+                        </p>
+                    )}
+                    {!calculatingDistance && !distanceCalculationError && distance && (
+                        <p className="mt-1 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Distance calculated (editable)
+                        </p>
+                    )}
+                </div>
                 <InputField
                     label="Number of Stops"
                     id="stops"
@@ -257,7 +337,7 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
                     required
                 />
                 <div>
-                    <label htmlFor="client" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client (Optional)</label>
+                    <label htmlFor="client" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client</label>
                     <select
                         id="client"
                         value={clientId}

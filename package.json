@@ -12,6 +12,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@googlemaps/google-maps-services-js": "^3.4.2",
     "@react-google-maps/api": "^2.20.7",
     "axios": "^1.12.2",
     "firebase": "^10.12.2",
