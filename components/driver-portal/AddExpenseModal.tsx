@@ -137,21 +137,21 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ driver, onClose, onSu
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-gray-700 p-6 z-10">
+        <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-gray-700 p-4 md:p-6 z-10">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add Expense</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Submit an expense for reimbursement</p>
+              <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">Add Expense</h2>
+              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-1">Submit an expense for reimbursement</p>
             </div>
             <button
               onClick={onClose}
               disabled={loading}
-              className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 disabled:opacity-50"
+              className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 disabled:opacity-50 ml-2"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -159,37 +159,37 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ driver, onClose, onSu
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-4 md:space-y-6">
           {/* Error Message */}
           {error && (
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="p-3 md:p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <div className="flex items-center">
-                <svg className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 md:w-5 md:h-5 text-red-600 dark:text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
-                <span className="text-sm text-red-800 dark:text-red-200">{error}</span>
+                <span className="text-xs md:text-sm text-red-800 dark:text-red-200">{error}</span>
               </div>
             </div>
           )}
 
           {/* Expense Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Expense Type <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
               {expenseTypes.map((expType) => (
                 <button
                   key={expType.value}
                   type="button"
                   onClick={() => setType(expType.value)}
-                  className={`p-3 rounded-lg border-2 transition-all ${
+                  className={`p-2 md:p-3 rounded-lg border-2 transition-all ${
                     type === expType.value
                       ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20'
                       : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                   }`}
                 >
-                  <div className="text-2xl mb-1">{expType.icon}</div>
+                  <div className="text-xl md:text-2xl mb-1">{expType.icon}</div>
                   <div className="text-xs font-medium text-gray-900 dark:text-white">{expType.label}</div>
                 </button>
               ))}
@@ -349,13 +349,13 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ driver, onClose, onSu
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600
-                       text-gray-700 dark:text-gray-300 rounded-lg font-medium
+              className="w-full sm:flex-1 px-4 py-2.5 md:py-3 border border-gray-300 dark:border-gray-600
+                       text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm md:text-base
                        hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors
                        disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -364,7 +364,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ driver, onClose, onSu
             <button
               type="submit"
               disabled={loading || !amount || !description}
-              className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg font-medium
+              className="w-full sm:flex-1 px-4 py-2.5 md:py-3 bg-indigo-600 text-white rounded-lg font-medium text-sm md:text-base
                        hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed
                        transition-colors flex items-center justify-center gap-2"
             >

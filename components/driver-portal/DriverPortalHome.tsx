@@ -179,7 +179,7 @@ const DriverPortalHome: React.FC<DriverPortalHomeProps> = ({ driver, onNavigate 
         <KPICard
           title="Wallet Balance"
           value={formatCurrency(kpis?.walletBalance || 0)}
-          subtitle={`Net: ${formatCurrency(kpis?.netEarnings || 0)}`}
+          subtitle="Available for withdrawal"
           icon="💰"
           onClick={() => onNavigate('wallet')}
         />
@@ -258,15 +258,12 @@ const DriverPortalHome: React.FC<DriverPortalHomeProps> = ({ driver, onNavigate 
                     <span>🚚 {route.vehicle}</span>
                     <span>📍 {route.stops} stops</span>
                     <span>📏 {route.distanceKm} km</span>
+                    {route.status === 'Completed' && route.completionDate && (
+                      <span className="text-xs text-gray-500 dark:text-gray-500">
+                        ✅ {new Date(route.completionDate).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-gray-900 dark:text-white">{formatCurrency(route.rate)}</p>
-                  {route.status === 'Completed' && route.completionDate && (
-                    <p className="text-xs text-gray-500 dark:text-gray-500">
-                      {new Date(route.completionDate).toLocaleDateString()}
-                    </p>
-                  )}
                 </div>
               </div>
             ))}
@@ -275,43 +272,19 @@ const DriverPortalHome: React.FC<DriverPortalHomeProps> = ({ driver, onNavigate 
       </div>
 
       {/* Performance Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Monthly Summary</h2>
-          <div className="space-y-3">
-            <SummaryItem label="Total Routes" value={kpis?.totalRoutes || 0} />
-            <SummaryItem label="Completed" value={kpis?.completedRoutes || 0} />
-            <SummaryItem label="In Progress" value={(kpis?.totalRoutes || 0) - (kpis?.completedRoutes || 0) - (kpis?.pendingRoutes || 0)} />
-            <SummaryItem label="Pending" value={kpis?.pendingRoutes || 0} />
-            <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-              <SummaryItem
-                label="Completion Rate"
-                value={`${Math.round(kpis?.completionRate || 0)}%`}
-                highlight
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Earnings Summary</h2>
-          <div className="space-y-3">
-            <SummaryItem label="Total Revenue" value={formatCurrency(kpis?.totalRevenue || 0)} />
-            <SummaryItem label="Total Expenses" value={formatCurrency(kpis?.totalExpenses || 0)} />
-            <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-              <SummaryItem
-                label="Net Earnings"
-                value={formatCurrency(kpis?.netEarnings || 0)}
-                highlight
-              />
-            </div>
-            <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-              <SummaryItem
-                label="Wallet Balance"
-                value={formatCurrency(kpis?.walletBalance || 0)}
-                highlight
-              />
-            </div>
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Monthly Summary</h2>
+        <div className="space-y-3">
+          <SummaryItem label="Total Routes" value={kpis?.totalRoutes || 0} />
+          <SummaryItem label="Completed" value={kpis?.completedRoutes || 0} />
+          <SummaryItem label="In Progress" value={(kpis?.totalRoutes || 0) - (kpis?.completedRoutes || 0) - (kpis?.pendingRoutes || 0)} />
+          <SummaryItem label="Pending" value={kpis?.pendingRoutes || 0} />
+          <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+            <SummaryItem
+              label="Completion Rate"
+              value={`${Math.round(kpis?.completionRate || 0)}%`}
+              highlight
+            />
           </div>
         </div>
       </div>

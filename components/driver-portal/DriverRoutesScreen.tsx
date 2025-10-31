@@ -235,24 +235,24 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Routes</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your assigned routes</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">My Routes</h1>
+          <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1">Manage your assigned routes</p>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl p-2 border border-gray-200 dark:border-gray-700 inline-flex gap-2">
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-2 border border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
         {(['all', 'Pending', 'In Progress', 'Completed'] as const).map((status) => {
           const count = status === 'all' ? routes.length : routes.filter(r => r.status === status).length;
           return (
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium transition-colors ${
                 filter === status
                   ? 'bg-indigo-600 text-white'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'
@@ -282,19 +282,19 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
           {filteredRoutes.map((route) => (
             <div
               key={route.id}
-              className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
+              className="bg-white dark:bg-slate-800 rounded-xl p-4 md:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
             >
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                    <h3 className="text-base md:text-lg font-bold text-gray-900 dark:text-white">
                       {route.origin || 'Origin'} → {route.destination || 'Destination'}
                     </h3>
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(route.status)}`}>
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(route.status)} self-start`}>
                       {route.status}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400">
                     <div>
                       <span className="block text-xs text-gray-500 dark:text-gray-500">Vehicle</span>
                       <span className="font-medium">🚚 {route.vehicle}</span>
@@ -306,10 +306,6 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
                     <div>
                       <span className="block text-xs text-gray-500 dark:text-gray-500">Distance</span>
                       <span className="font-medium">📏 {route.distanceKm} km</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-500 dark:text-gray-500">Payment</span>
-                      <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(route.rate)}</span>
                     </div>
                   </div>
                 </div>
@@ -347,11 +343,11 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
               )}
 
               {/* Action Buttons */}
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 {route.status === 'Pending' && (
                   <button
                     onClick={() => handleStartRoute(route)}
-                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                    className="w-full sm:flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-sm md:text-base"
                   >
                     Start Route 🚀
                   </button>
@@ -359,7 +355,7 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
                 {route.status === 'In Progress' && (
                   <button
                     onClick={() => handleCompleteRoute(route)}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                    className="w-full sm:flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm md:text-base"
                   >
                     Complete & Upload POD ✅
                   </button>
@@ -367,7 +363,7 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
                 {route.status === 'Completed' && route.podUrl && (
                   <button
                     onClick={() => window.open(route.podUrl, '_blank')}
-                    className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors"
+                    className="w-full sm:flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors text-sm md:text-base"
                   >
                     View POD 📄
                   </button>

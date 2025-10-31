@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Driver, FuelLog, Vehicle } from '../../types';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc, updateDoc, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase/firebaseConfig';
@@ -168,6 +168,13 @@ const DriverFuelManagement: React.FC<DriverFuelManagementProps> = ({ driver }) =
         updatedAt: serverTimestamp(),
       } as Omit<FuelLog, 'id'>);
 
+      // Update vehicle odometer
+      const vehicleRef = doc(db, 'vehicles', assignedVehicle.id);
+      await updateDoc(vehicleRef, {
+        'telematics.odometer': data.currentOdometer,
+        updatedAt: serverTimestamp(),
+      });
+
       alert('Fuel log added successfully! ⛽');
       setShowAddModal(false);
       loadData();
@@ -319,7 +326,6 @@ const DriverFuelManagement: React.FC<DriverFuelManagementProps> = ({ driver }) =
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fuel</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Consumption</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cost</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Receipt</th>
                 </tr>
               </thead>
@@ -355,11 +361,6 @@ const DriverFuelManagement: React.FC<DriverFuelManagementProps> = ({ driver }) =
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {formatCurrency(log.totalFuelCost)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(log.status)}`}>
-                        {log.status}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {log.receiptPhotoUrl ? (

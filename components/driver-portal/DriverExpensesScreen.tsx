@@ -120,16 +120,16 @@ const DriverExpensesScreen: React.FC<DriverExpensesScreenProps> = ({ driver }) =
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Expenses</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Track and submit your expenses for reimbursement</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">My Expenses</h1>
+          <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1">Track and submit your expenses for reimbursement</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2"
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 text-sm md:text-base"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -139,7 +139,7 @@ const DriverExpensesScreen: React.FC<DriverExpensesScreenProps> = ({ driver }) =
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           icon="💰"
           title="Total Expenses"
@@ -167,14 +167,14 @@ const DriverExpensesScreen: React.FC<DriverExpensesScreenProps> = ({ driver }) =
       </div>
 
       {/* Filter Tabs */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl p-2 border border-gray-200 dark:border-gray-700 inline-flex gap-2">
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-2 border border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
         {(['all', 'pending', 'approved', 'rejected', 'reimbursed'] as const).map((status) => {
           const count = status === 'all' ? expenses.length : expenses.filter(e => e.status === status).length;
           return (
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
+              className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium transition-colors capitalize ${
                 filter === status
                   ? 'bg-indigo-600 text-white'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'
@@ -204,19 +204,19 @@ const DriverExpensesScreen: React.FC<DriverExpensesScreenProps> = ({ driver }) =
           {filteredExpenses.map((expense) => (
             <div
               key={expense.id}
-              className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
+              className="bg-white dark:bg-slate-800 rounded-xl p-4 md:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className="text-4xl">{getTypeIcon(expense.type)}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{expense.description}</h3>
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(expense.status)}`}>
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                <div className="flex items-start gap-3 md:gap-4 flex-1">
+                  <div className="text-3xl md:text-4xl">{getTypeIcon(expense.type)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                      <h3 className="text-base md:text-lg font-bold text-gray-900 dark:text-white truncate">{expense.description}</h3>
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(expense.status)} self-start`}>
                         {expense.status}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="grid grid-cols-2 gap-3 md:gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <div>
                         <span className="block text-xs text-gray-500 dark:text-gray-500">Type</span>
                         <span className="font-medium">{expense.type}</span>
@@ -249,8 +249,8 @@ const DriverExpensesScreen: React.FC<DriverExpensesScreenProps> = ({ driver }) =
                     )}
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(expense.amount)}</p>
+                <div className="text-left md:text-right">
+                  <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(expense.amount)}</p>
                   {expense.receiptPhotoUrl && (
                     <a
                       href={expense.receiptPhotoUrl}
@@ -287,13 +287,13 @@ const StatCard: React.FC<{
   value: string;
   subtitle: string;
 }> = ({ icon, title, value, subtitle }) => (
-  <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-    <div className="flex items-center justify-between mb-3">
-      <span className="text-2xl">{icon}</span>
+  <div className="bg-white dark:bg-slate-800 rounded-xl p-4 md:p-6 border border-gray-200 dark:border-gray-700">
+    <div className="flex items-center justify-between mb-2 md:mb-3">
+      <span className="text-xl md:text-2xl">{icon}</span>
     </div>
-    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{value}</h3>
-    <p className="text-sm text-gray-600 dark:text-gray-400">{subtitle}</p>
-    <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">{title}</p>
+    <h3 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white mb-1">{value}</h3>
+    <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">{subtitle}</p>
+    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 md:mt-2">{title}</p>
   </div>
 );
 

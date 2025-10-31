@@ -47,31 +47,6 @@ const DriverWalletScreen: React.FC<DriverWalletScreenProps> = ({ driver }) => {
         onViewHistory={() => setShowHistory(true)}
       />
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          icon="💰"
-          title="Available Balance"
-          value={formatCurrency(driver.walletBalance || 0)}
-          subtitle="Ready to withdraw"
-          color="green"
-        />
-        <StatCard
-          icon="📊"
-          title="Transaction Limits"
-          value={formatCurrency(driver.transactionLimits?.dailyWithdrawalLimit || 50000)}
-          subtitle="Daily limit"
-          color="blue"
-        />
-        <StatCard
-          icon="🏦"
-          title="Per Transaction"
-          value={formatCurrency(driver.transactionLimits?.singleTransactionLimit || 20000)}
-          subtitle="Maximum per withdrawal"
-          color="purple"
-        />
-      </div>
-
       {/* Virtual Account Info */}
       {driver.paystack?.virtualAccountNumber && (
         <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
@@ -155,32 +130,6 @@ const DriverWalletScreen: React.FC<DriverWalletScreenProps> = ({ driver }) => {
           onClose={() => setShowHistory(false)}
         />
       )}
-    </div>
-  );
-};
-
-// Stat Card Component
-const StatCard: React.FC<{
-  icon: string;
-  title: string;
-  value: string;
-  subtitle: string;
-  color: 'green' | 'blue' | 'purple';
-}> = ({ icon, title, value, subtitle, color }) => {
-  const colorClasses = {
-    green: 'from-green-500 to-emerald-600',
-    blue: 'from-blue-500 to-cyan-600',
-    purple: 'from-purple-500 to-pink-600',
-  };
-
-  return (
-    <div className={`bg-gradient-to-r ${colorClasses[color]} rounded-xl p-6 text-white`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-3xl">{icon}</span>
-      </div>
-      <h3 className="text-2xl font-bold mb-1">{value}</h3>
-      <p className="text-sm text-white/80">{subtitle}</p>
-      <p className="text-xs text-white/60 mt-2">{title}</p>
     </div>
   );
 };

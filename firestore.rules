@@ -94,10 +94,21 @@ service cloud.firestore {
                exists(/databases/$(database)/documents/drivers/$(resource.data.organizationId));
       }
 
+      // Helper to check if current user is the assigned driver
+      function isAssignedDriverForVehicle() {
+        return isAuthenticated() &&
+               resource.data.assignedDriverId != null &&
+               get(/databases/$(database)/documents/drivers/$(resource.data.assignedDriverId)).data.firebaseAuthUid == request.auth.uid;
+      }
+
       // Drivers can read vehicles in their organization, admins can do everything
       allow read: if belongsToUserOrg() || (isAuthenticated() && resource.data.organizationId != null);
       allow create: if requestBelongsToUserOrg();
-      allow update: if belongsToUserOrg();
+      // Allow updates for admins OR assigned drivers updating only odometer and updatedAt
+      allow update: if belongsToUserOrg() ||
+                      (isAssignedDriverForVehicle() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['telematics', 'updatedAt']) &&
+                       request.resource.data.telematics.diff(resource.data.telematics).affectedKeys().hasOnly(['odometer']));
       allow delete: if belongsToUserOrg();
 
       // Maintenance logs subcollection
