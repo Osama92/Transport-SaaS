@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import type { Invoice, Client } from '../../types';
+import type { Invoice, Client, Organization } from '../../types';
 import InvoiceForm from './InvoiceForm';
 import InvoiceTemplate, { InvoiceTemplateType } from './InvoiceTemplates';
 import InvoiceTemplatePicker from './InvoiceTemplatePicker';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { ArrowLeftIcon, ExclamationCircleIcon, DocumentTextIcon, EnvelopeIcon, CreditCardIcon, ChevronDownIcon } from '../Icons';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface InvoiceScreenProps {
     onCancel: () => void;
@@ -15,16 +16,17 @@ interface InvoiceScreenProps {
     clients: Client[];
 }
 
-const createInitialInvoice = (): Invoice => ({
+const createInitialInvoice = (organization?: Organization | null): Invoice => ({
     id: `#${(Math.random() * 100000).toFixed(0)}`,
     project: 'New Project',
     issuedDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric'}),
     dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric'}),
     from: {
-        name: 'Your Company',
-        address: '123 Main Street',
-        email: 'billing@yourcompany.com',
-        phone: '(555) 123-4567',
+        name: organization?.name || 'Your Company',
+        address: organization?.companyDetails?.address || '123 Main Street',
+        email: organization?.companyDetails?.email || 'billing@yourcompany.com',
+        phone: organization?.companyDetails?.phone || '(555) 123-4567',
+        logoUrl: organization?.companyDetails?.logoUrl || undefined,
     },
     to: {
         name: 'Client Company',
@@ -38,15 +40,18 @@ const createInitialInvoice = (): Invoice => ({
     notes: 'Thank you for your business.',
     paymentDetails: {
         method: 'EFT Bank Transfer',
-        accountName: 'Your Company Inc.',
+        accountName: organization?.paymentDetails?.bankAccountName || 'Your Company Inc.',
         code: '123456',
-        accountNumber: '987654321'
+        accountNumber: organization?.paymentDetails?.bankAccountNumber || '987654321',
+        bankName: organization?.paymentDetails?.bankName || undefined,
     },
+    signatureUrl: organization?.companyDetails?.signatureUrl || undefined,
     status: 'Draft',
 });
 
 const InvoiceScreen: React.FC<InvoiceScreenProps> = ({ onCancel, onSave, invoiceData, onEmailRequest, clients }) => {
-    const [invoice, setInvoice] = useState<Invoice>(invoiceData || createInitialInvoice());
+    const { organization } = useAuth();
+    const [invoice, setInvoice] = useState<Invoice>(invoiceData || createInitialInvoice(organization));
     const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplateType>('classic');
     const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
     const [activeView, setActiveView] = useState<'form' | 'preview'>('form');

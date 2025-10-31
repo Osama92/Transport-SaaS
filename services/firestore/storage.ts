@@ -298,3 +298,87 @@ export const uploadInvoiceSignature = async (
         throw new Error('Failed to upload invoice signature');
     }
 };
+
+/**
+ * Upload company branding logo (persistent across all invoices)
+ * Stores in a standardized path for easy access across platforms (web, WhatsApp, mobile)
+ * @param file - The logo image file to upload
+ * @param organizationId - The organization's ID
+ * @returns The download URL of the uploaded logo
+ */
+export const uploadCompanyLogo = async (
+    file: File,
+    organizationId: string
+): Promise<string> => {
+    try {
+        const timestamp = Date.now();
+        const fileExtension = file.name.split('.').pop() || 'png';
+        const fileName = `logo_${timestamp}.${fileExtension}`;
+
+        // Standardized path for organization branding
+        // Path: organizations/{orgId}/branding/logo_{timestamp}.ext
+        const storageRef = ref(storage, `organizations/${organizationId}/branding/${fileName}`);
+
+        // Upload file with metadata
+        const snapshot = await uploadBytes(storageRef, file, {
+            contentType: file.type,
+            customMetadata: {
+                organizationId: organizationId,
+                assetType: 'company-logo',
+                uploadedAt: new Date().toISOString(),
+                platform: 'web', // Can be used by WhatsApp bot, mobile app, etc.
+            }
+        });
+
+        // Get public download URL
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        console.log('Company logo uploaded successfully:', downloadURL);
+        return downloadURL;
+    } catch (error) {
+        console.error('Error uploading company logo:', error);
+        throw new Error('Failed to upload company logo');
+    }
+};
+
+/**
+ * Upload authorized signature (persistent across all invoices)
+ * Stores in a standardized path for easy access across platforms (web, WhatsApp, mobile)
+ * @param file - The signature image file to upload
+ * @param organizationId - The organization's ID
+ * @returns The download URL of the uploaded signature
+ */
+export const uploadAuthorizedSignature = async (
+    file: File,
+    organizationId: string
+): Promise<string> => {
+    try {
+        const timestamp = Date.now();
+        const fileExtension = file.name.split('.').pop() || 'png';
+        const fileName = `signature_${timestamp}.${fileExtension}`;
+
+        // Standardized path for organization branding
+        // Path: organizations/{orgId}/branding/signature_{timestamp}.ext
+        const storageRef = ref(storage, `organizations/${organizationId}/branding/${fileName}`);
+
+        // Upload file with metadata
+        const snapshot = await uploadBytes(storageRef, file, {
+            contentType: file.type,
+            customMetadata: {
+                organizationId: organizationId,
+                assetType: 'authorized-signature',
+                uploadedAt: new Date().toISOString(),
+                platform: 'web', // Can be used by WhatsApp bot, mobile app, etc.
+            }
+        });
+
+        // Get public download URL
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        console.log('Authorized signature uploaded successfully:', downloadURL);
+        return downloadURL;
+    } catch (error) {
+        console.error('Error uploading authorized signature:', error);
+        throw new Error('Failed to upload authorized signature');
+    }
+};

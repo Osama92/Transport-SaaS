@@ -65,6 +65,40 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
+    const handleDownloadCSV = () => {
+        // Create CSV content
+        const headers = ['Route ID', 'Origin', 'Destination', 'Driver', 'Vehicle', 'Stops', 'Distance (km)', 'Rate (₦)', 'Progress (%)', 'Status', 'Client'];
+        const csvRows = [headers.join(',')];
+
+        routes.forEach(route => {
+            const row = [
+                route.id,
+                route.origin || 'N/A',
+                route.destination || 'N/A',
+                route.driverName || 'Unassigned',
+                route.vehicle || route.assignedVehiclePlate || 'Unassigned',
+                route.stops || 0,
+                route.distance || route.distanceKm || 0,
+                route.rate || 0,
+                route.progress || 0,
+                route.status,
+                route.clientName || 'N/A'
+            ];
+            csvRows.push(row.map(cell => `"${cell}"`).join(','));
+        });
+
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `routes_${activeFilter.toLowerCase().replace(' ', '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -90,7 +124,12 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                     <FilterButton label="Completed" activeFilter={activeFilter} onClick={onFilterChange} />
                     <FilterButton label="Pending" activeFilter={activeFilter} onClick={onFilterChange} />
                     {!onViewAll && (
-                        <button className="flex items-center gap-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600 flex-shrink-0">
+                        <button
+                            onClick={handleDownloadCSV}
+                            disabled={routes.length === 0}
+                            className="flex items-center gap-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Download routes as CSV"
+                        >
                             <ArrowDownTrayIcon className="w-5 h-5"/>
                         </button>
                     )}
@@ -220,7 +259,9 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                                                             {onEdit && (
                                                                 <button
                                                                     onClick={() => { onEdit(route); setOpenMenuId(null); }}
-                                                                    className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
+                                                                    disabled={route.status !== 'Pending'}
+                                                                    className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                                                    title={route.status !== 'Pending' ? 'Cannot edit assigned or completed routes' : ''}
                                                                 >
                                                                     <PencilIcon className="w-4 h-4 text-gray-500"/> {t('common.edit')}
                                                                 </button>
@@ -230,7 +271,9 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                                                                     <div className="border-t my-1 dark:border-slate-700"></div>
                                                                     <button
                                                                         onClick={() => { onDelete(route); setOpenMenuId(null); }}
-                                                                        className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                                        disabled={route.status !== 'Pending'}
+                                                                        className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                                                        title={route.status !== 'Pending' ? 'Cannot delete assigned or completed routes' : ''}
                                                                     >
                                                                         <TrashIcon className="w-4 h-4"/> {t('common.delete')}
                                                                     </button>

@@ -43,7 +43,9 @@
       "Bash(findstr:*)",
       "Bash(gcloud functions describe:*)",
       "Bash(move FIRESTORE_SETUP.md docs )",
-      "Bash(move PAYROLL_SYSTEM_GUIDE.md docs )"
+      "Bash(move PAYROLL_SYSTEM_GUIDE.md docs )",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)"
     ],
     "deny": [],
     "ask": []

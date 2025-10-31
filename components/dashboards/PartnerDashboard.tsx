@@ -6,6 +6,7 @@ import AddVehicleModal from '../modals/AddVehicleModal';
 import AddDriverModal from '../modals/AddDriverModal';
 import EditDriverModal from '../modals/EditDriverModal';
 import CreateRouteModal from '../modals/CreateRouteModal';
+import EditRouteModal from '../modals/EditRouteModal';
 import AddClientModal from '../modals/AddClientModal';
 import EditClientModal from '../modals/EditClientModal';
 import AssignDriverModal from '../modals/AssignDriverModal';
@@ -122,7 +123,7 @@ interface PartnerDashboardProps {
   onSubscribeClick?: () => void;
 }
 
-type ModalType = 'addVehicle' | 'addDriver' | 'editDriver' | 'createRoute' | 'addClient' | 'editClient' | 'confirmDeleteClient' | 'confirmToggleClientStatus' | 'assignDriver' | 'viewPOD' | 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'updateVehicleStatus' | 'addMaintenanceLog' | 'uploadDocument' | 'emailInvoice' | 'confirmMarkAsPaid' | 'profileSettings' | 'addExpense' | 'viewPayslip' | 'createPayrollRun' | 'editDriverPay' | 'deletePayrollRun' | 'manageFunds' | 'addBonus' | null;
+type ModalType = 'addVehicle' | 'addDriver' | 'editDriver' | 'createRoute' | 'editRoute' | 'addClient' | 'editClient' | 'confirmDeleteClient' | 'confirmToggleClientStatus' | 'assignDriver' | 'viewPOD' | 'sendFunds' | 'driverDetails' | 'confirmRemoval' | 'updateVehicleStatus' | 'addMaintenanceLog' | 'uploadDocument' | 'emailInvoice' | 'confirmMarkAsPaid' | 'profileSettings' | 'addExpense' | 'viewPayslip' | 'createPayrollRun' | 'editDriverPay' | 'deletePayrollRun' | 'manageFunds' | 'addBonus' | null;
 type RouteStatusFilter = 'All' | 'Pending' | 'In Progress' | 'Completed';
 type InvoiceView = 'list' | 'create' | 'edit';
 
@@ -739,12 +740,30 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
   };
 
   const handleEditRoute = (route: Route) => {
-    // TODO: Implement edit route modal
-    console.log('Edit route:', route);
-    alert('Edit route feature coming soon!');
+    // Only allow editing if route is not assigned (status is Pending)
+    if (route.status !== 'Pending') {
+      alert('You can only edit routes that have not been assigned to a driver or vehicle yet.');
+      return;
+    }
+    setSelectedItem(route);
+    setActiveModal('editRoute');
+  };
+
+  const handleUpdateRoute = async (updatedRoute: Route) => {
+    if (isDemoMode) {
+      // Demo mode: update in mock array
+      setMockRoutes(prev => prev.map(r => r.id === updatedRoute.id ? updatedRoute : r));
+    }
+    // Production mode: Firestore hook will automatically update via updateRoute() in EditRouteModal
   };
 
   const handleDeleteRoute = async (route: Route) => {
+    // Only allow deletion if route is not assigned (status is Pending)
+    if (route.status !== 'Pending') {
+      alert('You can only delete routes that have not been assigned to a driver or vehicle yet.');
+      return;
+    }
+
     const confirmed = window.confirm(`Are you sure you want to delete route ${route.id}?`);
     if (!confirmed) return;
 
@@ -1395,6 +1414,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
         return <EditDriverModal driver={selectedItem as Driver} onClose={() => setActiveModal(null)} onSave={handleUpdateDriver} />;
       case 'createRoute':
         return <CreateRouteModal onClose={() => setActiveModal(null)} onAddRoute={handleCreateRoute} currentMonthRouteCount={currentMonthRouteCount} onUpgradePlan={() => setActiveNav('Manage Subscription')} />;
+      case 'editRoute':
+        return <EditRouteModal route={selectedItem as Route} onClose={() => setActiveModal(null)} onSave={handleUpdateRoute} />;
       case 'addClient':
         return <AddClientModal onClose={() => setActiveModal(null)} onAddClient={handleAddClient} currentClientCount={clients.length} />;
       case 'editClient':
@@ -1428,7 +1449,16 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
       case 'confirmRemoval':
         return <ConfirmRemovalModal onClose={() => setActiveModal(null)} driver={selectedItem as Driver} onConfirm={handleRemoveDriver} />;
       case 'updateVehicleStatus':
-        return <UpdateVehicleStatusModal vehicle={selectedItem as Vehicle} onClose={() => setActiveModal(null)} onSave={(vehicleId, newStatus) => { setVehicles(prev => prev.map(v => v.id === vehicleId ? {...v, status: newStatus} : v)); setActiveModal(null); }} />;
+        return <UpdateVehicleStatusModal vehicle={selectedItem as Vehicle} onClose={() => setActiveModal(null)} onSave={async (vehicleId, newStatus) => {
+          try {
+            await updateVehicle(vehicleId, { status: newStatus });
+            // Firestore hook will automatically update the vehicles list
+            setActiveModal(null);
+          } catch (error) {
+            console.error('Error updating vehicle status:', error);
+            alert('Failed to update vehicle status. Please try again.');
+          }
+        }} />;
       case 'addMaintenanceLog':
         return <AddMaintenanceLogModal vehicle={selectedItem as Vehicle} onClose={() => setActiveModal(null)} onSave={(vehicleId, newLog) => { setVehicles(prev => prev.map(v => v.id === vehicleId ? {...v, maintenanceLogs: [newLog, ...v.maintenanceLogs]} : v)); setActiveModal(null); }} />;
       case 'uploadDocument':

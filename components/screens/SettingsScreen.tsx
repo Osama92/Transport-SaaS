@@ -6,6 +6,8 @@ import { getSubscriptionLimits } from '../../services/firestore/subscriptions';
 import { useDrivers, useVehicles, useRoutes, useClients } from '../../hooks/useFirestore';
 import { getUserProfile, updateWhatsAppPreferences } from '../../services/firestore/users';
 import { whatsAppService } from '../../services/whatsapp/whatsappService';
+import { uploadCompanyLogo, uploadAuthorizedSignature } from '../../services/firestore/storage';
+import { updateOrganizationBranding } from '../../services/firestore/organizations';
 import { ArrowLeftIcon } from '../Icons';
 import TeamManagementScreen from './TeamManagementScreen';
 
@@ -13,13 +15,13 @@ interface SettingsScreenProps {
     onBack: () => void;
     onManageSubscription: () => void;
     onTestWhatsApp?: () => void;
-    initialTab?: 'general' | 'password' | 'orgGeneral' | 'billing' | 'team';
+    initialTab?: 'general' | 'password' | 'orgGeneral' | 'billing' | 'team' | 'branding';
 }
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscription, onTestWhatsApp, initialTab = 'general' }) => {
     const { t } = useTranslation();
     const { userRole, organization, organizationId, currentUser, updateDisplayName: updateDisplayNameAuth, updateProfilePicture } = useAuth();
-    const [activeTab, setActiveTab] = useState<'general' | 'password' | 'orgGeneral' | 'billing' | 'team'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'general' | 'password' | 'orgGeneral' | 'billing' | 'team' | 'branding'>(initialTab);
 
     // Form states for profile
     const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
@@ -43,8 +45,17 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
     const [passwordError, setPasswordError] = useState('');
     const [passwordSuccess, setPasswordSuccess] = useState('');
 
+    // Form states for branding
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string>('');
+    const [signatureFile, setSignatureFile] = useState<File | null>(null);
+    const [signaturePreview, setSignaturePreview] = useState<string>('');
+    const [isSavingBranding, setIsSavingBranding] = useState(false);
+
     // File upload ref
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const logoInputRef = useRef<HTMLInputElement>(null);
+    const signatureInputRef = useRef<HTMLInputElement>(null);
 
     // Load user WhatsApp preferences on mount and set initial values
     useEffect(() => {
@@ -260,6 +271,118 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
         }
     };
 
+    // Handle logo file selection
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            // Validate file size (5MB max)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                return;
+            }
+
+            // Validate file type
+            if (!file.type.match(/^image\/(png|jpeg|jpg|gif)$/)) {
+                alert('Only PNG, JPG, JPEG, or GIF files are allowed');
+                return;
+            }
+
+            setLogoFile(file);
+
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setLogoPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // Handle signature file selection
+    const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            // Validate file size (5MB max)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                return;
+            }
+
+            // Validate file type
+            if (!file.type.match(/^image\/(png|jpeg|jpg|gif)$/)) {
+                alert('Only PNG, JPG, JPEG, or GIF files are allowed');
+                return;
+            }
+
+            setSignatureFile(file);
+
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setSignaturePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // Save branding (logo and signature) to Firebase
+    const handleSaveBranding = async () => {
+        if (!organizationId) {
+            alert('Organization ID not found');
+            return;
+        }
+
+        if (!logoFile && !signatureFile) {
+            alert('Please select at least one file to upload');
+            return;
+        }
+
+        setIsSavingBranding(true);
+
+        try {
+            const updates: { logoUrl?: string; signatureUrl?: string } = {};
+
+            // Upload logo if selected
+            if (logoFile) {
+                console.log('Uploading company logo...');
+                const logoUrl = await uploadCompanyLogo(logoFile, organizationId);
+                updates.logoUrl = logoUrl;
+                console.log('Logo uploaded:', logoUrl);
+            }
+
+            // Upload signature if selected
+            if (signatureFile) {
+                console.log('Uploading authorized signature...');
+                const signatureUrl = await uploadAuthorizedSignature(signatureFile, organizationId);
+                updates.signatureUrl = signatureUrl;
+                console.log('Signature uploaded:', signatureUrl);
+            }
+
+            // Update organization branding in Firestore
+            await updateOrganizationBranding(organizationId, updates);
+
+            // Reset state
+            setLogoFile(null);
+            setSignatureFile(null);
+            setLogoPreview('');
+            setSignaturePreview('');
+
+            // Clear file inputs
+            if (logoInputRef.current) logoInputRef.current.value = '';
+            if (signatureInputRef.current) signatureInputRef.current.value = '';
+
+            alert('Branding saved successfully! Your logo and signature will now appear on all new invoices.');
+
+            // Trigger a refresh of the organization data in AuthContext
+            window.location.reload();
+        } catch (error: any) {
+            console.error('Error saving branding:', error);
+            alert('Failed to save branding: ' + error.message);
+        } finally {
+            setIsSavingBranding(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full">
             {/* Header - Mobile Responsive */}
@@ -334,6 +457,17 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                             </svg>
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('settings.tabs.team')}</span>
                         </button>
+                        <button
+                            onClick={() => setActiveTab('branding')}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${
+                                activeTab === 'branding' ? 'bg-gray-100 dark:bg-slate-700' : 'hover:bg-gray-50 dark:hover:bg-slate-800'
+                            }`}
+                        >
+                            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Branding</span>
+                        </button>
                     </div>
                 </div>
 
@@ -373,6 +507,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
                                 }`}
                             >
                                 {t('settings.tabs.team')}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('branding')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex-shrink-0 ${
+                                    activeTab === 'branding' ? 'bg-indigo-500 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300'
+                                }`}
+                            >
+                                Branding
                             </button>
                         </div>
                     </div>
@@ -772,6 +914,139 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onManageSubscri
 
                     {activeTab === 'team' && (
                         <TeamManagementScreen onBack={() => setActiveTab('general')} />
+                    )}
+
+                    {activeTab === 'branding' && (
+                        <div className="max-w-2xl space-y-6">
+                            <div>
+                                <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">Company Branding</h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Upload your company logo and authorized signature. These will be used in invoices and official documents.</p>
+                            </div>
+
+                            <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6 space-y-8">
+                                {/* Company Logo */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                        Company Logo
+                                    </label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-24 h-24 rounded-lg bg-gray-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 dark:border-slate-600">
+                                            {logoPreview ? (
+                                                <img src={logoPreview} alt="Logo Preview" className="w-full h-full object-contain p-2" />
+                                            ) : organization?.companyDetails?.logoUrl ? (
+                                                <img src={organization.companyDetails.logoUrl} alt="Company Logo" className="w-full h-full object-contain p-2" />
+                                            ) : (
+                                                <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <input
+                                                type="file"
+                                                ref={logoInputRef}
+                                                id="logo-upload"
+                                                accept="image/png, image/jpeg, image/jpg, image/gif"
+                                                onChange={handleLogoChange}
+                                                className="hidden"
+                                            />
+                                            <label
+                                                htmlFor="logo-upload"
+                                                className="inline-block px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
+                                            >
+                                                {logoFile ? 'Change Logo' : 'Upload Logo'}
+                                            </label>
+                                            {logoFile && (
+                                                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                    ✓ Selected: {logoFile.name}
+                                                </p>
+                                            )}
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                JPG, PNG or GIF. Max size 5MB.<br/>
+                                                Recommended: Square image (500x500px or larger)
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Divider */}
+                                <div className="border-t border-gray-200 dark:border-slate-700"></div>
+
+                                {/* Authorized Signature */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                        Authorized Signature
+                                    </label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-32 h-24 rounded-lg bg-gray-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 dark:border-slate-600">
+                                            {signaturePreview ? (
+                                                <img src={signaturePreview} alt="Signature Preview" className="w-full h-full object-contain p-2" />
+                                            ) : organization?.companyDetails?.signatureUrl ? (
+                                                <img src={organization.companyDetails.signatureUrl} alt="Signature" className="w-full h-full object-contain p-2" />
+                                            ) : (
+                                                <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <input
+                                                type="file"
+                                                ref={signatureInputRef}
+                                                id="signature-upload"
+                                                accept="image/png, image/jpeg, image/jpg, image/gif"
+                                                onChange={handleSignatureChange}
+                                                className="hidden"
+                                            />
+                                            <label
+                                                htmlFor="signature-upload"
+                                                className="inline-block px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
+                                            >
+                                                {signatureFile ? 'Change Signature' : 'Upload Signature'}
+                                            </label>
+                                            {signatureFile && (
+                                                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                    ✓ Selected: {signatureFile.name}
+                                                </p>
+                                            )}
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                JPG, PNG or GIF. Max size 5MB.<br/>
+                                                Recommended: Transparent PNG with signature only
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Info Banner */}
+                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                    <div className="flex gap-3">
+                                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                                                Automatic Invoice Branding
+                                            </p>
+                                            <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                                                Once uploaded, your logo and signature will automatically appear on all new invoices. You can still override them for individual invoices if needed.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Save Button */}
+                                <div className="flex justify-end pt-4 border-t dark:border-slate-700">
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveBranding}
+                                        disabled={isSavingBranding || (!logoFile && !signatureFile)}
+                                        className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isSavingBranding ? 'Uploading...' : 'Save Branding'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {activeTab === 'orgGeneral' && (
