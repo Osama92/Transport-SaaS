@@ -13,8 +13,9 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
-import type { PayrollRun, Payslip, Driver } from '../../types';
+import type { PayrollRun, Payslip, Driver, Bonus } from '../../types';
 import { calculateNigerianPAYE } from '../../firebase/config';
+import { getBonusesByPayPeriod } from './bonuses';
 
 const PAYROLL_RUNS_COLLECTION = 'payrollRuns';
 
@@ -24,16 +25,21 @@ const PAYROLL_RUNS_COLLECTION = 'payrollRuns';
 /**
  * Calculate payslips for drivers - matches types.ts schema
  */
-const calculatePayslips = (
+const calculatePayslips = async (
     drivers: Driver[],
     periodStart: string,
-    periodEnd: string
-): Payslip[] => {
+    periodEnd: string,
+    organizationId: string
+): Promise<Payslip[]> => {
     const payPeriodDate = new Date(periodStart);
     const payPeriod = `${payPeriodDate.toLocaleString('default', { month: 'short' })} ${payPeriodDate.getFullYear()}`;
     const payDate = new Date(new Date(periodEnd).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     console.log('[PAYROLL] Calculating payslips for', drivers.length, 'drivers, period:', payPeriod);
+
+    // Fetch all approved bonuses for this pay period
+    const allBonuses = await getBonusesByPayPeriod(organizationId, payPeriod);
+    console.log('[PAYROLL] Found', allBonuses.length, 'approved bonuses for period:', payPeriod);
 
     return drivers.map((driver, index) => {
         console.log('[PAYROLL] Processing driver:', driver.name, '(ID:', driver.id, ')');
@@ -54,8 +60,15 @@ const calculatePayslips = (
 
         const monthlyBasePay = annualGross / 12;
 
-        // NO RANDOM BONUSES! Bonuses come from the separate Bonus collection
-        const totalBonusAmount = 0; // TODO: Aggregate approved bonuses from bonuses collection
+        // Get approved bonuses for this driver for this pay period
+        const driverBonuses = allBonuses.filter(bonus =>
+            String(bonus.driverId) === String(driver.id)
+        );
+        const totalBonusAmount = driverBonuses.reduce((sum, bonus) => sum + bonus.amount, 0);
+
+        if (totalBonusAmount > 0) {
+            console.log('[PAYROLL] Driver', driver.name, '- Bonuses:', totalBonusAmount, '(', driverBonuses.length, 'bonuses)');
+        }
 
         const monthlyGrossPay = monthlyBasePay + totalBonusAmount;
 
@@ -218,8 +231,8 @@ export const createPayrollRun = async (
     try {
         const payrollRunsRef = collection(db, PAYROLL_RUNS_COLLECTION);
 
-        // Calculate payslips for all drivers
-        const payslipsData = calculatePayslips(drivers, periodStart, periodEnd);
+        // Calculate payslips for all drivers (now async - fetches bonuses)
+        const payslipsData = await calculatePayslips(drivers, periodStart, periodEnd, organizationId);
 
         // Calculate totals
         const totalGrossPay = payslipsData.reduce((sum, ps) => sum + ps.grossPay, 0);
