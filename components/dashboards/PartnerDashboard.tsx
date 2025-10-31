@@ -46,6 +46,7 @@ import { createClient, updateClient as updateClientFirestore, deleteClient, upda
 import { createPayrollRun, deletePayrollRun } from '../../services/firestore/payroll';
 import { addFundsToWallet } from '../../services/firestore/wallet';
 import { createInvoice, updateInvoice, deleteInvoice as deleteInvoiceFirestore, updateInvoiceStatus } from '../../services/firestore/invoices';
+import { createBonus as createBonusFirestore } from '../../services/firestore/bonuses';
 // Import notification triggers and handlers
 import { notifyDriverAssigned, notifyRouteCompleted, notifyNewRoute, notifyDriverOnboarded, notifyExpenseAdded, notifyClientAdded, notifyPayrollGenerated } from '../../services/notificationTriggers';
 import { markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } from '../../services/firestore/notifications';
@@ -62,10 +63,6 @@ import {
     getNotifications,
     getPayrollRuns,
     calculatePayslipsForPeriod,
-    createBonus,
-    getBonuses,
-    approveBonus,
-    deleteBonus,
 } from '../../firebase/config';
 
 import DriversScreen from '../screens/DriversScreen';
@@ -84,6 +81,7 @@ import VehicleTrackingScreen from '../screens/VehicleTrackingScreen';
 import PayrollScreen from '../screens/PayrollScreen';
 import PayrollRunDetailsScreen from '../screens/PayrollRunDetailsScreen';
 import PartnerAnalyticsScreen from '../screens/PartnerAnalyticsScreen';
+import BonusManagementScreen from '../screens/BonusManagementScreen';
 import InvoiceTemplate from '../invoice/InvoiceTemplates';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -1327,8 +1325,13 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
   };
 
   const handleCreateBonus = async (bonus: any) => {
+    if (!organizationId || !currentUser?.uid) {
+      alert('Organization or user not found');
+      return;
+    }
+
     try {
-      await createBonus(bonus);
+      await createBonusFirestore(organizationId, bonus, currentUser.uid);
       setActiveModal(null);
       alert('Bonus created successfully! It must be approved before it appears in payroll.');
     } catch (error) {
@@ -1661,6 +1664,8 @@ const PartnerDashboard: React.FC<PartnerDashboardProps> = ({ onLogout, role, onS
             onDateFilterChange={setPayrollDateFilter}
             isDeletingPayroll={isDeletingPayroll}
         />;
+      case 'Bonuses':
+        return <BonusManagementScreen />;
       case 'Notifications':
         return (
           <AllNotificationsScreen

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Squares2X2Icon, MapPinIcon, ChartBarIcon, DocumentTextIcon, BellIcon, Cog8ToothIcon, SunIcon, MoonIcon, ArrowRightOnRectangleIcon,
-    UserGroupIcon, TruckIcon, MapIcon, BuildingOffice2Icon, ArchiveBoxIcon, WalletIcon, Bars3Icon, XMarkIcon, SignalIcon
+    UserGroupIcon, TruckIcon, MapIcon, BuildingOffice2Icon, ArchiveBoxIcon, WalletIcon, Bars3Icon, XMarkIcon, SignalIcon, BanknotesIcon
 } from './Icons';
 import { HomeIcon, DriversIcon, VehiclesIcon, RoutesIcon, ClientsIcon, InvoicesIcon, AnalyticsIcon, PayrollIcon, SettingsIcon } from './NavIcons';
 
@@ -37,6 +37,7 @@ const partnerNavItems = [
     { icon: <WalletIcon className="w-6 h-6" />, name: 'Wallet' },
     { icon: <AnalyticsIcon className="w-6 h-6" />, name: 'Analytics' },
     { icon: <PayrollIcon className="w-6 h-6" />, name: 'Payroll' },
+    { icon: <BanknotesIcon className="w-6 h-6" />, name: 'Bonuses' },
     { icon: <SettingsIcon className="w-6 h-6" />, name: 'Settings' },
 ];
 
