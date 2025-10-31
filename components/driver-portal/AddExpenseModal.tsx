@@ -17,7 +17,6 @@ interface AddExpenseModalProps {
 }
 
 const expenseTypes = [
-  { value: 'Fuel', label: 'Fuel', icon: '⛽' },
   { value: 'Tolls', label: 'Tolls', icon: '🛣️' },
   { value: 'Parking', label: 'Parking', icon: '🅿️' },
   { value: 'Maintenance', label: 'Maintenance', icon: '🔧' },
@@ -27,7 +26,7 @@ const expenseTypes = [
 ] as const;
 
 const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ driver, onClose, onSuccess }) => {
-  const [type, setType] = useState<typeof expenseTypes[number]['value']>('Fuel');
+  const [type, setType] = useState<typeof expenseTypes[number]['value']>('Tolls');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [vendorName, setVendorName] = useState('');
@@ -100,6 +99,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ driver, onClose, onSu
       const expensesRef = collection(db, 'driverExpenses');
       await addDoc(expensesRef, {
         driverId: driver.id,
+        driverName: driver.name,
         organizationId: driver.organizationId,
         type,
         description: description.trim(),
