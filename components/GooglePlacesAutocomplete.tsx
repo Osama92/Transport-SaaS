@@ -222,7 +222,7 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
                     value={inputValue}
                     onChange={handleInputChange}
                     onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 300)}
                     placeholder={placeholder}
                     required={required}
                     className="w-full px-3 py-2 pr-10 rounded-lg bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200"
@@ -246,7 +246,10 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
                                 <button
                                     key={suggestion.placePrediction?.placeId || index}
                                     type="button"
-                                    onClick={() => handleSuggestionClick(suggestion)}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleSuggestionClick(suggestion);
+                                    }}
                                     className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-start gap-2 border-b border-gray-100 dark:border-slate-700 last:border-b-0"
                                 >
                                     <svg className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
