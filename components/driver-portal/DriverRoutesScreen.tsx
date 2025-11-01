@@ -11,6 +11,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase/firebaseConfig';
 import ProofOfDeliveryModal from './ProofOfDeliveryModal';
 import DriverRouteNavigationScreen from '../driver/DriverRouteNavigationScreen';
+import ViewPODsScreen from './ViewPODsScreen';
 
 interface DriverRoutesScreenProps {
   driver: Driver;
@@ -23,6 +24,7 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [showPODModal, setShowPODModal] = useState(false);
   const [navigatingRoute, setNavigatingRoute] = useState<Route | null>(null);
+  const [viewingPODsRoute, setViewingPODsRoute] = useState<Route | null>(null);
 
   useEffect(() => {
     loadRoutes();
@@ -408,6 +410,16 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
     }
   };
 
+  // Show POD viewer for completed routes
+  if (viewingPODsRoute) {
+    return (
+      <ViewPODsScreen
+        route={viewingPODsRoute}
+        onBack={() => setViewingPODsRoute(null)}
+      />
+    );
+  }
+
   // Show navigation screen if a route is selected for navigation
   if (navigatingRoute) {
     return (
@@ -561,7 +573,7 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
                 )}
                 {route.status === 'Completed' && Array.isArray(route.stops) && route.stops.length > 0 && (
                   <button
-                    onClick={() => handleNavigateRoute(route)}
+                    onClick={() => setViewingPODsRoute(route)}
                     className="w-full px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm md:text-base"
                   >
                     View PODs 📄
