@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Driver, DriverExpense } from '../../types';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import AddExpenseModal from './AddExpenseModal';
 
@@ -18,6 +18,7 @@ const DriverExpensesScreen: React.FC<DriverExpensesScreenProps> = ({ driver }) =
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'reimbursed'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalExpenses: 0,
     pendingAmount: 0,
@@ -66,6 +67,37 @@ const DriverExpensesScreen: React.FC<DriverExpensesScreenProps> = ({ driver }) =
   const handleAddExpense = () => {
     setShowAddModal(false);
     loadExpenses();
+  };
+
+  const handleDeleteExpense = async (expense: DriverExpense) => {
+    // Only allow deletion of pending expenses
+    if (expense.status !== 'pending') {
+      alert('Only pending expenses can be deleted.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this expense?\n\n` +
+      `Type: ${expense.type}\n` +
+      `Amount: ${formatCurrency(expense.amount)}\n` +
+      `Description: ${expense.description}\n\n` +
+      `This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingExpenseId(expense.id);
+      const expenseRef = doc(db, 'driverExpenses', expense.id);
+      await deleteDoc(expenseRef);
+      alert('Expense deleted successfully! 🗑️');
+      await loadExpenses();
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      alert('Failed to delete expense. Please try again.');
+    } finally {
+      setDeletingExpenseId(null);
+    }
   };
 
   const filteredExpenses = filter === 'all' ? expenses : expenses.filter(e => e.status === filter);
@@ -249,17 +281,41 @@ const DriverExpensesScreen: React.FC<DriverExpensesScreenProps> = ({ driver }) =
                     )}
                   </div>
                 </div>
-                <div className="text-left md:text-right">
+                <div className="text-left md:text-right flex flex-col gap-2">
                   <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(expense.amount)}</p>
                   {expense.receiptPhotoUrl && (
                     <a
                       href={expense.receiptPhotoUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline mt-2 inline-block"
+                      className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline inline-block"
                     >
                       View Receipt 📄
                     </a>
+                  )}
+                  {expense.status === 'pending' && (
+                    <button
+                      onClick={() => handleDeleteExpense(expense)}
+                      disabled={deletingExpenseId === expense.id}
+                      className="mt-2 px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    >
+                      {deletingExpenseId === expense.id ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          <span>Deleting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span>Delete</span>
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
               </div>

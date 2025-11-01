@@ -142,16 +142,18 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                 <table className="w-full text-left">
                     <thead className="border-b text-sm text-gray-500 dark:border-slate-700 dark:text-gray-400">
                         <tr>
-                            <th className="py-3 px-2 font-medium">
-                                <input
-                                    type="checkbox"
-                                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-600 disabled:opacity-50"
-                                    disabled={!hasSelectableCompletedRoutes}
-                                    checked={allCompletedSelected}
-                                    onChange={onSelectAllCompleted}
-                                    aria-label="Select all completed routes"
-                                />
-                            </th>
+                            {!onViewAll && (
+                                <th className="py-3 px-2 font-medium">
+                                    <input
+                                        type="checkbox"
+                                        className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-600 disabled:opacity-50"
+                                        disabled={!hasSelectableCompletedRoutes}
+                                        checked={allCompletedSelected}
+                                        onChange={onSelectAllCompleted}
+                                        aria-label="Select all completed routes"
+                                    />
+                                </th>
+                            )}
                             <th className="py-3 px-4 font-medium">{t('components.routeAssignmentTable.headerId')}</th>
                             <th className="py-3 px-4 font-medium">{t('components.routeAssignmentTable.headerDriver')}</th>
                             <th className="py-3 px-4 font-medium">{t('components.routeAssignmentTable.headerVehicle')}</th>
@@ -164,7 +166,7 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                     <tbody>
                         {routes.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="py-12 px-4 text-center">
+                                <td colSpan={onViewAll ? 7 : 8} className="py-12 px-4 text-center">
                                     <div className="flex flex-col items-center justify-center text-gray-400">
                                         <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -178,23 +180,25 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                             const isInvoiced = invoicedRouteIds.has(route.id);
                             return (
                                 <tr key={route.id} className={`border-b hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-700/50 transition-colors ${selectedRoutes.includes(route.id) ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''} ${isInvoiced ? 'opacity-60' : ''}`}>
-                                    <td className="py-4 px-2">
-                                        <div className="relative group flex items-center">
-                                            <input
-                                                type="checkbox"
-                                                className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                disabled={route.status !== 'Completed' || isInvoiced}
-                                                checked={selectedRoutes.includes(route.id)}
-                                                onChange={() => onSelectRoute(route.id)}
-                                                aria-label={`Select route ${route.id}`}
-                                            />
-                                            {isInvoiced && (
-                                                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                                                    {t('components.routeAssignmentTable.invoicedTooltip')}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
+                                    {!onViewAll && (
+                                        <td className="py-4 px-2">
+                                            <div className="relative group flex items-center">
+                                                <input
+                                                    type="checkbox"
+                                                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    disabled={route.status !== 'Completed' || isInvoiced}
+                                                    checked={selectedRoutes.includes(route.id)}
+                                                    onChange={() => onSelectRoute(route.id)}
+                                                    aria-label={`Select route ${route.id}`}
+                                                />
+                                                {isInvoiced && (
+                                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                                                        {t('components.routeAssignmentTable.invoicedTooltip')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                    )}
                                     <td className="py-4 px-4 font-mono text-sm dark:text-gray-300">{route.id}</td>
                                     <td className="py-4 px-4">
                                         <div className="flex items-center gap-3">

@@ -358,7 +358,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
     return (
         <div className="flex flex-col gap-8">
         {/* Stat Cards Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <WalletCard routes={routes} walletBalance={walletBalance} onManageFunds={onManageFunds} />
             <StatCard
                 title={t('partnerDashboard.totalRouteAssigned')}
@@ -446,7 +446,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
         <div>
             <RouteAssignmentTable
-                routes={routes.slice(0, 5)}
+                routes={routes.slice(0, 3)}
                 onAssign={onAssignRoute}
                 onViewDetails={onViewDetails}
                 onComplete={onCompleteRoute}
