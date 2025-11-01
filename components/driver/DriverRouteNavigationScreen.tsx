@@ -7,21 +7,29 @@
 import React, { useState, useEffect } from 'react';
 import { Route, RouteStop } from '../../types';
 import RouteMap from '../route/RouteMap';
+import StopPODModal from './StopPODModal';
 
 interface DriverRouteNavigationScreenProps {
     route: Route;
     onUpdateStopStatus: (stopId: string, status: RouteStop['status'], notes?: string) => void;
-    onComplete: () => void;
+    onUpdateStopPOD: (stopId: string, podData: {
+        photo?: File;
+        photoUrl?: string;
+        signature?: string;
+        deliveryNotes: string;
+        recipientName: string;
+    }) => void;
 }
 
 const DriverRouteNavigationScreen: React.FC<DriverRouteNavigationScreenProps> = ({
     route,
     onUpdateStopStatus,
-    onComplete
+    onUpdateStopPOD
 }) => {
     const [currentStopIndex, setCurrentStopIndex] = useState(0);
-    const [showMap, setShowMap] = useState(false);
+    const [showMap, setShowMap] = useState(true); // Show map by default
     const [deliveryNotes, setDeliveryNotes] = useState('');
+    const [showPODModal, setShowPODModal] = useState(false);
 
     // Ensure stops is an array
     const stops = Array.isArray(route.stops) ? route.stops : [];
@@ -47,8 +55,27 @@ const DriverRouteNavigationScreen: React.FC<DriverRouteNavigationScreenProps> = 
     }
 
     const currentStop = stops[currentStopIndex];
-    const completedStops = stops.filter(s => s.status === 'completed').length;
-    const progressPercentage = (completedStops / stops.length) * 100;
+    // Calculate progress based on stops with POD actually uploaded
+    // POD is only considered complete if status is 'completed' (which is set when POD is uploaded)
+    const stopsWithPOD = stops.filter(s => s.status === 'completed').length;
+    const progressPercentage = stops.length > 0 ? (stopsWithPOD / stops.length) * 100 : 0;
+
+    // Debug logging - detailed stop information
+    console.log('[NAVIGATION SCREEN] Progress calculation:', {
+        totalStops: stops.length,
+        stopsWithPOD,
+        progressPercentage,
+        stops: stops.map(s => ({
+            id: s.id,
+            sequence: s.sequence,
+            address: s.address,
+            status: s.status,
+            recipientName: s.recipientName,
+            podPhotoUrl: s.podPhotoUrl,
+            isCompleted: s.status === 'completed',
+            allStopFields: Object.keys(s)
+        }))
+    });
 
     const handlePrevious = () => {
         if (currentStopIndex > 0) {
@@ -69,7 +96,25 @@ const DriverRouteNavigationScreen: React.FC<DriverRouteNavigationScreenProps> = 
     };
 
     const handleMarkCompleted = () => {
-        onUpdateStopStatus(currentStop.id, 'completed', deliveryNotes);
+        // Open POD modal for capturing proof of delivery
+        setShowPODModal(true);
+    };
+
+    const handlePODSubmit = (podData: {
+        photo?: File;
+        photoUrl?: string;
+        signature?: string;
+        deliveryNotes: string;
+        recipientName: string;
+    }) => {
+        // Update stop with POD data and mark as completed
+        onUpdateStopPOD(currentStop.id, podData);
+        onUpdateStopStatus(currentStop.id, 'completed', podData.deliveryNotes);
+
+        setShowPODModal(false);
+        setDeliveryNotes('');
+
+        // Auto-advance to next stop
         if (currentStopIndex < stops.length - 1) {
             setTimeout(() => handleNext(), 500);
         }
@@ -85,13 +130,6 @@ const DriverRouteNavigationScreen: React.FC<DriverRouteNavigationScreenProps> = 
         }
     };
 
-    const openNavigation = () => {
-        const { lat, lng } = currentStop.coordinates;
-        // Open Google Maps with directions
-        window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
-    };
-
-    const allStopsCompleted = stops.every(s => s.status === 'completed' || s.status === 'failed');
 
     return (
         <div className="flex flex-col h-screen bg-gray-50 dark:bg-slate-900">
@@ -115,7 +153,7 @@ const DriverRouteNavigationScreen: React.FC<DriverRouteNavigationScreenProps> = 
                     {/* Progress Bar */}
                     <div className="space-y-1">
                         <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-                            <span>{completedStops} of {stops.length} stops completed</span>
+                            <span>{stopsWithPOD} of {stops.length} stops completed</span>
                             <span>{Math.round(progressPercentage)}%</span>
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
@@ -151,32 +189,21 @@ const DriverRouteNavigationScreen: React.FC<DriverRouteNavigationScreenProps> = 
                         currentStop.status === 'failed' ? 'bg-red-100 dark:bg-red-900/30' :
                         'bg-yellow-100 dark:bg-yellow-900/30'
                     }`}>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center font-bold text-lg shadow-md">
-                                    {currentStop.sequence}
-                                </div>
-                                <div>
-                                    <h2 className="font-bold text-gray-900 dark:text-white">
-                                        Stop {currentStop.sequence} of {stops.length}
-                                    </h2>
-                                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                                        {currentStop.status === 'completed' ? '✓ Completed' :
-                                         currentStop.status === 'arrived' ? '→ At Location' :
-                                         currentStop.status === 'failed' ? '✗ Failed' :
-                                         '○ Pending'}
-                                    </p>
-                                </div>
+                        <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center font-bold text-lg shadow-md">
+                                {currentStop.sequence}
                             </div>
-
-                            <button
-                                onClick={openNavigation}
-                                className="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                </svg>
-                            </button>
+                            <div>
+                                <h2 className="font-bold text-gray-900 dark:text-white">
+                                    Stop {currentStop.sequence} of {stops.length}
+                                </h2>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    {currentStop.status === 'completed' ? '✓ Completed' :
+                                     currentStop.status === 'arrived' ? '→ At Location' :
+                                     currentStop.status === 'failed' ? '✗ Failed' :
+                                     '○ Pending'}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -278,6 +305,33 @@ const DriverRouteNavigationScreen: React.FC<DriverRouteNavigationScreenProps> = 
                                 </p>
                             </div>
                         )}
+
+                        {/* POD Details (if completed) */}
+                        {currentStop.status === 'completed' && currentStop.recipientName && (
+                            <div>
+                                <label className="block text-xs font-semibold text-green-600 dark:text-green-400 uppercase mb-1">
+                                    Proof of Delivery
+                                </label>
+                                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800 space-y-2">
+                                    <div>
+                                        <span className="text-xs text-gray-600 dark:text-gray-400">Received by:</span>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{currentStop.recipientName}</p>
+                                    </div>
+                                    {currentStop.podPhotoUrl && (
+                                        <div>
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">Photo:</span>
+                                            <img src={currentStop.podPhotoUrl} alt="POD" className="mt-1 w-full h-32 object-cover rounded border" />
+                                        </div>
+                                    )}
+                                    {currentStop.deliveryNotes && (
+                                        <div>
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">Notes:</span>
+                                            <p className="text-sm text-gray-900 dark:text-white">{currentStop.deliveryNotes}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Action Buttons */}
@@ -344,41 +398,38 @@ const DriverRouteNavigationScreen: React.FC<DriverRouteNavigationScreenProps> = 
 
             {/* Bottom Navigation */}
             <div className="bg-white dark:bg-slate-800 border-t dark:border-slate-700 p-4">
-                {allStopsCompleted ? (
+                <div className="flex space-x-3">
                     <button
-                        onClick={onComplete}
-                        className="w-full py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 shadow-md transition-colors flex items-center justify-center space-x-2"
+                        onClick={handlePrevious}
+                        disabled={currentStopIndex === 0}
+                        className="flex-1 py-3 px-4 bg-gray-200 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
-                        <span>Complete Route</span>
+                        <span>Previous</span>
                     </button>
-                ) : (
-                    <div className="flex space-x-3">
-                        <button
-                            onClick={handlePrevious}
-                            disabled={currentStopIndex === 0}
-                            className="flex-1 py-3 px-4 bg-gray-200 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                            <span>Previous</span>
-                        </button>
-                        <button
-                            onClick={handleNext}
-                            disabled={currentStopIndex === stops.length - 1}
-                            className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
-                        >
-                            <span>Next</span>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
-                    </div>
-                )}
+                    <button
+                        onClick={handleNext}
+                        disabled={currentStopIndex === stops.length - 1}
+                        className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
+                    >
+                        <span>Next</span>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
             </div>
+
+            {/* POD Modal */}
+            {showPODModal && (
+                <StopPODModal
+                    stop={currentStop}
+                    onSubmit={handlePODSubmit}
+                    onClose={() => setShowPODModal(false)}
+                />
+            )}
         </div>
     );
 };

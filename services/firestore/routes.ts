@@ -130,7 +130,8 @@ export const createRoute = async (
 
         const routeRef = doc(db, ROUTES_COLLECTION, routeId);
 
-        const newRoute = {
+        // Create route object, filtering out undefined values
+        const routeObject: any = {
             organizationId,
             origin: routeData.origin,
             destination: routeData.destination,
@@ -141,33 +142,72 @@ export const createRoute = async (
             driverName: (routeData as any).driverName || '',
             driverAvatar: (routeData as any).driverAvatar || '',
             vehicle: (routeData as any).vehicle || '',
-            driverId: (routeData as any).driverId || null,
-            vehicleId: (routeData as any).vehicleId || null,
             status: routeData.status || 'Pending',
             progress: routeData.progress || 0,
-            assignedDriverId: routeData.assignedDriverId || null,
             assignedDriverName: routeData.assignedDriverName || '',
-            assignedVehicleId: routeData.assignedVehicleId || null,
             assignedVehiclePlate: routeData.assignedVehiclePlate || '',
-            clientId: routeData.clientId || null,
             clientName: routeData.clientName || '',
             cargo: routeData.cargo || { type: '', weight: 0, description: '' },
-            estimatedDepartureTime: routeData.estimatedDepartureTime || null,
-            estimatedArrivalTime: routeData.estimatedArrivalTime || null,
-            actualDepartureTime: routeData.actualDepartureTime || null,
-            actualArrivalTime: routeData.actualArrivalTime || null,
-            podUrl: routeData.podUrl || null,
             notes: routeData.notes || '',
-            // New optimization fields
-            optimizationMethod: (routeData as any).optimizationMethod || null,
             isOptimized: (routeData as any).isOptimized || false,
-            totalDistanceKm: (routeData as any).totalDistanceKm || null,
-            estimatedDurationMinutes: (routeData as any).estimatedDurationMinutes || null,
-            routePolyline: (routeData as any).routePolyline || null,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             createdBy: userId,
         };
+
+        // Add optional fields only if they exist (not undefined)
+        if (routeData.driverId !== undefined && routeData.driverId !== null) {
+            routeObject.driverId = routeData.driverId;
+        }
+        if (routeData.vehicleId !== undefined && routeData.vehicleId !== null) {
+            routeObject.vehicleId = routeData.vehicleId;
+        }
+        if (routeData.assignedDriverId !== undefined && routeData.assignedDriverId !== null) {
+            routeObject.assignedDriverId = routeData.assignedDriverId;
+        }
+        if (routeData.assignedVehicleId !== undefined && routeData.assignedVehicleId !== null) {
+            routeObject.assignedVehicleId = routeData.assignedVehicleId;
+        }
+        if (routeData.clientId !== undefined && routeData.clientId !== null) {
+            routeObject.clientId = routeData.clientId;
+        }
+        if (routeData.estimatedDepartureTime !== undefined && routeData.estimatedDepartureTime !== null) {
+            routeObject.estimatedDepartureTime = routeData.estimatedDepartureTime;
+        }
+        if (routeData.estimatedArrivalTime !== undefined && routeData.estimatedArrivalTime !== null) {
+            routeObject.estimatedArrivalTime = routeData.estimatedArrivalTime;
+        }
+        if (routeData.actualDepartureTime !== undefined && routeData.actualDepartureTime !== null) {
+            routeObject.actualDepartureTime = routeData.actualDepartureTime;
+        }
+        if (routeData.actualArrivalTime !== undefined && routeData.actualArrivalTime !== null) {
+            routeObject.actualArrivalTime = routeData.actualArrivalTime;
+        }
+        if (routeData.podUrl !== undefined && routeData.podUrl !== null) {
+            routeObject.podUrl = routeData.podUrl;
+        }
+
+        // Add new optimization fields only if they exist
+        if ((routeData as any).optimizationMethod !== undefined && (routeData as any).optimizationMethod !== null) {
+            routeObject.optimizationMethod = (routeData as any).optimizationMethod;
+        }
+        if ((routeData as any).totalDistanceKm !== undefined && (routeData as any).totalDistanceKm !== null) {
+            routeObject.totalDistanceKm = (routeData as any).totalDistanceKm;
+        }
+        if ((routeData as any).estimatedDurationMinutes !== undefined && (routeData as any).estimatedDurationMinutes !== null) {
+            routeObject.estimatedDurationMinutes = (routeData as any).estimatedDurationMinutes;
+        }
+        if ((routeData as any).routePolyline !== undefined && (routeData as any).routePolyline !== null) {
+            routeObject.routePolyline = (routeData as any).routePolyline;
+        }
+        if ((routeData as any).originCoordinates !== undefined && (routeData as any).originCoordinates !== null) {
+            routeObject.originCoordinates = (routeData as any).originCoordinates;
+        }
+        if ((routeData as any).destinationCoordinates !== undefined && (routeData as any).destinationCoordinates !== null) {
+            routeObject.destinationCoordinates = (routeData as any).destinationCoordinates;
+        }
+
+        const newRoute = routeObject;
 
         console.log('[ROUTE CREATE] Saving route to Firestore...');
         console.log('[ROUTE CREATE] Route document:', {
@@ -177,8 +217,36 @@ export const createRoute = async (
             destination: newRoute.destination,
             status: newRoute.status
         });
+        console.log('[ROUTE CREATE] Full route object:', JSON.stringify(newRoute, null, 2));
 
-        await setDoc(routeRef, newRoute);
+        // Deep clean function to remove undefined values recursively
+        const deepClean = (obj: any): any => {
+            if (obj === null || obj === undefined) {
+                return null;
+            }
+
+            if (Array.isArray(obj)) {
+                return obj.map(item => deepClean(item));
+            }
+
+            if (typeof obj === 'object' && obj.constructor === Object) {
+                const cleaned: any = {};
+                Object.keys(obj).forEach(key => {
+                    const value = obj[key];
+                    if (value !== undefined) {
+                        cleaned[key] = deepClean(value);
+                    }
+                });
+                return cleaned;
+            }
+
+            return obj;
+        };
+
+        const cleanedRoute = deepClean(newRoute);
+        console.log('[ROUTE CREATE] Cleaned route object:', JSON.stringify(cleanedRoute, null, 2));
+
+        await setDoc(routeRef, cleanedRoute);
 
         console.log('[ROUTE CREATE] ✅ Route saved successfully!');
         console.log('[ROUTE CREATE] Route ID:', routeId);

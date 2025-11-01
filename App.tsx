@@ -13,6 +13,7 @@ import DriverPortalProfessional from './components/DriverPortalProfessional';
 import DriverPhoneLogin from './components/driver-portal/DriverPhoneLogin';
 import DriverPortalDashboard from './components/driver-portal/DriverPortalDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { GoogleMapsProvider } from './contexts/GoogleMapsContext';
 import type { Driver } from './types';
 
 const AppContent: React.FC = () => {
@@ -179,9 +180,11 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
     return (
       <AuthProvider>
-        <div className="App">
-            <AppContent />
-        </div>
+        <GoogleMapsProvider>
+          <div className="App">
+              <AppContent />
+          </div>
+        </GoogleMapsProvider>
       </AuthProvider>
     );
 };

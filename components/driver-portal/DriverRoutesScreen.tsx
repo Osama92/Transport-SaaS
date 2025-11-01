@@ -155,12 +155,150 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
     }
   };
 
-  const handleCompleteNavigation = () => {
-    if (navigatingRoute) {
-      setNavigatingRoute(null);
-      handleCompleteRoute(navigatingRoute);
+  const handleUpdateStopPOD = async (stopId: string, podData: {
+    photo?: File;
+    photoUrl?: string;
+    signature?: string;
+    deliveryNotes: string;
+    recipientName: string;
+  }) => {
+    if (!navigatingRoute) return;
+
+    try {
+      const stops = Array.isArray(navigatingRoute.stops) ? navigatingRoute.stops : [];
+
+      // TODO: Upload photo to Firebase Storage if provided
+      let photoUrl = podData.photoUrl;
+      if (podData.photo) {
+        // For now, use the local preview URL
+        // In production, upload to Firebase Storage
+        photoUrl = podData.photoUrl;
+      }
+
+      // Deep clean function to remove undefined values recursively
+      const deepClean = (obj: any): any => {
+        if (obj === null || obj === undefined) {
+          return null;
+        }
+
+        if (Array.isArray(obj)) {
+          return obj.map(item => deepClean(item));
+        }
+
+        if (typeof obj === 'object' && obj.constructor === Object) {
+          const cleaned: any = {};
+          Object.keys(obj).forEach(key => {
+            const value = obj[key];
+            if (value !== undefined) {
+              cleaned[key] = deepClean(value);
+            }
+          });
+          return cleaned;
+        }
+
+        return obj;
+      };
+
+      const updatedStops = stops.map(stop =>
+        stop.id === stopId
+          ? deepClean({
+              ...stop,
+              status: 'completed', // Mark stop as completed when POD is uploaded
+              recipientName: podData.recipientName,
+              deliveryNotes: podData.deliveryNotes,
+              podPhotoUrl: photoUrl,
+              signatureUrl: podData.signature,
+              completedAt: new Date().toISOString(),
+            })
+          : stop
+      );
+
+      // Calculate route progress based on stops that are completed (POD uploaded)
+      const stopsWithPOD = updatedStops.filter(stop => stop.status === 'completed');
+      const progress = Math.round((stopsWithPOD.length / updatedStops.length) * 100);
+
+      console.log('[POD UPDATE] Route progress:', {
+        totalStops: updatedStops.length,
+        stopsWithPOD: stopsWithPOD.length,
+        progress,
+        stops: updatedStops.map(s => ({
+          id: s.id,
+          sequence: s.sequence,
+          status: s.status,
+          hasRecipient: !!s.recipientName,
+          isCompleted: s.status === 'completed'
+        }))
+      });
+
+      // Check if all stops have POD uploaded (status is 'completed')
+      const allStopsComplete = stopsWithPOD.length === updatedStops.length;
+
+      const routeRef = doc(db, 'routes', navigatingRoute.id);
+
+      // Update route with progress and check for completion
+      const updateData: any = deepClean({
+        stops: updatedStops,
+        progress: progress,
+        updatedAt: serverTimestamp(),
+      });
+
+      // If all stops have POD, mark route as completed
+      if (allStopsComplete) {
+        updateData.status = 'Completed';
+        updateData.completionDate = new Date().toISOString();
+
+        // Update driver status to Idle
+        const driverRef = doc(db, 'drivers', driver.id);
+        await updateDoc(driverRef, {
+          currentRouteId: null,
+          currentRouteStatus: null,
+          status: 'Idle',
+          updatedAt: serverTimestamp(),
+        });
+
+        // Update vehicle status to Idle
+        const vehicleId = (navigatingRoute as any).assignedVehicleId || navigatingRoute.vehicleId;
+        if (vehicleId) {
+          const vehicleRef = doc(db, 'vehicles', vehicleId);
+          await updateDoc(vehicleRef, {
+            currentRouteId: null,
+            currentRouteStatus: null,
+            status: 'Idle',
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+
+      await updateDoc(routeRef, updateData);
+
+      // Update local state
+      const updatedRoute = {
+        ...navigatingRoute,
+        stops: updatedStops,
+        progress,
+        ...(allStopsComplete && { status: 'Completed' as const, completionDate: new Date().toISOString() })
+      };
+      setNavigatingRoute(updatedRoute);
+
+      // Also update routes list
+      setRoutes(routes.map(r =>
+        r.id === navigatingRoute.id ? updatedRoute : r
+      ));
+
+      // If all stops complete, show success message and close navigation
+      if (allStopsComplete) {
+        setTimeout(() => {
+          alert('🎉 All deliveries completed! Route marked as completed.');
+          setNavigatingRoute(null);
+          loadRoutes();
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Error updating stop POD:', error);
+      alert('Failed to update delivery proof. Please try again.');
     }
   };
+
 
   const handlePODSubmit = async (podData: {
     recipientName: string;
@@ -276,7 +414,7 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
       <DriverRouteNavigationScreen
         route={navigatingRoute}
         onUpdateStopStatus={handleUpdateStopStatus}
-        onComplete={handleCompleteNavigation}
+        onUpdateStopPOD={handleUpdateStopPOD}
       />
     );
   }
@@ -408,33 +546,23 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
                 {route.status === 'Pending' && (
                   <button
                     onClick={() => handleStartRoute(route)}
-                    className="w-full sm:flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-sm md:text-base"
+                    className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-sm md:text-base"
                   >
                     Start Route 🚀
                   </button>
                 )}
-                {route.status === 'In Progress' && (
-                  <>
-                    {Array.isArray(route.stops) && route.stops.length > 0 && (
-                      <button
-                        onClick={() => handleNavigateRoute(route)}
-                        className="w-full sm:flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm md:text-base"
-                      >
-                        Navigate Stops 🗺️
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleCompleteRoute(route)}
-                      className="w-full sm:flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm md:text-base"
-                    >
-                      Complete & Upload POD ✅
-                    </button>
-                  </>
+                {route.status === 'In Progress' && Array.isArray(route.stops) && route.stops.length > 0 && (
+                  <button
+                    onClick={() => handleNavigateRoute(route)}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm md:text-base"
+                  >
+                    Navigate Stops 🗺️
+                  </button>
                 )}
                 {route.status === 'Completed' && route.podUrl && (
                   <button
                     onClick={() => window.open(route.podUrl, '_blank')}
-                    className="w-full sm:flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors text-sm md:text-base"
+                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors text-sm md:text-base"
                   >
                     View POD 📄
                   </button>

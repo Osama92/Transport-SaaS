@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 
 interface GooglePlacesAutocompleteProps {
     label: string;
@@ -21,82 +20,13 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [inputValue, setInputValue] = useState(value);
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [loadError, setLoadError] = useState(false);
+    const { isLoaded, loadError } = useGoogleMaps(); // Use shared Google Maps context
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
 
     useEffect(() => {
         setInputValue(value);
     }, [value]);
-
-    // Load Google Maps API with new Places library (v2)
-    useEffect(() => {
-        const loadGoogleMaps = async () => {
-            try {
-                // Check if already loaded
-                if ((window as any).google?.maps?.places?.Place) {
-                    setIsLoaded(true);
-                    return;
-                }
-
-                // Check if script is already being loaded
-                const existingScript = document.querySelector(`script[src*="maps.googleapis.com/maps/api/js"]`);
-                if (existingScript) {
-                    // Script is loading, wait for it
-                    const checkInterval = setInterval(() => {
-                        if ((window as any).google?.maps?.places?.Place) {
-                            clearInterval(checkInterval);
-                            setIsLoaded(true);
-                        }
-                    }, 100);
-
-                    // Timeout after 10 seconds
-                    setTimeout(() => {
-                        clearInterval(checkInterval);
-                        if (!(window as any).google?.maps?.places?.Place) {
-                            setLoadError(true);
-                        }
-                    }, 10000);
-                    return;
-                }
-
-                // Dynamically load the Google Maps script with new Places library
-                const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`;
-                script.async = true;
-                script.defer = true;
-
-                script.onload = () => {
-                    // Wait for Google to be fully available
-                    const checkGoogle = setInterval(() => {
-                        if ((window as any).google?.maps?.places?.Place) {
-                            clearInterval(checkGoogle);
-                            setIsLoaded(true);
-                        }
-                    }, 100);
-
-                    setTimeout(() => {
-                        clearInterval(checkGoogle);
-                        if (!(window as any).google?.maps?.places?.Place) {
-                            setLoadError(true);
-                        }
-                    }, 5000);
-                };
-
-                script.onerror = () => {
-                    setLoadError(true);
-                };
-
-                document.head.appendChild(script);
-            } catch (error) {
-                console.error('Error loading Google Maps:', error);
-                setLoadError(true);
-            }
-        };
-
-        loadGoogleMaps();
-    }, []);
 
     // Handle input changes and fetch suggestions using new Places API
     const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

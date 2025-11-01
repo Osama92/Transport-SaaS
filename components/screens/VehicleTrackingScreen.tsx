@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleMap, useLoadScript, Marker, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useGoogleMaps } from '../../contexts/GoogleMapsContext';
 import { useVehicles, useDrivers } from '../../hooks/useFirestore';
 import type { Vehicle, Driver } from '../../types';
 
@@ -38,19 +39,13 @@ interface VehicleWithLocation extends Vehicle {
 
 const VehicleTrackingScreen: React.FC = () => {
     const { organizationId } = useAuth();
+    const { isLoaded, loadError } = useGoogleMaps();
     const { data: vehicles } = useVehicles(organizationId);
     const { data: drivers } = useDrivers(organizationId);
     const [selectedVehicle, setSelectedVehicle] = useState<VehicleWithLocation | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'idle' | 'moving' | 'stopped'>('all');
     const [vehiclesWithTracking, setVehiclesWithTracking] = useState<VehicleWithLocation[]>([]);
-
-    const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-    // Load Google Maps script
-    const { isLoaded, loadError } = useLoadScript({
-        googleMapsApiKey: googleMapsApiKey,
-    });
 
     // Mock GPS data for demonstration (Kano locations)
     useEffect(() => {
