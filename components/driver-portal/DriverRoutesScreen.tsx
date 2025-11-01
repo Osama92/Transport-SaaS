@@ -559,12 +559,12 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
                     Navigate Stops 🗺️
                   </button>
                 )}
-                {route.status === 'Completed' && route.podUrl && (
+                {route.status === 'Completed' && Array.isArray(route.stops) && route.stops.length > 0 && (
                   <button
-                    onClick={() => window.open(route.podUrl, '_blank')}
-                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors text-sm md:text-base"
+                    onClick={() => handleNavigateRoute(route)}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm md:text-base"
                   >
-                    View POD 📄
+                    View PODs 📄
                   </button>
                 )}
               </div>
