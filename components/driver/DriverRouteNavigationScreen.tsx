@@ -316,11 +316,23 @@ const DriverRouteNavigationScreen: React.FC<DriverRouteNavigationScreenProps> = 
                                     <div>
                                         <span className="text-xs text-gray-600 dark:text-gray-400">Received by:</span>
                                         <p className="text-sm font-medium text-gray-900 dark:text-white">{currentStop.recipientName}</p>
+                                        {currentStop.completedAt && (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                {new Date(currentStop.completedAt).toLocaleString()}
+                                            </p>
+                                        )}
                                     </div>
                                     {currentStop.podPhotoUrl && (
                                         <div>
                                             <span className="text-xs text-gray-600 dark:text-gray-400">Photo:</span>
-                                            <img src={currentStop.podPhotoUrl} alt="POD" className="mt-1 w-full h-32 object-cover rounded border" />
+                                            <a href={currentStop.podPhotoUrl} target="_blank" rel="noopener noreferrer" className="block mt-1">
+                                                <img
+                                                    src={currentStop.podPhotoUrl}
+                                                    alt="POD"
+                                                    className="w-full h-32 object-cover rounded border border-green-300 dark:border-green-700 hover:opacity-90 transition-opacity cursor-pointer"
+                                                />
+                                                <p className="text-xs text-green-600 dark:text-green-400 mt-1 text-center">Click to view full size</p>
+                                            </a>
                                         </div>
                                     )}
                                     {currentStop.deliveryNotes && (

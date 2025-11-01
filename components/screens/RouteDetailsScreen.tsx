@@ -81,27 +81,83 @@ const RouteDetailsScreen: React.FC<RouteDetailsScreenProps> = ({ route, onBack, 
                         </div>
                     </div>
 
+                    {/* Proof of Delivery Section */}
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm flex flex-col">
-                        {route.status === 'Completed' && route.podUrl ? (
-                            <>
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                                    <ClipboardDocumentCheckIcon className="w-6 h-6 text-green-500" />
-                                    {t('routeDetails.pod')}
-                                </h3>
-                                <div className="rounded-lg overflow-hidden border dark:border-slate-700">
-                                     <a href={route.podUrl} target="_blank" rel="noopener noreferrer" title="View full image">
-                                        <img src={route.podUrl} alt={t('routeDetails.pod')} className="w-full h-auto object-cover" />
-                                    </a>
-                                </div>
-                            </>
+                        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                            <ClipboardDocumentCheckIcon className="w-6 h-6 text-green-500" />
+                            Proof of Delivery
+                        </h3>
+
+                        {Array.isArray(route.stops) && route.stops.length > 0 ? (
+                            <div className="space-y-4 max-h-96 overflow-y-auto">
+                                {route.stops.map((stop) => (
+                                    <div key={stop.id} className="border dark:border-slate-700 rounded-lg p-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="font-semibold text-gray-800 dark:text-white">
+                                                Stop {stop.sequence}
+                                            </span>
+                                            <span className={`text-xs px-2 py-1 rounded-full ${
+                                                stop.status === 'completed'
+                                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                    : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-400'
+                                            }`}>
+                                                {stop.status === 'completed' ? 'Completed' : 'Pending'}
+                                            </span>
+                                        </div>
+
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                                            {stop.address}
+                                        </p>
+
+                                        {stop.status === 'completed' && stop.podPhotoUrl ? (
+                                            <div className="space-y-2">
+                                                {/* POD Photo */}
+                                                <div className="rounded-lg overflow-hidden border dark:border-slate-600">
+                                                    <a href={stop.podPhotoUrl} target="_blank" rel="noopener noreferrer" title="View full image">
+                                                        <img
+                                                            src={stop.podPhotoUrl}
+                                                            alt={`POD for Stop ${stop.sequence}`}
+                                                            className="w-full h-48 object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                                                        />
+                                                    </a>
+                                                </div>
+
+                                                {/* Recipient Info */}
+                                                {stop.recipientName && (
+                                                    <div className="bg-gray-50 dark:bg-slate-900 p-3 rounded">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Received by:</p>
+                                                        <p className="font-medium text-gray-900 dark:text-white">{stop.recipientName}</p>
+                                                        {stop.recipientPhone && (
+                                                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{stop.recipientPhone}</p>
+                                                        )}
+                                                        {stop.completedAt && (
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                                {new Date(stop.completedAt).toLocaleString()}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Delivery Notes */}
+                                                {stop.deliveryNotes && (
+                                                    <div className="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                                                        <strong>Notes:</strong> {stop.deliveryNotes}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-4 text-gray-400 dark:text-gray-500 text-sm">
+                                                {stop.status === 'completed' ? 'No POD uploaded' : 'Awaiting delivery'}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         ) : (
-                            <div className="h-64 flex-grow flex items-center justify-center">
+                            <div className="h-64 flex items-center justify-center">
                                 <div className="text-center text-gray-500 dark:text-gray-400">
-                                    <MapIcon className="w-16 h-16 mx-auto text-gray-400"/>
-                                    <p className="mt-2 font-semibold">{t('routeDetails.mapPlaceholder')}</p>
-                                    {route.status === 'Completed' && !route.podUrl && (
-                                        <p className="text-sm mt-1">{t('modals.pod.noPod')}</p>
-                                    )}
+                                    <ClipboardDocumentCheckIcon className="w-16 h-16 mx-auto text-gray-400"/>
+                                    <p className="mt-2 font-semibold">No stops available</p>
                                 </div>
                             </div>
                         )}
