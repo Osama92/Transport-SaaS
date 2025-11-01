@@ -5,7 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { updateRoute } from '../../services/firestore/routes';
 import { useClients } from '../../hooks/useFirestore';
 import GooglePlacesAutocomplete from '../GooglePlacesAutocomplete';
-import type { Route } from '../../types';
+import StopManager from '../route/StopManager';
+import type { Route, RouteStop } from '../../types';
 
 interface EditRouteModalProps {
     route: Route;
@@ -29,7 +30,16 @@ const EditRouteModal: React.FC<EditRouteModalProps> = ({ route, onClose, onSave 
     const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(null);
     const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>(null);
     const [distance, setDistance] = useState(String(route.distance || route.distanceKm || ''));
-    const [stops, setStops] = useState(String(route.stops || ''));
+
+    // Handle both number and RouteStop[] array formats
+    const hasDetailedStops = Array.isArray(route.stops);
+    const [stopsArray, setStopsArray] = useState<RouteStop[]>(
+        hasDetailedStops ? route.stops as RouteStop[] : []
+    );
+    const [stopsNumber, setStopsNumber] = useState(
+        hasDetailedStops ? String((route.stops as RouteStop[]).length) : String(route.stops || '')
+    );
+
     const [rate, setRate] = useState(String(route.rate || ''));
     const [clientId, setClientId] = useState(route.clientId || '');
     const [loading, setLoading] = useState(false);
@@ -120,7 +130,8 @@ const EditRouteModal: React.FC<EditRouteModalProps> = ({ route, onClose, onSave 
                 origin: origin,
                 destination: destination,
                 distance: distance ? Number(distance) : 0,
-                stops: stops ? Number(stops) : 0,
+                // Use updated stopsArray if detailed stops exist, otherwise use number
+                stops: hasDetailedStops ? stopsArray : (stopsNumber ? Number(stopsNumber) : 0),
                 rate: rate ? Number(rate) : 0,
                 distanceKm: distance ? Number(distance) : 0,
                 clientId: clientId || null,
@@ -147,7 +158,7 @@ const EditRouteModal: React.FC<EditRouteModalProps> = ({ route, onClose, onSave 
     };
 
     return (
-        <ModalBase title="Edit Route" onClose={onClose}>
+        <ModalBase title="Edit Route" onClose={onClose} size={hasDetailedStops ? 'lg' : 'md'}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
@@ -215,15 +226,33 @@ const EditRouteModal: React.FC<EditRouteModalProps> = ({ route, onClose, onSave 
                         </p>
                     )}
                 </div>
-                <InputField
-                    label="Number of Stops"
-                    id="stops"
-                    type="number"
-                    placeholder="e.g., 5"
-                    value={stops}
-                    onChange={(e) => setStops(e.target.value)}
-                    required
-                />
+                {hasDetailedStops ? (
+                    <div className="border-t pt-4 dark:border-slate-700">
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                            Delivery Stops ({stopsArray.length})
+                        </h3>
+                        <StopManager
+                            stops={stopsArray}
+                            onStopsChange={setStopsArray}
+                            maxStops={15}
+                        />
+                    </div>
+                ) : (
+                    <div>
+                        <label htmlFor="stops" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Number of Stops <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="number"
+                            id="stops"
+                            placeholder="e.g., 5"
+                            value={stopsNumber}
+                            onChange={(e) => setStopsNumber(e.target.value)}
+                            required
+                            className="w-full px-3 py-2 rounded-lg border bg-gray-100 border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200"
+                        />
+                    </div>
+                )}
                 <InputField
                     label="Route Rate (₦)"
                     id="rate"

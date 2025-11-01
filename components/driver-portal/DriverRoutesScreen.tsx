@@ -4,12 +4,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { Driver, Route, ProofOfDelivery } from '../../types';
+import type { Driver, Route, ProofOfDelivery, RouteStop } from '../../types';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase/firebaseConfig';
 import ProofOfDeliveryModal from './ProofOfDeliveryModal';
+import DriverRouteNavigationScreen from '../driver/DriverRouteNavigationScreen';
 
 interface DriverRoutesScreenProps {
   driver: Driver;
@@ -21,6 +22,7 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
   const [filter, setFilter] = useState<'all' | 'Pending' | 'In Progress' | 'Completed'>('all');
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [showPODModal, setShowPODModal] = useState(false);
+  const [navigatingRoute, setNavigatingRoute] = useState<Route | null>(null);
 
   useEffect(() => {
     loadRoutes();
@@ -110,6 +112,54 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
   const handleCompleteRoute = (route: Route) => {
     setSelectedRoute(route);
     setShowPODModal(true);
+  };
+
+  const handleNavigateRoute = (route: Route) => {
+    setNavigatingRoute(route);
+  };
+
+  const handleUpdateStopStatus = async (stopId: string, status: RouteStop['status'], notes?: string) => {
+    if (!navigatingRoute) return;
+
+    try {
+      const stops = Array.isArray(navigatingRoute.stops) ? navigatingRoute.stops : [];
+      const updatedStops = stops.map(stop =>
+        stop.id === stopId
+          ? {
+              ...stop,
+              status,
+              ...(status === 'arrived' && { actualArrival: new Date().toISOString() }),
+              ...(status === 'completed' && { completedAt: new Date().toISOString() }),
+              ...(status === 'failed' && notes && { failureReason: notes }),
+              ...(notes && (status === 'completed' || status === 'failed') && { deliveryNotes: notes })
+            }
+          : stop
+      );
+
+      const routeRef = doc(db, 'routes', navigatingRoute.id);
+      await updateDoc(routeRef, {
+        stops: updatedStops,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update local state
+      setNavigatingRoute({ ...navigatingRoute, stops: updatedStops });
+
+      // Also update routes list
+      setRoutes(routes.map(r =>
+        r.id === navigatingRoute.id ? { ...r, stops: updatedStops } : r
+      ));
+    } catch (error) {
+      console.error('Error updating stop status:', error);
+      alert('Failed to update stop status. Please try again.');
+    }
+  };
+
+  const handleCompleteNavigation = () => {
+    if (navigatingRoute) {
+      setNavigatingRoute(null);
+      handleCompleteRoute(navigatingRoute);
+    }
   };
 
   const handlePODSubmit = async (podData: {
@@ -220,6 +270,17 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
     }
   };
 
+  // Show navigation screen if a route is selected for navigation
+  if (navigatingRoute) {
+    return (
+      <DriverRouteNavigationScreen
+        route={navigatingRoute}
+        onUpdateStopStatus={handleUpdateStopStatus}
+        onComplete={handleCompleteNavigation}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -301,7 +362,7 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
                     </div>
                     <div>
                       <span className="block text-xs text-gray-500 dark:text-gray-500">Stops</span>
-                      <span className="font-medium">📍 {route.stops}</span>
+                      <span className="font-medium">📍 {Array.isArray(route.stops) ? route.stops.length : route.stops || 0}</span>
                     </div>
                     <div>
                       <span className="block text-xs text-gray-500 dark:text-gray-500">Distance</span>
@@ -353,12 +414,22 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
                   </button>
                 )}
                 {route.status === 'In Progress' && (
-                  <button
-                    onClick={() => handleCompleteRoute(route)}
-                    className="w-full sm:flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm md:text-base"
-                  >
-                    Complete & Upload POD ✅
-                  </button>
+                  <>
+                    {Array.isArray(route.stops) && route.stops.length > 0 && (
+                      <button
+                        onClick={() => handleNavigateRoute(route)}
+                        className="w-full sm:flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm md:text-base"
+                      >
+                        Navigate Stops 🗺️
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleCompleteRoute(route)}
+                      className="w-full sm:flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm md:text-base"
+                    >
+                      Complete & Upload POD ✅
+                    </button>
+                  </>
                 )}
                 {route.status === 'Completed' && route.podUrl && (
                   <button

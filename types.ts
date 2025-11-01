@@ -437,6 +437,27 @@ export interface ProofOfDelivery extends FirestoreDocument {
     verified: boolean;
 }
 
+// Route Stop Interface - for multi-stop deliveries
+export interface RouteStop {
+    id: string;                           // Unique stop ID
+    sequence: number;                     // Order: 1, 2, 3...
+    address: string;                      // Full address
+    coordinates: {                        // Lat/lng from Google Places
+        lat: number;
+        lng: number;
+    };
+    recipientName?: string;               // Who receives delivery
+    recipientPhone?: string;              // Contact number
+    deliveryNotes?: string;               // Special instructions
+    estimatedArrival?: string;            // Calculated by Google API
+    actualArrival?: string;               // When driver checks in
+    status: 'pending' | 'arrived' | 'completed' | 'failed';
+    podPhotoUrl?: string;                 // POD photo per stop
+    signatureUrl?: string;                // Signature per stop
+    failureReason?: string;               // If delivery failed
+    completedAt?: string;                 // Timestamp
+}
+
 export interface Route extends FirestoreDocument {
     id: string;
     organizationId: string; // Foreign key to organization
@@ -448,12 +469,22 @@ export interface Route extends FirestoreDocument {
     clientId?: string; // Foreign key to client
     origin?: string;
     destination?: string;
-    stops: number;
-    stopAddresses?: string[]; // Array of stop addresses
+
+    // NEW: Support both old (number) and new (RouteStop[]) formats
+    stops: number | RouteStop[];          // Backward compatible
+    stopAddresses?: string[];             // Deprecated - kept for old routes
+
+    // NEW: Optimization fields
+    optimizationMethod?: 'manual' | 'nearestNeighbor' | 'google';
+    isOptimized?: boolean;                // Whether route was optimized
+    totalDistanceKm?: number;             // Sum of all legs (overrides distanceKm when using stops array)
+    estimatedDurationMinutes?: number;    // Total travel time
+    routePolyline?: string;               // Encoded polyline for map display
+
     progress: number;
     status: 'In Progress' | 'Completed' | 'Pending';
-    podUrl?: string;
-    distanceKm: number;
+    podUrl?: string;                      // Legacy - for old routes
+    distanceKm: number;                   // Legacy - kept for backward compatibility
     rate: number;
     expenses?: Expense[];
     completionDate?: string;

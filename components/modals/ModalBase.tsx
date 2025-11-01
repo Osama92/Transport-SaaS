@@ -6,9 +6,17 @@ interface ModalBaseProps {
     onClose: () => void;
     children: React.ReactNode;
     zIndex?: string; // Optional z-index override (e.g., 'z-60', 'z-[60]')
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'; // Modal size
 }
 
-const ModalBase: React.FC<ModalBaseProps> = ({ title, onClose, children, zIndex = 'z-50' }) => {
+const ModalBase: React.FC<ModalBaseProps> = ({ title, onClose, children, zIndex = 'z-50', size = 'md' }) => {
+    const sizeClasses = {
+        sm: 'max-w-sm',
+        md: 'max-w-lg',
+        lg: 'max-w-2xl',
+        xl: 'max-w-4xl',
+        '2xl': 'max-w-6xl'
+    };
     useEffect(() => {
         const handleEsc = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
@@ -28,8 +36,8 @@ const ModalBase: React.FC<ModalBaseProps> = ({ title, onClose, children, zIndex 
             aria-modal="true"
             role="dialog"
         >
-            <div 
-                className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col"
+            <div
+                className={`bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <header className="flex justify-between items-center p-5 border-b dark:border-slate-700">

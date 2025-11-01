@@ -256,7 +256,7 @@ const DriverPortalHome: React.FC<DriverPortalHomeProps> = ({ driver, onNavigate 
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                     <span>🚚 {route.vehicle}</span>
-                    <span>📍 {route.stops} stops</span>
+                    <span>📍 {Array.isArray(route.stops) ? route.stops.length : route.stops || 0} stops</span>
                     <span>📏 {route.distanceKm} km</span>
                     {route.status === 'Completed' && route.completionDate && (
                       <span className="text-xs text-gray-500 dark:text-gray-500">

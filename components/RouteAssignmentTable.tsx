@@ -77,7 +77,7 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                 route.destination || 'N/A',
                 route.driverName || 'Unassigned',
                 route.vehicle || route.assignedVehiclePlate || 'Unassigned',
-                route.stops || 0,
+                Array.isArray(route.stops) ? route.stops.length : route.stops || 0,
                 route.distance || route.distanceKm || 0,
                 route.rate || 0,
                 route.progress || 0,
@@ -215,7 +215,9 @@ const RouteAssignmentTable: React.FC<RouteAssignmentTableProps> = ({ routes, onA
                                         </div>
                                     </td>
                                     <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">{route.vehicle}</td>
-                                    <td className="py-4 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">{route.stops}</td>
+                                    <td className="py-4 px-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        {Array.isArray(route.stops) ? route.stops.length : route.stops || 0}
+                                    </td>
                                     <td className="py-4 px-4">
                                         <div className="flex items-center gap-2">
                                             <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-slate-700">

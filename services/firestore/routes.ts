@@ -136,7 +136,7 @@ export const createRoute = async (
             destination: routeData.destination,
             distance: routeData.distance || 0,
             distanceKm: (routeData as any).distanceKm || routeData.distance || 0,
-            stops: (routeData as any).stops || 0,
+            stops: (routeData as any).stops || 0, // Can be number or RouteStop[]
             rate: (routeData as any).rate || 0,
             driverName: (routeData as any).driverName || '',
             driverAvatar: (routeData as any).driverAvatar || '',
@@ -158,6 +158,12 @@ export const createRoute = async (
             actualArrivalTime: routeData.actualArrivalTime || null,
             podUrl: routeData.podUrl || null,
             notes: routeData.notes || '',
+            // New optimization fields
+            optimizationMethod: (routeData as any).optimizationMethod || null,
+            isOptimized: (routeData as any).isOptimized || false,
+            totalDistanceKm: (routeData as any).totalDistanceKm || null,
+            estimatedDurationMinutes: (routeData as any).estimatedDurationMinutes || null,
+            routePolyline: (routeData as any).routePolyline || null,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             createdBy: userId,

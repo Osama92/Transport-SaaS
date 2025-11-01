@@ -59,7 +59,7 @@ const RouteDetailsScreen: React.FC<RouteDetailsScreenProps> = ({ route, onBack, 
                         } />
                         <InfoRow label={t('components.routeAssignmentTable.headerVehicle')} value={route.vehicle} />
                         <InfoRow label={t('common.status')} value={route.status} />
-                        <InfoRow label={t('components.routeAssignmentTable.headerStops')} value={`${Math.round(route.stops * (route.progress / 100))} / ${route.stops}`} />
+                        <InfoRow label={t('components.routeAssignmentTable.headerStops')} value={`${Math.round((Array.isArray(route.stops) ? route.stops.length : route.stops || 0) * (route.progress / 100))} / ${Array.isArray(route.stops) ? route.stops.length : route.stops || 0}`} />
                          <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4 mb-1">{t('components.routeAssignmentTable.headerProgress')}</label>
                             <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5">

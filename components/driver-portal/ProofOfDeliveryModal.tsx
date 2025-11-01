@@ -244,7 +244,9 @@ const ProofOfDeliveryModal: React.FC<ProofOfDeliveryModalProps> = ({ route, onCl
               </div>
               <div>
                 <span className="text-gray-500 dark:text-gray-500">Stops:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{route.stops}</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                  {Array.isArray(route.stops) ? route.stops.length : route.stops || 0}
+                </span>
               </div>
               <div>
                 <span className="text-gray-500 dark:text-gray-500">Distance:</span>

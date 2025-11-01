@@ -8,6 +8,16 @@ import { canAddResource, getSubscriptionLimits } from '../../services/firestore/
 import LimitReachedModal from '../LimitReachedModal';
 import { calculateDistanceFallback } from '../../utils/distanceCalculator';
 import GooglePlacesAutocomplete from '../GooglePlacesAutocomplete';
+import StopManager from '../route/StopManager';
+import RouteMap from '../route/RouteMap';
+import { RouteStop } from '../../types';
+import { optimizeRouteWithGoogle } from '../../services/google/directionsService';
+import {
+    optimizeStopsNearestNeighbor,
+    calculateTotalDistance,
+    estimateTravelTime,
+    validateStopsForOptimization
+} from '../../utils/routeOptimization';
 
 interface CreateRouteModalProps {
     onClose: () => void;
@@ -32,7 +42,7 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
     const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(null);
     const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>(null);
     const [distance, setDistance] = useState('');
-    const [stops, setStops] = useState('');
+    const [stops, setStops] = useState<RouteStop[]>([]);
     const [rate, setRate] = useState('');
     const [clientId, setClientId] = useState('');
     const [loading, setLoading] = useState(false);
@@ -41,12 +51,22 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
     const [calculatingDistance, setCalculatingDistance] = useState(false);
     const [distanceCalculationError, setDistanceCalculationError] = useState<string | null>(null);
 
+    // Optimization states
+    const [optimizing, setOptimizing] = useState(false);
+    const [optimizationMethod, setOptimizationMethod] = useState<'manual' | 'nearestNeighbor' | 'google' | null>(null);
+    const [optimizationResult, setOptimizationResult] = useState<{
+        totalDistanceKm: number;
+        totalDurationMinutes: number;
+        method: string;
+    } | null>(null);
+
     // Get subscription limits
     const subscriptionPlan = organization?.subscription?.plan || 'basic';
     const limits = getSubscriptionLimits(subscriptionPlan, userRole || 'partner');
     const routeLimit = limits?.routes;
 
     // Auto-calculate distance when both locations are selected with coordinates
+    // or when stops are optimized
     useEffect(() => {
         const calculateDistance = async () => {
             if (!originCoords || !destCoords) {
@@ -57,18 +77,24 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
             setDistanceCalculationError(null);
 
             try {
-                // Calculate using Haversine since we have exact coordinates
-                const straightLineDistance = haversineDistance(
-                    originCoords.lat,
-                    originCoords.lng,
-                    destCoords.lat,
-                    destCoords.lng
-                );
+                if (stops.length === 0) {
+                    // No stops - calculate direct distance
+                    const straightLineDistance = haversineDistance(
+                        originCoords.lat,
+                        originCoords.lng,
+                        destCoords.lat,
+                        destCoords.lng
+                    );
 
-                // Add 30% buffer for realistic road distance
-                const estimatedRoadDistance = Math.round(straightLineDistance * 1.3);
+                    // Add 30% buffer for realistic road distance
+                    const estimatedRoadDistance = Math.round(straightLineDistance * 1.3);
+                    setDistance(String(estimatedRoadDistance));
+                } else {
+                    // Has stops - calculate total route distance
+                    const totalDistance = calculateTotalDistance(originCoords, stops, destCoords);
+                    setDistance(String(totalDistance));
+                }
 
-                setDistance(String(estimatedRoadDistance));
                 setDistanceCalculationError(null);
             } catch (err: any) {
                 console.error('Error calculating distance:', err);
@@ -79,7 +105,7 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
         };
 
         calculateDistance();
-    }, [originCoords, destCoords]);
+    }, [originCoords, destCoords, stops]);
 
     // Haversine distance calculation helper
     const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -102,6 +128,124 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
 
     const toRadians = (degrees: number): number => {
         return degrees * (Math.PI / 180);
+    };
+
+    // Optimize route using nearest-neighbor algorithm (free)
+    const handleOptimizeNearestNeighbor = () => {
+        if (!originCoords || !destCoords) {
+            setError('Please select origin and destination first');
+            return;
+        }
+
+        if (stops.length === 0) {
+            setError('Please add at least one stop before optimizing');
+            return;
+        }
+
+        if (!validateStopsForOptimization(stops)) {
+            setError('All stops must have valid coordinates');
+            return;
+        }
+
+        setOptimizing(true);
+        setError(null);
+
+        try {
+            // Optimize using nearest-neighbor
+            const optimizedStops = optimizeStopsNearestNeighbor(originCoords, destCoords, stops);
+
+            // Calculate totals
+            const totalDistance = calculateTotalDistance(originCoords, optimizedStops, destCoords);
+            const estimatedDuration = estimateTravelTime(totalDistance);
+
+            // Update stops with optimized order
+            setStops(optimizedStops);
+            setOptimizationMethod('nearestNeighbor');
+            setOptimizationResult({
+                totalDistanceKm: totalDistance,
+                totalDurationMinutes: estimatedDuration,
+                method: 'Nearest Neighbor (Free)'
+            });
+        } catch (err: any) {
+            console.error('Optimization error:', err);
+            setError('Failed to optimize route: ' + err.message);
+        } finally {
+            setOptimizing(false);
+        }
+    };
+
+    // Optimize route using Google Directions API (paid)
+    const handleOptimizeGoogle = async () => {
+        if (!originCoords || !destCoords) {
+            setError('Please select origin and destination first');
+            return;
+        }
+
+        if (stops.length === 0) {
+            setError('Please add at least one stop before optimizing');
+            return;
+        }
+
+        if (!validateStopsForOptimization(stops)) {
+            setError('All stops must have valid coordinates');
+            return;
+        }
+
+        setOptimizing(true);
+        setError(null);
+
+        try {
+            // Optimize using Google Directions API (SDK loaded via script tag)
+            const result = await optimizeRouteWithGoogle(
+                originCoords,
+                destCoords,
+                stops
+            );
+
+            // Update stops with Google's optimized order
+            setStops(result.optimizedStops);
+            setOptimizationMethod('google');
+            setOptimizationResult({
+                totalDistanceKm: result.totalDistanceKm,
+                totalDurationMinutes: result.totalDurationMinutes,
+                method: 'Google Directions API'
+            });
+        } catch (err: any) {
+            console.error('Google optimization error:', err);
+
+            // Check if it's an API key authorization error
+            const isAuthError = err.message?.includes('REQUEST_DENIED') || err.message?.includes('not authorized');
+
+            if (isAuthError) {
+                console.warn('Google Directions API not enabled. Please enable it in Google Cloud Console.');
+            }
+
+            // Automatically fallback to nearest neighbor
+            try {
+                const optimizedStops = optimizeStopsNearestNeighbor(originCoords, destCoords, stops);
+                const totalDistance = calculateTotalDistance(originCoords, optimizedStops, destCoords);
+                const estimatedDuration = estimateTravelTime(totalDistance);
+
+                setStops(optimizedStops);
+                setOptimizationMethod('nearestNeighbor');
+                setOptimizationResult({
+                    totalDistanceKm: totalDistance,
+                    totalDurationMinutes: estimatedDuration,
+                    method: 'Nearest Neighbor (Auto-Fallback)'
+                });
+
+                // Show helpful message based on error type
+                if (isAuthError) {
+                    setError('ℹ️ Google Directions API not enabled. Used free optimization instead. Route optimized successfully!');
+                } else {
+                    setError('⚠️ Google optimization unavailable. Used free optimization instead.');
+                }
+            } catch (fallbackErr: any) {
+                setError('❌ Optimization failed. Please check your stops and try again.');
+            }
+        } finally {
+            setOptimizing(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -138,7 +282,7 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
                     origin: origin,
                     destination: destination,
                     distance: distance ? Number(distance) : 0,
-                    stops: stops ? Number(stops) : 0,
+                    stops: stops.length > 0 ? stops : 0, // Support both RouteStop[] and number
                     rate: rate ? Number(rate) : 0,
                     distanceKm: distance ? Number(distance) : 0,
                     driverName: '',
@@ -163,6 +307,11 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
                     actualArrivalTime: null,
                     podUrl: null,
                     notes: '',
+                    // New optimization fields
+                    optimizationMethod: optimizationMethod || 'manual',
+                    isOptimized: optimizationMethod !== null,
+                    totalDistanceKm: optimizationResult?.totalDistanceKm,
+                    estimatedDurationMinutes: optimizationResult?.totalDurationMinutes,
                 },
                 currentUser.uid
             );
@@ -172,7 +321,7 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
                 onAddRoute({
                     distanceKm: Number(distance),
                     rate: Number(rate),
-                    stops: Number(stops),
+                    stops: stops.length,
                 });
             }
 
@@ -202,7 +351,11 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
                 currentPlan={subscriptionPlan}
                 onUpgrade={handleUpgrade}
             />
-            <ModalBase title={t('modals.createRoute.title')} onClose={onClose}>
+            <ModalBase
+                title={t('modals.createRoute.title')}
+                onClose={onClose}
+                size={optimizationResult && stops.length > 0 ? 'xl' : 'lg'}
+            >
                 <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Subscription Limit Warning Banner */}
                 {routeLimit !== undefined && (
@@ -273,7 +426,13 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
                 )}
 
                 {error && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
+                    <div className={`px-4 py-3 rounded-lg ${
+                        error.startsWith('ℹ️')
+                            ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
+                            : error.startsWith('⚠️')
+                            ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400'
+                            : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+                    }`}>
                         {error}
                     </div>
                 )}
@@ -349,15 +508,121 @@ const CreateRouteModal: React.FC<CreateRouteModalProps> = ({ onClose, onAddRoute
                         </p>
                     )}
                 </div>
-                <InputField
-                    label="Number of Stops"
-                    id="stops"
-                    type="number"
-                    placeholder="e.g., 5"
-                    value={stops}
-                    onChange={(e) => setStops(e.target.value)}
-                    required
-                />
+
+                {/* Stop Manager - Multi-Stop Deliveries */}
+                <div className="border-t pt-4 dark:border-slate-700">
+                    <StopManager
+                        stops={stops}
+                        onStopsChange={setStops}
+                        maxStops={15}
+                    />
+                </div>
+
+                {/* Route Optimization Buttons - Only show if stops exist */}
+                {stops.length > 0 && originCoords && destCoords && (
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
+                        <h4 className="text-sm font-semibold text-indigo-900 dark:text-indigo-300 mb-3">
+                            Route Optimization
+                        </h4>
+                        <p className="text-xs text-indigo-700 dark:text-indigo-400 mb-3">
+                            Optimize your route to find the best delivery sequence. Choose between free nearest-neighbor or Google's advanced optimization.
+                        </p>
+
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={handleOptimizeNearestNeighbor}
+                                disabled={optimizing || stops.length === 0}
+                                className="flex-1 px-4 py-2 bg-white dark:bg-slate-700 border-2 border-indigo-300 dark:border-indigo-600 text-indigo-700 dark:text-indigo-300 rounded-lg font-medium hover:bg-indigo-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {optimizing && optimizationMethod !== 'google' ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Optimizing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                        Quick Optimize (Free)
+                                    </>
+                                )}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleOptimizeGoogle}
+                                disabled={optimizing || stops.length === 0}
+                                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {optimizing && optimizationMethod === 'google' ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Optimizing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                        </svg>
+                                        Google Optimize
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            💡 Both methods optimize stop order for shortest distance. Google Optimize uses real roads (requires API setup), Quick Optimize uses straight-line calculations.
+                        </p>
+
+                        {/* Optimization Result Display */}
+                        {optimizationResult && (
+                            <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                <div className="flex items-start gap-2">
+                                    <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-green-900 dark:text-green-300">
+                                            Route Optimized!
+                                        </p>
+                                        <div className="mt-1 text-xs text-green-700 dark:text-green-400 space-y-1">
+                                            <p>Method: <span className="font-medium">{optimizationResult.method}</span></p>
+                                            <p>Total Distance: <span className="font-medium">{optimizationResult.totalDistanceKm} km</span></p>
+                                            <p>Estimated Time: <span className="font-medium">{Math.floor(optimizationResult.totalDurationMinutes / 60)}h {optimizationResult.totalDurationMinutes % 60}m</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Map Visualization */}
+                        {optimizationResult && stops.length > 0 && originCoords && destCoords && (
+                            <div className="mt-4">
+                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                    Route Visualization
+                                </h4>
+                                <RouteMap
+                                    origin={originCoords}
+                                    destination={destCoords}
+                                    stops={stops}
+                                    height="350px"
+                                />
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                    🗺️ Map shows optimized route. Green (A) = Origin, Red (B) = Destination, Blue = Stops (in sequence)
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <InputField
                     label="Route Rate (₦)"
                     id="rate"
