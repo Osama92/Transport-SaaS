@@ -83,7 +83,7 @@ const VehicleDetailsScreen: React.FC<VehicleDetailsScreenProps> = ({ vehicle, on
                                 </tr>
                             </thead>
                             <tbody>
-                                {vehicle.maintenanceLogs.map(log => (
+                                {vehicle.maintenanceLogs?.map(log => (
                                     <tr key={log.id} className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                         <td className="py-3 px-4 text-gray-600 dark:text-gray-300">{new Date(log.date).toLocaleDateString()}</td>
                                         <td className="py-3 px-4"><span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded dark:bg-slate-700 dark:text-slate-300">{log.type}</span></td>
@@ -91,7 +91,7 @@ const VehicleDetailsScreen: React.FC<VehicleDetailsScreenProps> = ({ vehicle, on
                                         <td className="py-3 px-4 text-gray-600 dark:text-gray-300 font-medium">${log.cost.toFixed(2)}</td>
                                     </tr>
                                 ))}
-                                {vehicle.maintenanceLogs.length === 0 && (
+                                {(!vehicle.maintenanceLogs || vehicle.maintenanceLogs.length === 0) && (
                                     <tr><td colSpan={4} className="text-center py-8 text-gray-500 dark:text-gray-400">No maintenance logs found.</td></tr>
                                 )}
                             </tbody>
@@ -112,7 +112,7 @@ const VehicleDetailsScreen: React.FC<VehicleDetailsScreenProps> = ({ vehicle, on
                                 </tr>
                             </thead>
                             <tbody>
-                                {vehicle.documents.map(doc => (
+                                {vehicle.documents?.map(doc => (
                                      <tr key={doc.id} className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                         <td className="py-3 px-4">
                                             <p className="font-semibold text-gray-800 dark:text-gray-100">{doc.name}</p>
@@ -127,7 +127,7 @@ const VehicleDetailsScreen: React.FC<VehicleDetailsScreenProps> = ({ vehicle, on
                                         </td>
                                      </tr>
                                 ))}
-                                {vehicle.documents.length === 0 && (
+                                {(!vehicle.documents || vehicle.documents.length === 0) && (
                                     <tr><td colSpan={3} className="text-center py-8 text-gray-500 dark:text-gray-400">No documents uploaded.</td></tr>
                                 )}
                             </tbody>
