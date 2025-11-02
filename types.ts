@@ -800,3 +800,44 @@ export interface SyncJob extends FirestoreDocument {
     completedAt?: string;
     nextRetryAt?: string;
 }
+
+// Pre-Trip Safety Inspection Types
+export type InspectionItemStatus = 'good' | 'fair' | 'poor' | 'missing' | 'not_applicable';
+
+export interface InspectionItem {
+    id: string;
+    category: string;
+    question: string;
+    status: InspectionItemStatus;
+    notes?: string;
+    photoUrl?: string;
+    required: boolean;
+}
+
+export interface SafetyInspection extends FirestoreDocument {
+    id: string;
+    routeId: string;
+    driverId: string;
+    vehicleId: string;
+    organizationId: string;
+    inspectionDate: string;
+    items: InspectionItem[];
+    overallScore: number; // 0-100
+    isPerfect: boolean; // All items marked as 'good'
+    hasCriticalIssues: boolean; // Any items marked as 'poor' or 'missing'
+    completedAt: string;
+    timeToComplete: number; // seconds
+}
+
+export interface SafetyScore {
+    driverId: string;
+    organizationId: string;
+    totalInspections: number;
+    perfectInspections: number;
+    score: number; // 0-100
+    currentStreak: number; // consecutive perfect inspections
+    longestStreak: number;
+    lastInspectionDate?: string;
+    incidents: number; // number of incidents/accidents
+    updatedAt: string;
+}

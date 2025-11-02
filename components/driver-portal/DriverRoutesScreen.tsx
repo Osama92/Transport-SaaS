@@ -12,6 +12,13 @@ import { storage } from '../../firebase/firebaseConfig';
 import ProofOfDeliveryModal from './ProofOfDeliveryModal';
 import DriverRouteNavigationScreen from '../driver/DriverRouteNavigationScreen';
 import ViewPODsScreen from './ViewPODsScreen';
+import PreTripSafetyQuiz from './PreTripSafetyQuiz';
+import type { SafetyInspection } from '../../types';
+import {
+  createSafetyInspection,
+  updateDriverSafetyScore,
+  createMaintenanceAlerts,
+} from '../../services/firestore/safetyInspections';
 
 interface DriverRoutesScreenProps {
   driver: Driver;
@@ -25,6 +32,8 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
   const [showPODModal, setShowPODModal] = useState(false);
   const [navigatingRoute, setNavigatingRoute] = useState<Route | null>(null);
   const [viewingPODsRoute, setViewingPODsRoute] = useState<Route | null>(null);
+  const [showSafetyQuiz, setShowSafetyQuiz] = useState(false);
+  const [routeToStart, setRouteToStart] = useState<Route | null>(null);
 
   useEffect(() => {
     loadRoutes();
@@ -74,39 +83,74 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
     }
   };
 
-  const handleStartRoute = async (route: Route) => {
+  const handleStartRoute = (route: Route) => {
+    // Show safety quiz before starting route
+    setRouteToStart(route);
+    setShowSafetyQuiz(true);
+  };
+
+  const handleSafetyQuizComplete = async (inspection: SafetyInspection) => {
+    if (!routeToStart) return;
+
     try {
-      const routeRef = doc(db, 'routes', route.id);
+      // Save inspection to Firestore using service function
+      const inspectionId = await createSafetyInspection(inspection);
+
+      // Update driver safety score
+      await updateDriverSafetyScore(driver.id, driver.organizationId, inspection);
+
+      // Create maintenance alerts if there are critical issues
+      const vehicleId = (routeToStart as any).assignedVehicleId || routeToStart.vehicleId;
+      if (inspection.hasCriticalIssues && vehicleId) {
+        await createMaintenanceAlerts(
+          { ...inspection, id: inspectionId },
+          vehicleId
+        );
+      }
+
+      // Update route status
+      const routeRef = doc(db, 'routes', routeToStart.id);
       await updateDoc(routeRef, {
         status: 'In Progress',
+        preTripInspectionId: inspectionId,
         updatedAt: serverTimestamp(),
       });
 
       // Update driver status
       const driverRef = doc(db, 'drivers', driver.id);
       await updateDoc(driverRef, {
-        currentRouteId: route.id,
+        currentRouteId: routeToStart.id,
         currentRouteStatus: 'In Progress',
         status: 'On-route',
         updatedAt: serverTimestamp(),
       });
 
       // Update vehicle status
-      const vehicleId = (route as any).assignedVehicleId || route.vehicleId;
       if (vehicleId) {
         const vehicleRef = doc(db, 'vehicles', vehicleId);
         await updateDoc(vehicleRef, {
-          currentRouteId: route.id,
+          currentRouteId: routeToStart.id,
           currentRouteStatus: 'In Progress',
           status: 'On the Move',
           updatedAt: serverTimestamp(),
         });
       }
 
-      alert('Route started successfully! 🚀');
+      setShowSafetyQuiz(false);
+      setRouteToStart(null);
+
+      // Show different messages based on inspection results
+      if (inspection.isPerfect) {
+        alert('🌟 Perfect inspection! All systems green. Route started successfully! 🚀');
+      } else if (inspection.hasCriticalIssues) {
+        alert('⚠️ Safety inspection completed with critical issues. Maintenance alerts created. Route started. Please address issues ASAP!');
+      } else {
+        alert('✅ Safety inspection completed! Route started successfully! 🚀');
+      }
+
       loadRoutes();
     } catch (error) {
-      console.error('Error starting route:', error);
+      console.error('Error completing safety inspection and starting route:', error);
       alert('Failed to start route. Please try again.');
     }
   };
@@ -609,6 +653,20 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
             setSelectedRoute(null);
           }}
           onSubmit={handlePODSubmit}
+        />
+      )}
+
+      {/* Pre-Trip Safety Quiz Modal */}
+      {showSafetyQuiz && routeToStart && (
+        <PreTripSafetyQuiz
+          route={routeToStart}
+          driver={driver}
+          vehicleId={(routeToStart as any).assignedVehicleId || routeToStart.vehicleId || ''}
+          onComplete={handleSafetyQuizComplete}
+          onCancel={() => {
+            setShowSafetyQuiz(false);
+            setRouteToStart(null);
+          }}
         />
       )}
     </div>
