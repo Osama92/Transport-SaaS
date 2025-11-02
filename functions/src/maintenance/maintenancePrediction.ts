@@ -89,8 +89,11 @@ const formatVehicleData = (vehicle: VehicleData, maintenanceLogs: MaintenanceLog
 
 /**
  * Cloud Function: Predict Vehicle Maintenance
+ * Note: onCall functions automatically handle CORS
  */
-export const predictVehicleMaintenance = functions.https.onCall(async (data, context) => {
+export const predictVehicleMaintenance = functions
+  .region('us-central1')
+  .https.onCall(async (data, context) => {
   // Verify authentication
   if (!context.auth) {
     throw new functions.https.HttpsError(
