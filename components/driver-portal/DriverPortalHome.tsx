@@ -169,6 +169,7 @@ const DriverPortalHome: React.FC<DriverPortalHomeProps> = ({ driver, onNavigate 
           icon="📦"
           trend={kpis?.completionRate}
           trendLabel="Completion Rate"
+          onClick={() => onNavigate('routes')}
         />
         <KPICard
           title="Distance Covered"
