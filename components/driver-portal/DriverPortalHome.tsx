@@ -95,7 +95,13 @@ const DriverPortalHome: React.FC<DriverPortalHomeProps> = ({ driver, onNavigate 
       };
 
       setKpis(metrics);
-      setHasPendingRoutes(pendingRoutes.length > 0);
+      const hasPending = pendingRoutes.length > 0;
+      setHasPendingRoutes(hasPending);
+      console.log('[DRIVER HOME] Pending routes check:', {
+        pendingCount: pendingRoutes.length,
+        hasPending,
+        totalRoutes: routes.length
+      });
     } catch (error) {
       console.error('Error loading KPIs:', error);
     }

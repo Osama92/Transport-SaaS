@@ -174,20 +174,20 @@ const PreTripSafetyQuiz: React.FC<PreTripSafetyQuizProps> = ({ vehicleName, onCo
     const hasCriticalIssues = Array.from(responses.values()).some(r => r.status === 'poor' || r.status === 'missing');
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-2 sm:p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h2 className="text-2xl font-bold">Pre-Trip Safety Check</h2>
-                            <p className="text-indigo-100 text-sm mt-1">Vehicle: {vehicleName}</p>
+                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 sm:p-6 text-white">
+                    <div className="flex items-center justify-between mb-3 sm:mb-4">
+                        <div className="flex-1 min-w-0 mr-2">
+                            <h2 className="text-lg sm:text-2xl font-bold truncate">Pre-Trip Safety Check</h2>
+                            <p className="text-indigo-100 text-xs sm:text-sm mt-1 truncate">Vehicle: {vehicleName}</p>
                         </div>
                         <button
                             onClick={onCancel}
-                            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+                            className="flex-shrink-0 text-white hover:bg-white/20 rounded-full p-1.5 sm:p-2 transition-colors"
                         >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
@@ -209,62 +209,63 @@ const PreTripSafetyQuiz: React.FC<PreTripSafetyQuizProps> = ({ vehicleName, onCo
                 </div>
 
                 {/* Category Tabs */}
-                <div className="flex overflow-x-auto border-b dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+                <div className="flex overflow-x-auto border-b dark:border-slate-700 bg-gray-50 dark:bg-slate-900 scrollbar-hide">
                     {CHECKLIST_CATEGORIES.map((category, index) => {
                         const categoryCompleted = category.items.every(item => responses.has(item.id));
                         return (
                             <button
                                 key={index}
                                 onClick={() => setCurrentCategoryIndex(index)}
-                                className={`flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors ${
+                                className={`flex-shrink-0 px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                                     currentCategoryIndex === index
                                         ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600'
                                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                                 }`}
                             >
-                                <span className="mr-2">{category.icon}</span>
-                                {category.name}
-                                {categoryCompleted && <span className="ml-2">✓</span>}
+                                <span className="mr-1 sm:mr-2">{category.icon}</span>
+                                <span className="hidden sm:inline">{category.name}</span>
+                                <span className="sm:hidden">{category.name.split(' ')[0]}</span>
+                                {categoryCompleted && <span className="ml-1 sm:ml-2">✓</span>}
                             </button>
                         );
                     })}
                 </div>
 
                 {/* Questions List */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4">
                     {currentCategory.items.map((item) => {
                         const response = responses.get(item.id);
                         return (
                             <div
                                 key={item.id}
-                                className="border dark:border-slate-700 rounded-xl p-4 bg-gray-50 dark:bg-slate-900"
+                                className="border dark:border-slate-700 rounded-xl p-3 sm:p-4 bg-gray-50 dark:bg-slate-900"
                             >
-                                <div className="flex items-start justify-between mb-3">
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-900 dark:text-white">
+                                <div className="flex items-start justify-between mb-2 sm:mb-3">
+                                    <div className="flex-1 min-w-0 pr-2">
+                                        <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base leading-tight">
                                             {item.question}
                                             {item.required && <span className="text-red-500 ml-1">*</span>}
                                         </p>
                                         {response?.notes && (
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 italic">
+                                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 italic break-words">
                                                 Note: {response.notes}
                                             </p>
                                         )}
                                     </div>
                                     {response && (
-                                        <span className="text-2xl ml-3">{getStatusEmoji(response.status)}</span>
+                                        <span className="text-xl sm:text-2xl flex-shrink-0">{getStatusEmoji(response.status)}</span>
                                     )}
                                 </div>
 
                                 {/* Status Buttons */}
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                                     {['good', 'fair', 'poor', 'missing'].map((status) => (
                                         <button
                                             key={status}
                                             onClick={() => handleResponse(item.id, status as InspectionItemStatus)}
-                                            className={`py-2 px-3 rounded-lg text-white text-sm font-medium transition-all ${
+                                            className={`py-1.5 sm:py-2 px-1 sm:px-3 rounded-lg text-white text-xs sm:text-sm font-medium transition-all ${
                                                 response?.status === status
-                                                    ? getStatusColor(status as InspectionItemStatus) + ' ring-2 ring-offset-2 ring-indigo-500'
+                                                    ? getStatusColor(status as InspectionItemStatus) + ' ring-2 ring-offset-1 ring-indigo-500'
                                                     : 'bg-gray-300 hover:bg-gray-400 dark:bg-slate-700 dark:hover:bg-slate-600'
                                             }`}
                                         >
@@ -288,22 +289,24 @@ const PreTripSafetyQuiz: React.FC<PreTripSafetyQuizProps> = ({ vehicleName, onCo
                 </div>
 
                 {/* Footer */}
-                <div className="border-t dark:border-slate-700 p-4 bg-gray-50 dark:bg-slate-900">
-                    <div className="flex items-center justify-between">
-                        <div className="flex gap-2">
+                <div className="border-t dark:border-slate-700 p-2 sm:p-4 bg-gray-50 dark:bg-slate-900">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
+                        <div className="flex gap-2 order-2 sm:order-1">
                             <button
                                 onClick={() => setCurrentCategoryIndex(Math.max(0, currentCategoryIndex - 1))}
                                 disabled={currentCategoryIndex === 0}
-                                className="px-4 py-2 bg-gray-300 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-300 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                ← Previous
+                                <span className="hidden sm:inline">← Previous</span>
+                                <span className="sm:hidden">←</span>
                             </button>
                             {currentCategoryIndex < CHECKLIST_CATEGORIES.length - 1 && (
                                 <button
                                     onClick={() => setCurrentCategoryIndex(currentCategoryIndex + 1)}
-                                    className="px-4 py-2 bg-gray-300 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium"
+                                    className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-300 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm"
                                 >
-                                    Next →
+                                    <span className="hidden sm:inline">Next →</span>
+                                    <span className="sm:hidden">→</span>
                                 </button>
                             )}
                         </div>
@@ -311,7 +314,7 @@ const PreTripSafetyQuiz: React.FC<PreTripSafetyQuizProps> = ({ vehicleName, onCo
                         <button
                             onClick={handleSubmit}
                             disabled={!canSubmit}
-                            className={`px-6 py-2 rounded-lg font-bold transition-all ${
+                            className={`px-4 sm:px-6 py-2 rounded-lg font-bold text-sm sm:text-base transition-all order-1 sm:order-2 ${
                                 canSubmit
                                     ? hasCriticalIssues
                                         ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
