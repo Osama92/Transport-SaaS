@@ -17,6 +17,7 @@ const DriverPortalHome: React.FC<DriverPortalHomeProps> = ({ driver, onNavigate 
   const [kpis, setKpis] = useState<DriverKPIMetrics | null>(null);
   const [recentRoutes, setRecentRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasPendingRoutes, setHasPendingRoutes] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -94,6 +95,7 @@ const DriverPortalHome: React.FC<DriverPortalHomeProps> = ({ driver, onNavigate 
       };
 
       setKpis(metrics);
+      setHasPendingRoutes(pendingRoutes.length > 0);
     } catch (error) {
       console.error('Error loading KPIs:', error);
     }
@@ -170,6 +172,8 @@ const DriverPortalHome: React.FC<DriverPortalHomeProps> = ({ driver, onNavigate 
           trend={kpis?.completionRate}
           trendLabel="Completion Rate"
           onClick={() => onNavigate('routes')}
+          showBadge={hasPendingRoutes}
+          badgeText={`${kpis?.pendingRoutes || 0} New`}
         />
         <KPICard
           title="Distance Covered"
@@ -302,13 +306,27 @@ const KPICard: React.FC<{
   trend?: number;
   trendLabel?: string;
   onClick?: () => void;
-}> = ({ title, value, subtitle, icon, trend, trendLabel, onClick }) => (
+  showBadge?: boolean;
+  badgeText?: string;
+}> = ({ title, value, subtitle, icon, trend, trendLabel, onClick, showBadge, badgeText }) => (
   <div
-    className={`bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 ${
+    className={`relative bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 ${
       onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''
     }`}
     onClick={onClick}
   >
+    {/* Pulsing Badge */}
+    {showBadge && badgeText && (
+      <div className="absolute -top-2 -right-2 z-10">
+        <span className="relative flex h-6 w-auto px-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-6 px-3 bg-indigo-600 text-white text-xs font-bold items-center justify-center">
+            {badgeText}
+          </span>
+        </span>
+      </div>
+    )}
+
     <div className="flex items-center justify-between mb-3">
       <span className="text-2xl">{icon}</span>
       {trend !== undefined && (

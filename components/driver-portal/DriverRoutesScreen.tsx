@@ -599,15 +599,17 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-3">
-                {route.status === 'Pending' && (
+                {/* Show Start Route for Pending OR In Progress without safety inspection */}
+                {(route.status === 'Pending' || (route.status === 'In Progress' && !(route as any).preTripInspectionId)) && (
                   <button
                     onClick={() => handleStartRoute(route)}
                     className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-sm md:text-base"
                   >
-                    Start Route 🚀
+                    {route.status === 'In Progress' ? 'Complete Safety Check 🛡️' : 'Start Route 🚀'}
                   </button>
                 )}
-                {route.status === 'In Progress' && Array.isArray(route.stops) && route.stops.length > 0 && (
+                {/* Only show Navigate Stops if In Progress AND has completed safety inspection */}
+                {route.status === 'In Progress' && (route as any).preTripInspectionId && Array.isArray(route.stops) && route.stops.length > 0 && (
                   <button
                     onClick={() => handleNavigateRoute(route)}
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm md:text-base"
