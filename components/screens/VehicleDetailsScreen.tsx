@@ -10,6 +10,7 @@ import {
     SparklesIcon,
 } from '../Icons';
 import { getAIMaintenancePredictions } from '../../services/ai/openAIMaintenancePredictor';
+import { predictVehicleMaintenance } from '../../services/ai/maintenancePrediction';
 import type { MaintenancePrediction } from '../../services/ai/maintenancePrediction';
 
 interface VehicleDetailsScreenProps {
@@ -47,15 +48,41 @@ const VehicleDetailsScreen: React.FC<VehicleDetailsScreenProps> = ({ vehicle, on
         const fetchPredictions = async () => {
             setLoadingPredictions(true);
             try {
-                const analysis = await getAIMaintenancePredictions(
-                    vehicle,
-                    vehicle.maintenanceLogs || []
-                );
-                setAiPredictions(analysis.predictions);
-                setHealthScore(analysis.healthScore);
-                setAiInsights([...analysis.insights, ...analysis.recommendations]);
+                // Try OpenAI-powered predictions first
+                const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY;
+
+                if (hasOpenAIKey) {
+                    const analysis = await getAIMaintenancePredictions(
+                        vehicle,
+                        vehicle.maintenanceLogs || []
+                    );
+                    setAiPredictions(analysis.predictions);
+                    setHealthScore(analysis.healthScore);
+                    setAiInsights([...analysis.insights, ...analysis.recommendations]);
+                } else {
+                    // Fallback to standard prediction logic
+                    const schedule = predictVehicleMaintenance(
+                        vehicle,
+                        vehicle.maintenanceLogs || []
+                    );
+                    setAiPredictions(schedule.predictions);
+                    setHealthScore(schedule.healthScore);
+                    setAiInsights(schedule.alerts);
+                }
             } catch (error) {
                 console.error('Error fetching AI predictions:', error);
+                // Fallback to standard prediction if AI fails
+                try {
+                    const schedule = predictVehicleMaintenance(
+                        vehicle,
+                        vehicle.maintenanceLogs || []
+                    );
+                    setAiPredictions(schedule.predictions);
+                    setHealthScore(schedule.healthScore);
+                    setAiInsights(schedule.alerts);
+                } catch (fallbackError) {
+                    console.error('Error with fallback predictions:', fallbackError);
+                }
             } finally {
                 setLoadingPredictions(false);
             }
