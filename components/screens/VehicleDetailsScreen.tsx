@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Vehicle } from '../../types';
-import { 
-    ArrowLeftIcon, 
-    PencilIcon, 
-    WrenchScrewdriverIcon, 
+import {
+    ArrowLeftIcon,
+    PencilIcon,
+    WrenchScrewdriverIcon,
     DocumentArrowUpIcon,
     EyeIcon,
     TrashIcon,
+    SparklesIcon,
 } from '../Icons';
+import { getAIMaintenancePredictions } from '../../services/ai/openAIMaintenancePredictor';
+import type { MaintenancePrediction } from '../../services/ai/maintenancePrediction';
 
 interface VehicleDetailsScreenProps {
     vehicle: Vehicle;
@@ -34,6 +37,52 @@ const StatusBadge: React.FC<{ status: Vehicle['status'] }> = ({ status }) => {
 };
 
 const VehicleDetailsScreen: React.FC<VehicleDetailsScreenProps> = ({ vehicle, onBack, onUpdateStatus, onAddLog, onAddDocument }) => {
+    const [aiPredictions, setAiPredictions] = useState<MaintenancePrediction[]>([]);
+    const [healthScore, setHealthScore] = useState<number>(100);
+    const [loadingPredictions, setLoadingPredictions] = useState<boolean>(false);
+    const [aiInsights, setAiInsights] = useState<string[]>([]);
+
+    // Fetch AI predictions on mount
+    useEffect(() => {
+        const fetchPredictions = async () => {
+            setLoadingPredictions(true);
+            try {
+                const analysis = await getAIMaintenancePredictions(
+                    vehicle,
+                    vehicle.maintenanceLogs || []
+                );
+                setAiPredictions(analysis.predictions);
+                setHealthScore(analysis.healthScore);
+                setAiInsights([...analysis.insights, ...analysis.recommendations]);
+            } catch (error) {
+                console.error('Error fetching AI predictions:', error);
+            } finally {
+                setLoadingPredictions(false);
+            }
+        };
+
+        fetchPredictions();
+    }, [vehicle]);
+
+    const getUrgencyBadgeColor = (urgency: string) => {
+        switch (urgency) {
+            case 'overdue':
+                return 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300';
+            case 'urgent':
+                return 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300';
+            case 'soon':
+                return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300';
+            default:
+                return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300';
+        }
+    };
+
+    const getHealthScoreColor = (score: number) => {
+        if (score >= 80) return 'text-green-600 dark:text-green-400';
+        if (score >= 60) return 'text-yellow-600 dark:text-yellow-400';
+        return 'text-red-600 dark:text-red-400';
+    };
+
     return (
         <div className="flex flex-col gap-8">
             {/* Header */}
@@ -62,12 +111,80 @@ const VehicleDetailsScreen: React.FC<VehicleDetailsScreenProps> = ({ vehicle, on
 
             {/* Vehicle Info Card */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm grid grid-cols-2 md:grid-cols-4 gap-6">
-                <Stat label="Odometer" value={vehicle.odometer ? `${vehicle.odometer.toLocaleString()} km` : 'N/A'} />
+                <Stat label="Odometer" value={vehicle.telematics?.odometer ? `${vehicle.telematics.odometer.toLocaleString()} km` : (vehicle.odometer ? `${vehicle.odometer.toLocaleString()} km` : 'N/A')} />
                 <Stat label="VIN" value={vehicle.vin || 'N/A'} />
-                <Stat label="Last Service" value={vehicle.lastServiceDate ? new Date(vehicle.lastServiceDate).toLocaleDateString() : 'N/A'} />
-                <Stat label="Next Service Due" value={vehicle.nextServiceDate ? new Date(vehicle.nextServiceDate).toLocaleDateString() : 'N/A'} />
+                <Stat label="Last Service" value={vehicle.maintenance?.lastServiceDate ? new Date(vehicle.maintenance.lastServiceDate).toLocaleDateString() : (vehicle.lastServiceDate ? new Date(vehicle.lastServiceDate).toLocaleDateString() : 'N/A')} />
+                <Stat label="Next Service Due" value={vehicle.maintenance?.nextServiceDate ? new Date(vehicle.maintenance.nextServiceDate).toLocaleDateString() : (vehicle.nextServiceDate ? new Date(vehicle.nextServiceDate).toLocaleDateString() : 'N/A')} />
             </div>
-            
+
+            {/* AI-Powered Maintenance Predictions */}
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 p-6 rounded-xl shadow-sm border border-indigo-100 dark:border-indigo-900">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <SparklesIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">AI Maintenance Predictions</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Health Score:</span>
+                        <span className={`text-2xl font-bold ${getHealthScoreColor(healthScore)}`}>{healthScore}/100</span>
+                    </div>
+                </div>
+
+                {loadingPredictions ? (
+                    <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <span className="ml-3 text-gray-600 dark:text-gray-400">Analyzing vehicle data...</span>
+                    </div>
+                ) : (
+                    <>
+                        {/* AI Insights */}
+                        {aiInsights.length > 0 && (
+                            <div className="mb-4 p-4 bg-white/50 dark:bg-slate-800/50 rounded-lg">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">💡 AI Insights</h4>
+                                <ul className="space-y-1">
+                                    {aiInsights.map((insight, index) => (
+                                        <li key={index} className="text-sm text-gray-600 dark:text-gray-400 pl-4 before:content-['•'] before:mr-2">
+                                            {insight}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Predictions List */}
+                        {aiPredictions.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {aiPredictions.map((prediction, index) => (
+                                    <div key={index} className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                                        <div className="flex items-start justify-between mb-2">
+                                            <h4 className="font-semibold text-gray-800 dark:text-gray-100">{prediction.type}</h4>
+                                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${getUrgencyBadgeColor(prediction.urgency)}`}>
+                                                {prediction.urgency.toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{prediction.reason}</p>
+                                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                            <span>Due: {new Date(prediction.recommendedDate).toLocaleDateString()}</span>
+                                            <span>₦{prediction.estimatedCost.min.toLocaleString()} - ₦{prediction.estimatedCost.max.toLocaleString()}</span>
+                                        </div>
+                                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-gray-500 dark:text-gray-400">{prediction.kmUntilDue > 0 ? `${prediction.kmUntilDue.toLocaleString()} km` : 'Overdue'}</span>
+                                                <span className="text-gray-500 dark:text-gray-400">{prediction.daysUntilDue > 0 ? `${prediction.daysUntilDue} days` : 'Overdue'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8">
+                                <p className="text-gray-600 dark:text-gray-400">✅ No immediate maintenance required. Your vehicle is in good condition!</p>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Maintenance History */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm h-full">
