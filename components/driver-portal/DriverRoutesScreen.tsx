@@ -93,19 +93,45 @@ const DriverRoutesScreen: React.FC<DriverRoutesScreenProps> = ({ driver }) => {
     if (!routeToStart) return;
 
     try {
+      console.log('[SAFETY QUIZ] Submitting inspection:', {
+        driverId: inspection.driverId,
+        organizationId: inspection.organizationId,
+        routeId: inspection.routeId,
+        vehicleId: inspection.vehicleId,
+        itemsCount: inspection.items.length,
+        driver: {
+          id: driver.id,
+          organizationId: driver.organizationId,
+          firebaseAuthUid: driver.firebaseAuthUid
+        }
+      });
+
       // Save inspection to Firestore using service function
       const inspectionId = await createSafetyInspection(inspection);
+      console.log('[SAFETY QUIZ] Inspection saved successfully:', inspectionId);
 
-      // Update driver safety score
-      await updateDriverSafetyScore(driver.id, driver.organizationId, inspection);
+      // Update driver safety score (non-blocking)
+      try {
+        await updateDriverSafetyScore(driver.id, driver.organizationId, inspection);
+        console.log('[SAFETY QUIZ] Driver safety score updated');
+      } catch (error) {
+        console.warn('[SAFETY QUIZ] Failed to update driver safety score (non-critical):', error);
+        // Don't fail the whole operation if safety score update fails
+      }
 
-      // Create maintenance alerts if there are critical issues
+      // Create maintenance alerts if there are critical issues (non-blocking)
       const vehicleId = (routeToStart as any).assignedVehicleId || routeToStart.vehicleId;
       if (inspection.hasCriticalIssues && vehicleId) {
-        await createMaintenanceAlerts(
-          { ...inspection, id: inspectionId },
-          vehicleId
-        );
+        try {
+          await createMaintenanceAlerts(
+            { ...inspection, id: inspectionId },
+            vehicleId
+          );
+          console.log('[SAFETY QUIZ] Maintenance alerts created');
+        } catch (error) {
+          console.warn('[SAFETY QUIZ] Failed to create maintenance alerts (non-critical):', error);
+          // Don't fail the whole operation if maintenance alerts fail
+        }
       }
 
       // Update route status

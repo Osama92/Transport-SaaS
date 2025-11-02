@@ -5,11 +5,13 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { InspectionItem, InspectionItemStatus } from '../../types';
+import { InspectionItem, InspectionItemStatus, SafetyInspection, Route, Driver } from '../../types';
 
 interface PreTripSafetyQuizProps {
-    vehicleName: string;
-    onComplete: (items: InspectionItem[], timeToComplete: number) => void;
+    route: Route;
+    driver: Driver;
+    vehicleId: string;
+    onComplete: (inspection: SafetyInspection) => void;
     onCancel: () => void;
 }
 
@@ -95,7 +97,7 @@ const CHECKLIST_CATEGORIES: ChecklistCategory[] = [
     },
 ];
 
-const PreTripSafetyQuiz: React.FC<PreTripSafetyQuizProps> = ({ vehicleName, onComplete, onCancel }) => {
+const PreTripSafetyQuiz: React.FC<PreTripSafetyQuizProps> = ({ route, driver, vehicleId, onComplete, onCancel }) => {
     const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
     const [responses, setResponses] = useState<Map<string, { status: InspectionItemStatus; notes?: string }>>(new Map());
     const [showNotes, setShowNotes] = useState<string | null>(null);
@@ -147,7 +149,37 @@ const PreTripSafetyQuiz: React.FC<PreTripSafetyQuizProps> = ({ vehicleName, onCo
             })
         );
 
-        onComplete(inspectionItems, timeToComplete);
+        // Calculate scores
+        const totalResponses = inspectionItems.filter(item => item.status !== 'not_applicable').length;
+        const goodResponses = inspectionItems.filter(item => item.status === 'good').length;
+        const criticalIssues = inspectionItems.filter(item =>
+            item.required && (item.status === 'poor' || item.status === 'missing')
+        );
+
+        const overallScore = totalResponses > 0 ? Math.round((goodResponses / totalResponses) * 100) : 0;
+        const isPerfect = inspectionItems.every(item => item.status === 'good' || item.status === 'not_applicable');
+        const hasCriticalIssues = criticalIssues.length > 0;
+
+        // Construct full SafetyInspection object
+        const inspection: SafetyInspection = {
+            id: '', // Will be set by Firestore
+            routeId: route.id,
+            driverId: driver.id,
+            vehicleId: vehicleId,
+            organizationId: driver.organizationId,
+            inspectionDate: new Date().toISOString(),
+            items: inspectionItems,
+            overallScore,
+            isPerfect,
+            hasCriticalIssues,
+            completedAt: new Date().toISOString(),
+            timeToComplete,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            createdBy: driver.firebaseAuthUid || driver.id,
+        };
+
+        onComplete(inspection);
     };
 
     const getStatusColor = (status: InspectionItemStatus) => {
@@ -181,7 +213,7 @@ const PreTripSafetyQuiz: React.FC<PreTripSafetyQuizProps> = ({ vehicleName, onCo
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
                         <div className="flex-1 min-w-0 mr-2">
                             <h2 className="text-lg sm:text-2xl font-bold truncate">Pre-Trip Safety Check</h2>
-                            <p className="text-indigo-100 text-xs sm:text-sm mt-1 truncate">Vehicle: {vehicleName}</p>
+                            <p className="text-indigo-100 text-xs sm:text-sm mt-1 truncate">Route: {route.routeName || route.id}</p>
                         </div>
                         <button
                             onClick={onCancel}
