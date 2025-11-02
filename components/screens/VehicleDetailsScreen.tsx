@@ -48,30 +48,17 @@ const VehicleDetailsScreen: React.FC<VehicleDetailsScreenProps> = ({ vehicle, on
         const fetchPredictions = async () => {
             setLoadingPredictions(true);
             try {
-                // Try OpenAI-powered predictions first
-                const hasOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY;
-
-                if (hasOpenAIKey) {
-                    const analysis = await getAIMaintenancePredictions(
-                        vehicle,
-                        vehicle.maintenanceLogs || []
-                    );
-                    setAiPredictions(analysis.predictions);
-                    setHealthScore(analysis.healthScore);
-                    setAiInsights([...analysis.insights, ...analysis.recommendations]);
-                } else {
-                    // Fallback to standard prediction logic
-                    const schedule = predictVehicleMaintenance(
-                        vehicle,
-                        vehicle.maintenanceLogs || []
-                    );
-                    setAiPredictions(schedule.predictions);
-                    setHealthScore(schedule.healthScore);
-                    setAiInsights(schedule.alerts);
-                }
+                // Try AI-powered predictions via Cloud Function first
+                const analysis = await getAIMaintenancePredictions(
+                    vehicle,
+                    vehicle.maintenanceLogs || []
+                );
+                setAiPredictions(analysis.predictions);
+                setHealthScore(analysis.healthScore);
+                setAiInsights([...analysis.insights, ...analysis.recommendations]);
             } catch (error) {
                 console.error('Error fetching AI predictions:', error);
-                // Fallback to standard prediction if AI fails
+                // Fallback to standard prediction if Cloud Function fails
                 try {
                     const schedule = predictVehicleMaintenance(
                         vehicle,

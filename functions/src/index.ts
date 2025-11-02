@@ -17,6 +17,9 @@ export { whatsappWebhook } from './whatsapp/webhook';
 // Driver Authentication
 export { createDriverAuth } from './createDriverAuth';
 
+// Maintenance Predictions
+export { predictVehicleMaintenance } from './maintenance/maintenancePrediction';
+
 // Proactive Notifications Engine
 import { NotificationEngine } from './whatsapp/notificationEngine';
 
