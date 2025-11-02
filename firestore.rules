@@ -406,6 +406,41 @@ service cloud.firestore {
       allow delete: if belongsToUserOrg();
     }
 
+    // Safety Inspections collection - organization-scoped + driver create access
+    match /safetyInspections/{inspectionId} {
+      // Helper to check if current user is the driver in the inspection
+      function isInspectionDriver() {
+        return isAuthenticated() &&
+               request.resource.data.driverId != null &&
+               get(/databases/$(database)/documents/drivers/$(request.resource.data.driverId)).data.firebaseAuthUid == request.auth.uid;
+      }
+
+      allow read: if belongsToUserOrg() ||
+                    (isAuthenticated() && resource.data.driverId != null &&
+                     get(/databases/$(database)/documents/drivers/$(resource.data.driverId)).data.firebaseAuthUid == request.auth.uid);
+      // Allow drivers to create their own inspections
+      allow create: if requestBelongsToUserOrg() || isInspectionDriver();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Driver Safety Scores collection - organization-scoped
+    match /driverSafetyScores/{scoreId} {
+      allow read: if belongsToUserOrg() ||
+                    (isAuthenticated() && resource.data.driverId != null &&
+                     get(/databases/$(database)/documents/drivers/$(resource.data.driverId)).data.firebaseAuthUid == request.auth.uid);
+      allow create, update: if requestBelongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
+    // Maintenance Alerts collection - organization-scoped
+    match /maintenanceAlerts/{alertId} {
+      allow read: if belongsToUserOrg();
+      allow create: if requestBelongsToUserOrg();
+      allow update: if belongsToUserOrg();
+      allow delete: if belongsToUserOrg();
+    }
+
     // Default deny all other documents
     match /{document=**} {
       allow read, write: if false;
