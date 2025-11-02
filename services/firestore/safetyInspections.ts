@@ -21,6 +21,32 @@ import { db } from '../../firebase/firebaseConfig';
 import type { SafetyInspection, SafetyScore } from '../../types';
 
 /**
+ * Helper function to remove undefined values from object (Firestore doesn't allow undefined)
+ */
+const cleanFirestoreData = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanFirestoreData(item));
+  }
+
+  if (typeof obj === 'object' && obj.constructor === Object) {
+    const cleaned: any = {};
+    Object.keys(obj).forEach(key => {
+      const value = obj[key];
+      if (value !== undefined) {
+        cleaned[key] = cleanFirestoreData(value);
+      }
+    });
+    return cleaned;
+  }
+
+  return obj;
+};
+
+/**
  * Create a new safety inspection
  */
 export const createSafetyInspection = async (
@@ -28,11 +54,15 @@ export const createSafetyInspection = async (
 ): Promise<string> => {
   try {
     const inspectionsRef = collection(db, 'safetyInspections');
-    const docRef = await addDoc(inspectionsRef, {
+
+    // Clean the data to remove undefined values
+    const cleanedInspection = cleanFirestoreData({
       ...inspection,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    const docRef = await addDoc(inspectionsRef, cleanedInspection);
     return docRef.id;
   } catch (error) {
     console.error('Error creating safety inspection:', error);
