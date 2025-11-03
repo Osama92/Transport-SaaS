@@ -7,6 +7,7 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import type { WhatsAppWebhookEvent, WhatsAppMessage } from './types';
 import { SupplyChainExpert } from './SupplyChainExpert';
+import { getWhatsAppV2User, handleNewUser, handleOnboardingButtonClick, isInOnboarding } from './webhookV2Integration';
 
 // Initialize the supply chain expert
 const supplyChainExpert = new SupplyChainExpert();
@@ -18,10 +19,7 @@ const getDb = () => admin.firestore();
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || functions.config().whatsapp?.token;
 const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || functions.config().whatsapp?.verify_token || 'transport_saas_verify_2024';
 
-// PREMIUM OPTIMIZATION: In-memory cache for user data (10 minute TTL)
-// This avoids repeated Firestore queries for the same user
-const userCache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+// Note: User caching now handled in webhookV2Integration.ts
 
 /**
  * WhatsApp Webhook Handler
@@ -171,35 +169,38 @@ async function processIncomingMessage(
 
     // PREMIUM OPTIMIZATION: Run these in parallel for instant response
     const [whatsappUser] = await Promise.all([
-      getWhatsAppUser(from),  // Fetch user data
+      getWhatsAppV2User(from),  // Fetch user data from V2 system
       markMessageAsRead(messageId, phoneNumberId).catch(err =>
         functions.logger.error('Failed to mark message as read', { error: err.message })
       )  // Mark as read simultaneously
     ]);
 
     if (!whatsappUser) {
-      // User not registered
-      // Check if this is a HELP request or email verification
-      const messageText = message.type === 'text' && message.text ? message.text.body.toLowerCase().trim() : '';
-
-      if (messageText === 'help' || messageText === 'menu') {
-        // Send help message even if not registered
-        const { sendHelpMessage } = await import('./messageProcessor');
-        await sendHelpMessage(from, phoneNumberId);
-        return;
-      }
-
-      // Check if it's an email (for registration)
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (emailRegex.test(messageText)) {
-        // User is trying to register with email
-        await handleEmailVerification(from, messageText, phoneNumberId);
-        return;
-      }
-
-      // Otherwise send onboarding message
-      await sendOnboardingMessage(from, phoneNumberId);
+      // New user or in onboarding - use V2 onboarding system
+      await handleNewUser(from, phoneNumberId, message);
       return;
+    }
+
+    // Check for button clicks during onboarding
+    if (message.type === 'button' && message.button) {
+      const inOnboarding = await isInOnboarding(from);
+      if (inOnboarding) {
+        await handleOnboardingButtonClick(from, message.button.payload, phoneNumberId);
+        return;
+      }
+    }
+
+    // Check for interactive button replies
+    if (message.type === 'interactive' && message.interactive) {
+      const inOnboarding = await isInOnboarding(from);
+      if (inOnboarding) {
+        const buttonId = message.interactive.button_reply?.id ||
+                         message.interactive.list_reply?.id;
+        if (buttonId) {
+          await handleOnboardingButtonClick(from, buttonId, phoneNumberId);
+          return;
+        }
+      }
     }
 
     // Process the message using the Supply Chain Expert AI
@@ -256,7 +257,6 @@ async function processIncomingMessage(
       messageId: message.id,
       from: from,
       duration: `${duration}ms`,
-      cached: userCache.has(from),
       processingTimestamp: new Date().toISOString(),
       success: true
     });
@@ -275,72 +275,9 @@ async function processIncomingMessage(
   }
 }
 
-/**
- * Get WhatsApp user from Firestore (with in-memory caching for speed)
- * PREMIUM OPTIMIZATION: Cache user data for 10 minutes to avoid repeated DB queries
- */
-async function getWhatsAppUser(whatsappNumber: string) {
-  try {
-    // Check cache first
-    const cached = userCache.get(whatsappNumber);
-    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
-      functions.logger.info('User data served from cache', { whatsappNumber });
-      return cached.data;
-    }
+// Old getWhatsAppUser function removed - now using getWhatsAppV2User from webhookV2Integration
 
-    // Cache miss or expired - fetch from Firestore
-    const userDoc = await getDb()
-      .collection('whatsapp_users')
-      .doc(whatsappNumber)
-      .get();
-
-    const userData = userDoc.exists ? userDoc.data() : null;
-
-    // Store in cache (even if null, to avoid repeated lookups for unregistered users)
-    userCache.set(whatsappNumber, {
-      data: userData,
-      timestamp: Date.now()
-    });
-
-    // Clean up old cache entries (keep cache size manageable)
-    if (userCache.size > 1000) {
-      const now = Date.now();
-      for (const [key, value] of userCache.entries()) {
-        if (now - value.timestamp > CACHE_TTL) {
-          userCache.delete(key);
-        }
-      }
-    }
-
-    return userData;
-  } catch (error: any) {
-    functions.logger.error('Error fetching WhatsApp user', {
-      error: error.message,
-      whatsappNumber
-    });
-    return null;
-  }
-}
-
-/**
- * Send onboarding message to new user
- */
-async function sendOnboardingMessage(to: string, phoneNumberId: string): Promise<void> {
-  const message = `Welcome to Amana! 👋
-
-I'm Amana, your trusted AI assistant for transport and logistics operations.
-
-Quick Start:
-• Type "HELP" to see what I can do
-• Share your email to link this WhatsApp number to your account
-
-Already have an account? Just send your email address.
-Example: "john.doe@company.com"
-
-How can I assist you today?`;
-
-  await sendWhatsAppMessage(to, phoneNumberId, { type: 'text', text: message });
-}
+// Old sendOnboardingMessage function removed - now using OnboardingManager from V2
 
 /**
  * Handle location messages
@@ -554,77 +491,7 @@ async function handleMediaMessage(
   }
 }
 
-/**
- * Handle email verification for new user registration
- */
-async function handleEmailVerification(
-  whatsappNumber: string,
-  email: string,
-  phoneNumberId: string
-): Promise<void> {
-  try {
-    // Look up user by email in users collection
-    const usersSnapshot = await getDb()
-      .collection('users')
-      .where('email', '==', email)
-      .limit(1)
-      .get();
-
-    if (usersSnapshot.empty) {
-      await sendWhatsAppMessage(whatsappNumber, phoneNumberId, {
-        type: 'text',
-        text: `❌ No account found with email: ${email}\n\nPlease check your email and try again, or create an account at:\nhttps://your-app-url.com`
-      });
-      return;
-    }
-
-    const userDoc = usersSnapshot.docs[0];
-    const userData = userDoc.data();
-
-    // Get user's organization
-    const organizationId = userData.organizationId;
-
-    if (!organizationId) {
-      await sendWhatsAppMessage(whatsappNumber, phoneNumberId, {
-        type: 'text',
-        text: `⚠️ Your account doesn't have an organization set up yet. Please complete your onboarding at:\nhttps://your-app-url.com`
-      });
-      return;
-    }
-
-    // Register WhatsApp number with user
-    await getDb().collection('whatsapp_users').doc(whatsappNumber).set({
-      whatsappNumber,
-      userId: userDoc.id,
-      organizationId,
-      email,
-      registeredAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastMessageAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    functions.logger.info('WhatsApp user registered', {
-      whatsappNumber,
-      userId: userDoc.id,
-      email
-    });
-
-    await sendWhatsAppMessage(whatsappNumber, phoneNumberId, {
-      type: 'text',
-      text: `✅ Account linked successfully!\n\nWelcome ${userData.displayName || 'back'}! 🎉\n\nYour WhatsApp is now connected to Amana, your trusted transport assistant.\n\nType "HELP" to see what I can do for you! 🚀`
-    });
-  } catch (error: any) {
-    functions.logger.error('Error in handleEmailVerification', {
-      error: error.message,
-      whatsappNumber,
-      email
-    });
-
-    await sendWhatsAppMessage(whatsappNumber, phoneNumberId, {
-      type: 'text',
-      text: '❌ Sorry, something went wrong during verification. Please try again later.'
-    });
-  }
-}
+// Old handleEmailVerification function removed - now using OnboardingManager from V2
 
 /**
  * Handle voice messages with multi-language support
