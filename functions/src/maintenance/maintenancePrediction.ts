@@ -51,9 +51,15 @@ interface MaintenancePrediction {
 }
 
 /**
- * Format vehicle data for OpenAI prompt
+ * Format vehicle data for OpenAI prompt with all available data sources
  */
-const formatVehicleData = (vehicle: VehicleData, maintenanceLogs: MaintenanceLog[]): string => {
+const formatVehicleData = (
+  vehicle: VehicleData,
+  maintenanceLogs: MaintenanceLog[],
+  safetyInspections: any[],
+  fuelLogs: any[],
+  recentRoutes: any[]
+): string => {
   const currentOdometer = vehicle.telematics?.odometer || 0;
   const lastServiceDate = vehicle.maintenance?.lastServiceDate || 'Unknown';
 
@@ -71,6 +77,46 @@ const formatVehicleData = (vehicle: VehicleData, maintenanceLogs: MaintenanceLog
     prompt += `- Average Daily Usage: ${dailyKm} km/day\n`;
   }
 
+  // Add recent routes to show vehicle is actively being used
+  if (recentRoutes.length > 0) {
+    prompt += `\nRecent Route Activity (Last 5 routes):\n`;
+    recentRoutes.forEach((route: any) => {
+      const routeDate = route.createdAt?.toDate?.() || new Date(route.createdAt);
+      prompt += `- ${routeDate.toLocaleDateString()}: ${route.routeName || 'Route'} - Status: ${route.status}\n`;
+    });
+    prompt += `\n⚠️ IMPORTANT: Vehicle is ACTIVELY being used with ${recentRoutes.length} recent routes logged.\n`;
+  }
+
+  // Add fuel logs to show vehicle is being refueled (proves active use)
+  if (fuelLogs.length > 0) {
+    prompt += `\nFuel Logs (Last 10 entries - proves vehicle is in active use):\n`;
+    fuelLogs.forEach((log: any) => {
+      const fuelDate = log.date?.toDate?.() || new Date(log.date);
+      prompt += `- ${fuelDate.toLocaleDateString()}: ${log.liters}L refueled at ${log.odometer?.toLocaleString() || 'N/A'} km (₦${log.cost?.toLocaleString() || 'N/A'})\n`;
+    });
+    prompt += `\n⚠️ IMPORTANT: Vehicle has ${fuelLogs.length} fuel logs, confirming it is actively being driven.\n`;
+  }
+
+  // Add safety inspections (pre-trip checklists from drivers)
+  if (safetyInspections.length > 0) {
+    prompt += `\nDriver Safety Inspections (Pre-trip checklists - Last 5):\n`;
+    safetyInspections.forEach((inspection: any) => {
+      const inspDate = inspection.inspectionDate?.toDate?.() || new Date(inspection.inspectionDate);
+      prompt += `- ${inspDate.toLocaleDateString()}: Score ${inspection.overallScore}/100 - ${inspection.isPerfect ? '✅ Perfect' : inspection.hasCriticalIssues ? '⚠️ Has Issues' : '✓ Good'}\n`;
+
+      if (inspection.hasCriticalIssues && inspection.items) {
+        const criticalItems = inspection.items.filter((item: any) =>
+          item.required && (item.status === 'poor' || item.status === 'missing')
+        );
+        if (criticalItems.length > 0) {
+          prompt += `  Critical issues found: ${criticalItems.map((item: any) => item.question).join(', ')}\n`;
+        }
+      }
+    });
+    prompt += `\n⚠️ Use the latest safety inspection score (${safetyInspections[0]?.overallScore || 'N/A'}/100) as the vehicle health baseline.\n`;
+  }
+
+  // Add maintenance history
   if (maintenanceLogs.length > 0) {
     prompt += `\nMaintenance History (Last 5 entries):\n`;
     const recentLogs = maintenanceLogs
@@ -81,7 +127,7 @@ const formatVehicleData = (vehicle: VehicleData, maintenanceLogs: MaintenanceLog
       prompt += `- ${new Date(log.date).toLocaleDateString()}: ${log.type} - ${log.description} (₦${log.cost.toLocaleString()})\n`;
     });
   } else {
-    prompt += `\nNo maintenance history available.\n`;
+    prompt += `\nNo formal maintenance history recorded in system.\n`;
   }
 
   return prompt;
@@ -142,8 +188,54 @@ export const predictVehicleMaintenance = functions
       ...doc.data(),
     })) as MaintenanceLog[];
 
-    // Format data for OpenAI
-    const vehicleData = formatVehicleData(vehicle, maintenanceLogs);
+    // Fetch recent safety inspections to get actual vehicle usage and condition
+    // Note: We fetch all matching docs and sort in memory to avoid needing composite indexes
+    const safetyInspectionsSnapshot = await db
+      .collection('safetyInspections')
+      .where('vehicleId', '==', vehicleId)
+      .get();
+
+    const safetyInspections = safetyInspectionsSnapshot.docs
+      .map(doc => doc.data())
+      .sort((a: any, b: any) => {
+        const dateA = a.inspectionDate?.toDate?.() || new Date(a.inspectionDate);
+        const dateB = b.inspectionDate?.toDate?.() || new Date(b.inspectionDate);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .slice(0, 5);
+
+    // Fetch recent fuel logs to show vehicle is actively being used
+    const fuelLogsSnapshot = await db
+      .collection('fuelLogs')
+      .where('vehicleId', '==', vehicleId)
+      .get();
+
+    const fuelLogs = fuelLogsSnapshot.docs
+      .map(doc => doc.data())
+      .sort((a: any, b: any) => {
+        const dateA = a.date?.toDate?.() || new Date(a.date);
+        const dateB = b.date?.toDate?.() || new Date(b.date);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .slice(0, 10);
+
+    // Fetch recent routes to show active usage
+    const routesSnapshot = await db
+      .collection('routes')
+      .where('vehicleId', '==', vehicleId)
+      .get();
+
+    const recentRoutes = routesSnapshot.docs
+      .map(doc => doc.data())
+      .sort((a: any, b: any) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt);
+        const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .slice(0, 5);
+
+    // Format data for OpenAI with all available data sources
+    const vehicleData = formatVehicleData(vehicle, maintenanceLogs, safetyInspections, fuelLogs, recentRoutes);
 
     const systemPrompt = `You are an expert automotive maintenance advisor specializing in commercial fleet vehicles in Nigeria.
 Your role is to analyze vehicle data and predict maintenance needs based on:
